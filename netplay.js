@@ -670,6 +670,9 @@
     '.np-fab,.np-card button,.np-gbar button,.np-pad button{font:inherit;color:inherit;cursor:pointer}',
     '.np-fab:focus-visible,.np-card button:focus-visible,.np-gbar button:focus-visible,.np-card input:focus-visible{outline:2px solid var(--np-acc);outline-offset:2px}',
     '.np-fab{position:fixed;z-index:2147483000;font-weight:800;font-size:13px;background:rgba(20,24,38,.82);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:7px 13px;display:flex;align-items:center;gap:7px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}',
+    '.np-fab{transition:opacity .3s}',
+    '.np-fab.idle{opacity:.18}',
+    '.np-fab.idle:hover,.np-fab:focus-visible{opacity:1}',
     '.np-fab .np-dot{width:8px;height:8px;border-radius:50%;background:var(--np-mute)}',
     '.np-fab.on .np-dot{background:var(--np-ok);box-shadow:0 0 0 3px rgba(79,209,139,.25)}',
     '.np-tl{top:calc(env(safe-area-inset-top,0px) + 8px);left:max(12px,env(safe-area-inset-left,0px))}',
@@ -742,6 +745,11 @@
       fab.addEventListener('click', function (e) { e.stopPropagation(); UI.show(); });
       fab.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
       document.body.appendChild(fab);
+      // しばらく操作がないとボタンを薄くして、ゲーム画面のじゃまをしない
+      var idleT = 0;
+      function wake() { fab.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(function () { fab.classList.add('idle'); }, 3000); }
+      ['pointermove', 'pointerdown', 'touchstart'].forEach(function (t) { window.addEventListener(t, wake, { passive: true }); });
+      wake();
       var j = (QS.get('join') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
       if (j.length === 4) this.show(j);
     },
