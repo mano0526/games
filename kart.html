@@ -100,7 +100,7 @@ kbd{font-family:var(--body);font-weight:800;border:2px solid var(--ink);border-b
 <div id="ui"></div>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="netplay.js" data-game="kart" data-fps="30" data-canvas="#gl,#hud" data-mirror="#ui"></script>
+<script src="netplay.js" data-game="kart" data-fps="30" data-canvas="#gl,#hud" data-mirror="#ui" data-keys="{&quot;KeyW&quot;:[12],&quot;ArrowUp&quot;:[12],&quot;KeyS&quot;:[13],&quot;ArrowDown&quot;:[13],&quot;KeyA&quot;:[14],&quot;ArrowLeft&quot;:[14],&quot;KeyD&quot;:[15],&quot;ArrowRight&quot;:[15],&quot;Space&quot;:[5,0],&quot;ShiftLeft&quot;:[5],&quot;KeyE&quot;:[4,0],&quot;KeyQ&quot;:[4],&quot;Enter&quot;:[0],&quot;Backspace&quot;:[1]}" data-keyhelp="アクセル：W / ↑　ブレーキ：S / ↓　ハンドル：A D / ← →　ドリフト：Space / Shift　アイテム：E / Q　決定：Space / Enter　戻る：Backspace"></script>
 <script>
 'use strict';
 // ============ math ============
@@ -302,7 +302,8 @@ const BTN_NAME=['A（下）','B（右）','X（左）','Y（上）','L','R','ZL�
 function btnName(i){return BTN_NAME[i]||('ボタン'+i);}
 function readPad(p){const b=i=>!!(p.buttons[i]&&(p.buttons[i].pressed||p.buttons[i].value>0.5));const any=a=>a.some(b);const ax=p.axes[0]||0,ay=p.axes[1]||0;
   let steer=Math.abs(ax)>0.18?(ax-Math.sign(ax)*0.18)/0.82:0;if(b(14))steer=-1;if(b(15))steer=1;
-  return{steer:clamp(steer,-1,1),accel:any(PADMAP.accel),brake:any(PADMAP.brake),drift:any(PADMAP.drift),item:any(PADMAP.item),confirm:any(PADMAP.confirm),back:any(PADMAP.back),pause:b(9),aimY:b(13)?1:b(12)?-1:(Math.abs(ay)>0.5?Math.sign(ay):0),
+  const rem=/^Remote Player/.test(p.id||'');
+  return{steer:clamp(steer,-1,1),accel:any(PADMAP.accel)||(rem&&b(12)),brake:any(PADMAP.brake)||(rem&&b(13)),drift:any(PADMAP.drift),item:any(PADMAP.item),confirm:any(PADMAP.confirm),back:any(PADMAP.back),pause:b(9),aimY:b(13)?1:b(12)?-1:(Math.abs(ay)>0.5?Math.sign(ay):0),
     up:b(12)||ay<-0.6,down:b(13)||ay>0.6,left:b(14)||ax<-0.6,right:b(15)||ax>0.6};}
 const DEVNAME={kb1:'キーボード（WASD）',kb2:'キーボード（矢印）',touch:'タッチ'};
 function devName(id){if(DEVNAME[id])return DEVNAME[id];return'コントローラー '+(+id.slice(2)+1);}

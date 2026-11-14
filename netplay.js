@@ -412,7 +412,7 @@
       };
       pc.onconnectionstatechange = function () {
         var s = pc.connectionState;
-        if (s === 'connected') { g.state = 'つながりました'; if (!g.pad) g.pad = addVPad(g.slot + 2); tuneSender(g.videoSender, self.canvas); }
+        if (s === 'connected') { g.state = 'つながりました'; if (!g.pad) g.pad = addVPad(g.slot + 2); tuneSender(g.videoSender, self.canvas, g.q); }
         else if (s === 'failed') { g.state = 'つながりませんでした'; self.drop(g.id); }
         else if (s === 'disconnected') g.state = '通信が不安定です';
         UI.refresh();
@@ -435,6 +435,7 @@
     onMsg: function (g, raw) {
       var m; try { m = JSON.parse(raw); } catch (e) { return; }
       if (m.t === 's' && g.pad) g.pad.setState(m.b | 0, m.a);
+      else if (m.t === 'qq') { g.q = QUALITY[m.k] ? m.k : null; tuneSender(g.videoSender, this.canvas, g.q); }
       else if (m.t === 'p') { try { g.dc.send(JSON.stringify({ t: 'q', ts: m.ts })); } catch (e) {} if (typeof m.r === 'number') { g.ping = m.r; UI.refresh(); } }
     },
     broadcastUI: function (h) {
@@ -483,15 +484,16 @@
       return sec;
     }).join('');
   }
-  function tuneSender(sender, cv) {
+  function tuneSender(sender, cv, q) {
     if (!sender || !sender.getParameters) return;
+    var mh = q && QUALITY[q] ? QUALITY[q].h : MAX_H, br = q && QUALITY[q] ? QUALITY[q].br : BITRATE;
     try {
       var p = sender.getParameters();
       if (!p.encodings || !p.encodings.length) p.encodings = [{}];
-      var h = cv ? cv.height : MAX_H;
-      p.encodings[0].maxBitrate = BITRATE;
+      var h = cv ? cv.height : mh;
+      p.encodings[0].maxBitrate = br;
       p.encodings[0].maxFramerate = FPS;
-      p.encodings[0].scaleResolutionDownBy = Math.max(1, h / MAX_H);
+      p.encodings[0].scaleResolutionDownBy = Math.max(1, h / mh);
       p.degradationPreference = 'balanced';
       sender.setParameters(p).catch(function () {});
     } catch (e) {}
@@ -550,7 +552,7 @@
         pc.addTransceiver('video', { direction: 'recvonly' });
         pc.addTransceiver('audio', { direction: 'recvonly' });
         var dc = self.dc = pc.createDataChannel('in', { ordered: false, maxRetransmits: 0 });
-        dc.onopen = function () { self.startSending(); UI.guestStatus('つながりました'); };
+        dc.onopen = function () { self.startSending(); UI.guestStatus('つながりました'); self.sendQuality(); };
         dc.onmessage = function (m) { self.onMsg(m.data); };
         var uc = pc.createDataChannel('ui', { ordered: true });
         uc.onmessage = function (m) { self.onMsg(m.data); };
@@ -581,6 +583,10 @@
       if (m.t === 'q') { this.ping = Math.round(performance.now() - m.ts); UI.guestPing(this.ping); }
       else if (m.t === 'i') { this.slot = m.slot; this.n = m.n; UI.guestInfo(m.slot, m.n); }
       else if (m.t === 'ui') UI.mirror(m.h || '');
+    },
+    sendQuality: function () {
+      var k = null; try { k = localStorage.getItem('np-gq'); } catch (e) {}
+      if (this.dc && this.dc.readyState === 'open') { try { this.dc.send(JSON.stringify({ t: 'qq', k: QUALITY[k] ? k : null })); } catch (e) {} }
     },
     startSending: function () {
       var self = this;
@@ -614,12 +620,16 @@
 
   /* ---------- 参加者の入力（キーボード・タッチ・コントローラー → 標準コントローラー形式） ---------- */
   var KEYMAP = {
-    ArrowUp: 12, KeyW: 12, ArrowDown: 13, KeyS: 13, ArrowLeft: 14, KeyA: 14, ArrowRight: 15, KeyD: 15,
-    Space: 0, KeyZ: 0, KeyJ: 0, KeyX: 1, KeyK: 1, KeyC: 2, KeyU: 2, KeyV: 3, KeyI: 3,
-    KeyQ: 4, KeyE: 5, KeyR: 6, KeyF: 7, Enter: 9, Escape: 9, KeyP: 9, Backspace: 8, Tab: 8
+    ArrowUp: [12], KeyW: [12], ArrowDown: [13], KeyS: [13], ArrowLeft: [14], KeyA: [14], ArrowRight: [15], KeyD: [15],
+    Space: [0], Enter: [0], KeyF: [0], KeyG: [1], ShiftLeft: [1], Backspace: [1]
   };
+  var KEYHELP = DS.keyhelp || '移動：WASD / 矢印　A：Space / Enter　B：G / Shift';
+  try { if (DS.keys) { var km = JSON.parse(DS.keys); KEYMAP = {}; for (var kk in km) KEYMAP[kk] = [].concat(km[kk]); } } catch (e) { console.warn('[netplay] data-keys', e); }
+  var MENUKEYS = { Escape: 1, KeyP: 1 };
+  var menuOpen = false;
   var GuestInput = {
     keys: 0, touch: 0, onChange: null,
+    padPrev: 0,
     read: function () {
       var b = this.keys | this.touch, a = [0, 0, 0, 0];
       var gps = []; try { gps = realGet() || []; } catch (e) {}
@@ -629,16 +639,23 @@
         for (var k = 0; k < 4; k++) a[k] = Math.round((g.axes[k] || 0) * 100) / 100;
         break;
       }
+      // コントローラーの START / SELECT は自分用メニュー（ゲームには送らない）
+      var mb = b & ((1 << 8) | (1 << 9));
+      if (mb && !(this.padPrev & mb)) UI.toggleMenu();
+      this.padPrev = mb;
+      b &= ~((1 << 8) | (1 << 9));
+      if (menuOpen) return { b: 0, a: [0, 0, 0, 0] };
       return { b: b, a: a };
     }
   };
   function guestKey(e, down) {
     if (!document.documentElement.classList.contains('np-guest')) return;
     var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-    var i = KEYMAP[e.code]; if (i === undefined) return;
+    if (MENUKEYS[e.code]) { e.preventDefault(); e.stopImmediatePropagation(); if (down && !e.repeat) UI.toggleMenu(); return; }
+    var list = KEYMAP[e.code]; if (!list) return;
     e.preventDefault(); e.stopImmediatePropagation();
     var before = GuestInput.keys;
-    if (down) GuestInput.keys |= (1 << i); else GuestInput.keys &= ~(1 << i);
+    list.forEach(function (i) { if (down) GuestInput.keys |= (1 << i); else GuestInput.keys &= ~(1 << i); });
     if (before !== GuestInput.keys && GuestInput.onChange) GuestInput.onChange();
   }
   window.addEventListener('keydown', function (e) { guestKey(e, true); }, true);
@@ -677,6 +694,10 @@
     '.np-q{display:flex;flex-direction:column;gap:6px}',
     '.np-q>span{font-size:13px;font-weight:800}',
     '.np-q .np-btn{flex:1 1 90px;min-height:40px;font-size:13px;padding:6px 8px}',
+    '.np-me{position:absolute;inset:0;z-index:5;display:grid;place-items:center;background:rgba(8,10,18,.55);padding:12px max(12px,env(safe-area-inset-right,0px)) 12px max(12px,env(safe-area-inset-left,0px));overflow:auto}',
+    '.np-lab{font-size:13px;font-weight:800;display:flex;justify-content:space-between}',
+    '.np-range{width:100%;accent-color:#ffcc33}',
+    '.np-keys{font-size:12px!important}',
     '.np-err{color:var(--np-bad)!important}',
     'html.np-guest,html.np-guest body{overflow:hidden!important}',
     '.np-gv{position:fixed;inset:0;z-index:2147482999;background:#000;display:flex;flex-direction:column}',
@@ -795,7 +816,7 @@
           QKEY = b.dataset.npq; MAX_H = QUALITY[QKEY].h; BITRATE = QUALITY[QKEY].br;
           try { localStorage.setItem('np-quality', QKEY); } catch (e) {}
           Array.prototype.forEach.call(c.querySelectorAll('[data-npq]'), function (x) { x.classList.toggle('pri', x === b); });
-          for (var k in Host.guests) tuneSender(Host.guests[k].videoSender, Host.canvas);
+          for (var k in Host.guests) tuneSender(Host.guests[k].videoSender, Host.canvas, Host.guests[k].q);
         };
       });
       c.querySelector('[data-npa=x]').onclick = function () { UI.close(); };
@@ -822,16 +843,26 @@
       this.fab.style.display = 'none';
       var gv = this.gv = el('div', 'np-ui np-gv',
         '<div class="np-gbar"><span class="np-chip">部屋 ' + esc(code) + '</span><span class="np-chip np-slot">接続中</span><span class="np-chip np-ping">— ms</span><span class="np-sp"></span>' +
-        '<button type="button" data-npa="snd">音：OFF</button><button type="button" data-npa="fit">表示：全体</button><button type="button" data-npa="fs">全画面</button><button type="button" data-npa="pad">ボタン表示</button><button type="button" data-npa="leave">退出</button></div>' +
+        '<button type="button" data-npa="menu">メニュー（Esc）</button></div>' +
         '<div class="np-stage"><video playsinline autoplay muted></video><div class="np-mirror" aria-hidden="true"></div><div class="np-msg">ホストにつないでいます…</div><button type="button" class="np-snd" hidden>タップで音を出す</button>' +
+        '<div class="np-me" hidden role="dialog" aria-label="自分用メニュー"><div class="np-card">' +
+        '<h2>自分用メニュー</h2><p>ここでの設定は、あなたの画面だけに効きます。ほかの人のゲームは止まりません。</p>' +
+        '<label class="np-lab" for="np-vol">音量 <span class="np-volv">100</span></label><input id="np-vol" class="np-range" type="range" min="0" max="100" step="5" value="100">' +
+        '<div class="np-q"><span>画質</span><div class="np-row">' +
+        '<button class="np-btn" data-npgq="" type="button">ホストに合わせる</button>' +
+        ['low', 'std', 'high'].map(function (k) { return '<button class="np-btn" data-npgq="' + k + '" type="button">' + QUALITY[k].label + '</button>'; }).join('') +
+        '</div></div>' +
+        '<div class="np-row"><button class="np-btn" data-npa="fit" type="button">表示：全体</button><button class="np-btn" data-npa="pad" type="button">画面のボタン：表示</button><button class="np-btn" data-npa="fs" type="button">全画面</button></div>' +
+        '<p class="np-keys"></p>' +
+        '<div class="np-row"><button class="np-btn pri" data-npa="close" type="button">ゲームにもどる</button><button class="np-btn ghost" data-npa="leave" type="button">部屋から出る</button></div>' +
+        '</div></div>' +
         '<div class="np-pad" hidden><div class="np-dp"><button data-npb="12" type="button">▲</button><button data-npb="14" type="button">◀</button><button data-npb="15" type="button">▶</button><button data-npb="13" type="button">▼</button></div>' +
         '<div class="np-mid"><div class="np-r"><button data-npb="4" type="button">L</button><button data-npb="5" type="button">R</button></div><div class="np-r"><button data-npb="8" type="button">SELECT</button><button data-npb="9" type="button">START</button></div></div>' +
         '<div class="np-face"><button data-npb="3" type="button">Y</button><button data-npb="2" type="button">X</button><button data-npb="1" type="button">B</button><button data-npb="0" type="button">A</button></div></div></div>');
       document.body.appendChild(gv);
       var v = gv.querySelector('video'); Guest.video = v;
-      var snd = gv.querySelector('[data-npa=snd]');
       var big = gv.querySelector('.np-snd');
-      function label() { var on = !v.muted && !v.paused; snd.textContent = '音：' + (on ? 'ON' : 'OFF'); big.hidden = on || !v.srcObject || UI._sndOff; }
+      function label() { var on = (!v.muted && !v.paused) || !!Vol.gain; big.hidden = on || !v.srcObject || UI._sndOff; }
       // 必ずタップの中から呼ぶ（iPhoneはタップ以外で音を出せない）
       function setSnd(on) {
         UI._sndOff = !on;
@@ -840,18 +871,33 @@
         if (p && p.catch) p.catch(function () { v.muted = true; v.play().catch(function () {}); UI._sndOff = false; label(); });
         label();
       }
-      snd.onclick = function () { setSnd(v.muted); };
-      big.onclick = function () { setSnd(true); };
+      big.onclick = function () { setSnd(true); Vol.apply(); };
       v.addEventListener('volumechange', label); v.addEventListener('play', label); v.addEventListener('pause', label);
       this._sndLabel = label;
       var fit = gv.querySelector('[data-npa=fit]'), stage = gv.querySelector('.np-stage');
       fit.onclick = function () { stage.classList.toggle('fill'); fit.textContent = '表示：' + (stage.classList.contains('fill') ? '拡大' : '全体'); };
+      gv.querySelector('[data-npa=menu]').onclick = function () { UI.toggleMenu(); };
+      gv.querySelector('[data-npa=close]').onclick = function () { UI.toggleMenu(false); };
+      gv.querySelector('.np-keys').textContent = 'キーボード：' + KEYHELP + '　メニュー：Esc / P（コントローラーは START）';
+      var vol = gv.querySelector('#np-vol'), volv = gv.querySelector('.np-volv');
+      vol.value = Vol.get(); volv.textContent = vol.value;
+      vol.addEventListener('input', function () { volv.textContent = vol.value; Vol.set(+vol.value, v); });
+      var gq = ''; try { gq = localStorage.getItem('np-gq') || ''; } catch (e) {}
+      function markQ() { Array.prototype.forEach.call(gv.querySelectorAll('[data-npgq]'), function (b) { b.classList.toggle('pri', b.dataset.npgq === gq); }); }
+      Array.prototype.forEach.call(gv.querySelectorAll('[data-npgq]'), function (b) {
+        b.onclick = function () { gq = b.dataset.npgq; try { localStorage.setItem('np-gq', gq); } catch (e) {} markQ(); Guest.sendQuality(); };
+      });
+      markQ();
+      Vol.video = v;
       gv.querySelector('[data-npa=leave]').onclick = function () { Guest.leave(false); };
       gv.querySelector('[data-npa=fs]').onclick = function () { try { if (document.fullscreenElement) document.exitFullscreen(); else gv.requestFullscreen().catch(function () {}); } catch (e) {} };
       var pad = gv.querySelector('.np-pad');
       var coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
       pad.hidden = !coarse;
-      gv.querySelector('[data-npa=pad]').onclick = function () { pad.hidden = !pad.hidden; };
+      var padBtn = gv.querySelector('[data-npa=pad]');
+      function padLabel() { padBtn.textContent = '画面のボタン：' + (pad.hidden ? '非表示' : '表示'); }
+      padBtn.onclick = function () { pad.hidden = !pad.hidden; padLabel(); };
+      padLabel();
       Array.prototype.forEach.call(pad.querySelectorAll('button'), function (b) {
         var bit = 1 << (+b.dataset.npb);
         function on(e) { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (x) {} b.classList.add('on'); GuestInput.touch |= bit; if (GuestInput.onChange) GuestInput.onChange(); }
@@ -869,8 +915,18 @@
       v.onloadeddata = function () { msg.textContent = ''; };
       v.play().catch(function () {});
       if (this._sndLabel) this._sndLabel();
+      Vol.video = v; Vol.apply();
     },
     guestStatus: function (s) { if (!this.gv) return; var msg = this.gv.querySelector('.np-msg'); var v = this.gv.querySelector('video'); if (!v.videoWidth) msg.textContent = s === 'つながりました' ? '映像を待っています…' : s; else if (s !== 'つながりました') msg.textContent = s; else msg.textContent = ''; },
+    toggleMenu: function (force) {
+      if (!this.gv) return;
+      var m = this.gv.querySelector('.np-me');
+      menuOpen = typeof force === 'boolean' ? force : !menuOpen;
+      m.hidden = !menuOpen;
+      GuestInput.keys = 0; GuestInput.touch = 0;
+      if (GuestInput.onChange) GuestInput.onChange();
+      if (menuOpen) { var b = m.querySelector('[data-npa=close]'); if (b) b.focus(); }
+    },
     mirror: function (h) {
       if (!this.gv) return; var m = this.gv.querySelector('.np-mirror'); if (!m) return;
       if (!m.__styled) {
@@ -905,6 +961,32 @@
     }
     while (a.length > b.length) cur.removeChild(cur.lastChild);
   }
+  var Vol = {
+    video: null, ctx: null, gain: null, src: null,
+    get: function () { var v = 100; try { var x = localStorage.getItem('np-vol'); if (x !== null) v = Math.max(0, Math.min(100, +x)); } catch (e) {} return v; },
+    set: function (n) { try { localStorage.setItem('np-vol', n); } catch (e) {} this.apply(); },
+    apply: function () {
+      var v = this.video; if (!v) return;
+      var k = this.get() / 100;
+      if (this.gain) { this.gain.gain.value = k; return; }
+      try { v.volume = k; } catch (e) {}
+      // iPhone は video.volume が効かない（常に1）。100%以外を選んだときだけ WebAudio に切り替える
+      if (k < 1 && Math.abs(v.volume - k) > 0.01) this.useWebAudio(k);
+    },
+    useWebAudio: function (k) {
+      var v = this.video;
+      try {
+        var tr = v.srcObject && v.srcObject.getAudioTracks()[0]; if (!tr) return;
+        var A = window.AudioContext || window.webkitAudioContext; if (!A) return;
+        this.ctx = new A();
+        this.src = this.ctx.createMediaStreamSource(new MediaStream([tr]));
+        this.gain = this.ctx.createGain(); this.gain.gain.value = k;
+        this.src.connect(this.gain); this.gain.connect(this.ctx.destination);
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        v.muted = true; UI._sndOff = false;
+      } catch (e) { this.ctx = null; this.gain = null; }
+    }
+  };
   var guestAudioWanted = false;
   function initGuestAudioUnlock() { guestAudioWanted = true; }
   function alertCard(text) { var c = UI.card('<h2>オンライン対戦</h2><p class="np-err">' + esc(text) + '</p><div class="np-row"><button class="np-btn" type="button">閉じる</button></div>'); c.querySelector('button').onclick = function () { UI.close(); }; }
