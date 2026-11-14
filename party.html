@@ -953,7 +953,7 @@ function teamOf(teams,i){return teams.groups.findIndex(g=>g.includes(i))}
 function teamCol(teams,i){if(teams.mode==='ffa')return CHARS[P(i).ci].col;return teams.colors[teamOf(teams,i)]}
 function drawMGTop(c,title,time,vals,teams){rr(c,16,12,W-32,64,18);c.fillStyle='rgba(43,33,64,.82)';c.fill();txt(c,title,36,44,{s:22,a:'left',f:FD,w:400,col:'#fff'});
  if(time!==null){txt(c,time>=10?Math.ceil(time)+'':time.toFixed(1),W/2,44,{s:34,f:FD,w:400,col:time<5?'#ff9a8a':C.gold})}
- if(vals){vals.forEach((v,i)=>{const x=W-16-4*150+i*150+10;rr(c,x,22,138,44,14);c.fillStyle=teamCol(teams,i);c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();drawChar(c,P(i).ci,x+24,44,15,{noShadow:true});txt(c,''+v,x+92,45,{s:24,f:FD,w:400,col:'#fff',st:C.ink,sw:5})})}}
+ if(vals){vals.forEach((v,i)=>{if(v===null||v===undefined)return;const x=W-16-4*150+i*150+10;rr(c,x,22,138,44,14);c.fillStyle=teamCol(teams,i);c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();drawChar(c,P(i).ci,x+24,44,15,{noShadow:true});txt(c,''+v,x+92,45,{s:24,f:FD,w:400,col:'#fff',st:C.ink,sw:5})})}}
 function drawFloor(c,ar,style){c.save();rr(c,ar.x-14,ar.y-14,ar.w+28,ar.h+28,22);c.fillStyle=C.ink;c.fill();rr(c,ar.x,ar.y,ar.w,ar.h,12);c.clip();
  const sz=50;for(let y=ar.y;y<ar.y+ar.h;y+=sz)for(let x=ar.x;x<ar.x+ar.w;x+=sz){const o=((x-ar.x)/sz+(y-ar.y)/sz)%2;
   c.fillStyle=style==='grass'?(o?'#86cc63':'#7bc157'):style==='stone'?(o?'#d9cdb4':'#cfc1a5'):(o?'#f4dca2':'#efd394');c.fillRect(x,y,sz,sz)}
@@ -1634,7 +1634,189 @@ MGS.pilot={name:'ふたりでそうじゅう',modes:['2v2'],desc:()=>'2人で 1�
    teams.groups.forEach((gr,k)=>gr.forEach((i,j)=>{if(P(i).human)txt(c,`${pname(P(i))}：${j?'▲▼ たて':'◀▶ よこ'}`,k?W-150:150,H-46+j*24,{s:16,col:'#fff',st:C.ink,sw:4})}))};
   return g}};
 MGS.bomb.roles=()=>['飛行船から ばくだんを 落とす','20秒 にげきる'];MGS.tag.roles=()=>['おに：ぜんいん タッチ','15秒 にげきる'];MGS.hammer.roles=()=>['▲ たかい棒 ／ ▼ ひくい棒','A ジャンプ ／ ▼ しゃがむ'];MGS.keeper.roles=()=>['キーパー：▲▼ で とめる','▲▼ ねらう・A シュート'];MGS.tug.roles=m=>m==='1v3'?['力 3ばい！ れんだ','3人で れんだ']:['れんだで 引け','れんだで 引け'];MGS.boat.roles=()=>['こうたいに A','こうたいに A'];
-const MG_ORDER=['coin','mash','quick','stop10','rock','sumo','dodge','paint','jump','memory','flags','count','boat','pilot','bomb','tug','tag','hammer','keeper','tunnel'];
+/* ================= 追加ミニゲーム（第1弾） ================= */
+function mgPickWin(sc,teams){const PL=PLs(teams);if(teams.mode==='ffa'||teams.mode==='1v1'){const m=Math.max(...PL.map(i=>sc[i]));return PL.filter(i=>Math.abs(sc[i]-m)<1e-9)}
+ const t=teams.groups.map(gr=>gr.reduce((s,i)=>s+sc[i],0));if(Math.abs(t[0]-t[1])<1e-9)return[];return teams.groups[t[0]>t[1]?0:1].slice()}
+function aliveWin(g,teams,alive,lastDeath){const PL=PLs(teams);const al=PL.filter(i=>alive[i]);
+ if(teams.mode==='ffa'||teams.mode==='1v1')return al.length?al:lastDeath.slice();
+ const ta=teams.groups.map(gr=>gr.filter(i=>alive[i]).length);if(ta[0]===ta[1])return[];return teams.groups[ta[0]>ta[1]?0:1].slice()}
+function drawBomb(c,x,y,r,fuse,t){c.save();c.translate(x,y);c.lineWidth=Math.max(2,r*.14);c.strokeStyle=C.ink;
+ c.fillStyle=fuse<.25?(Math.sin(t*30)>0?'#c0392b':'#2b2140'):'#2b2140';circ(c,0,0,r);c.fill();c.stroke();
+ c.fillStyle='rgba(255,255,255,.35)';circ(c,-r*.35,-r*.35,r*.28);c.fill();
+ c.fillStyle='#8a8496';c.fillRect(-r*.25,-r*1.15,r*.5,r*.3);c.strokeRect(-r*.25,-r*1.15,r*.5,r*.3);
+ c.strokeStyle='#8a5a2e';c.lineWidth=Math.max(2,r*.1);c.beginPath();c.moveTo(0,-r*1.15);c.quadraticCurveTo(r*.4,-r*1.6,r*.55,-r*1.45);c.stroke();
+ const sp=r*.3*(1+Math.sin(t*40)*.3);c.fillStyle=C.gold;drawStar(c,r*.55,-r*1.45,sp,t*6,C.gold,0);c.restore()}
+
+/* --- 1. ばくだんリレー：ばくだんを 押しつけあう --- */
+MGS.hotbomb={name:'ばくだんリレー',modes:['ffa'],desc:()=>'ばくだんを 持っている人は、ほかの人に ぶつかって 押しつけよう！ ばくだんが ばくはつした時に 持っていた人の 負け。それ以外の 全員が 勝ち。',ctl:'いどう：スティック / 十字 / WASD / 矢印',
+ create(mode,teams){const ar={x:160,y:150,w:960,h:500};const pos=[[320,280],[960,280],[320,520],[960,520]];const PL=PLs(teams);
+  const g={ar,el:0,done:false,ai:[],actors:[0,1,2,3].map(i=>mkActor(i,pos[i][0],pos[i][1])),holder:pick(PL),cool:[0,0,0,0],fuse:rand(13,19),fuse0:0,boomT:-1,rt:[0,0,0,0],pass:0};
+  g.fuse0=g.fuse;for(const a of g.actors)if(!PL.includes(a.pi))a.alive=false;
+  g.update=dt=>{g.el+=dt;
+   if(g.boomT>=0){g.boomT+=dt;const a=g.actors[g.holder];a.deadT+=dt;a.x+=a.dvx*dt;a.y+=a.dvy*dt;a.dvy+=900*dt;a.rot+=dt*8;if(g.boomT>1.4)g.done=true;return}
+   g.fuse-=dt;for(const i of PL)g.cool[i]=Math.max(0,g.cool[i]-dt);
+   if(g.fuse<=0){const a=g.actors[g.holder];sfx('boom');burst(a.x,a.y-30,30,['#ff9a3c',C.gold,'#5d566a'],{max:360});a.alive=false;a.dvx=rand(-120,120);a.dvy=-560;g.boomT=0;return}
+   g.think(dt);
+   for(const a of g.actors){if(!a.alive)continue;moveActor(a,mgIn(g,a.pi),a.pi===g.holder?335:300,dt,ar)}separate(g.actors.filter(a=>a.alive));
+   const h=g.actors[g.holder];if(g.cool[g.holder]<=0)for(const a of g.actors){if(!a.alive||a.pi===g.holder||g.cool[a.pi]>0)continue;
+    if(Math.hypot(a.x-h.x,a.y-h.y)<h.r+a.r+8){g.cool[g.holder]=.9;g.cool[a.pi]=.5;g.holder=a.pi;g.pass++;sfx('hit');burst(a.x,a.y-40,10,[C.gold,'#fff'],{max:160});break}}};
+  g.think=dt=>{const lv=LV();const h=g.actors[g.holder];for(const a of g.actors){const i=a.pi;if(!a.alive||P(i).human)continue;g.rt[i]-=dt;if(g.rt[i]>0)continue;g.rt[i]=[.28,.16,.08][lv];
+    if(i===g.holder){let best=null,bd=1e9;for(const b of g.actors){if(!b.alive||b.pi===i||g.cool[b.pi]>0)continue;const d=Math.hypot(b.x-a.x,b.y-a.y);if(d<bd){bd=d;best=b}}
+     if(best){const lead=[0,.15,.3][lv];const s=seek(a,best.x+best.vx*lead,best.y+best.vy*lead);g.ai[i]={x:s.x,y:s.y}}else g.ai[i]={x:0,y:0};continue}
+    const dx=a.x-h.x,dy=a.y-h.y,d=Math.hypot(dx,dy)||1;let fx=dx/d,fy=dy/d;const cx=ar.x+ar.w/2,cy=ar.y+ar.h/2;const wall=Math.min(a.x-ar.x,ar.x+ar.w-a.x,a.y-ar.y,ar.y+ar.h-a.y);
+    if(wall<110){fx+=(cx-a.x)/300;fy+=(cy-a.y)/300;const sd=dx*(cy-a.y)-dy*(cx-a.x);fx+=-dy/d*.8*Math.sign(sd||1);fy+=dx/d*.8*Math.sign(sd||1)}
+    const k=d<[200,280,360][lv]?[.75,.9,1][lv]:.25;g.ai[i]={x:fx*k,y:fy*k}}};
+  g.scores=()=>[0,1,2,3].map(i=>!PL.includes(i)?-1e9:i===g.holder?0:1);
+  g.winners=()=>PL.filter(i=>i!==g.holder);
+  g.draw=c=>{mgBG(c,'#ffd9a0','#ffa86b');drawFloor(c,ar,'grass');
+   const as=g.actors.filter(a=>a.alive||a.pi===g.holder&&g.boomT>=0).sort((a,b)=>a.y-b.y);
+   for(const a of as){if(!PL.includes(a.pi))continue;const hold=a.pi===g.holder;drawActor(c,a,{mood:hold&&g.boomT>=0?'dizzy':hold?'sad':null,rot:hold&&g.boomT>=0?a.rot:0,alpha:g.cool[a.pi]>0&&!hold?.6:1});
+    if(hold&&g.boomT<0)drawBomb(c,a.x,a.y-a.r*2.6-8,20,g.fuse/g.fuse0,g.el)}
+   if(g.boomT>=0&&g.boomT<.5){c.fillStyle=`rgba(255,240,200,${.6-g.boomT})`;c.fillRect(0,0,W,H)}
+   drawMGTop(c,'ばくだんリレー',null,null,teams);
+   const k=g.fuse/g.fuse0;txt(c,k>.6?'まだ だいじょうぶ…？':k>.3?'あぶないかも！':'もう すぐ！',W/2,44,{s:24,f:FD,w:400,col:k>.3?C.gold:'#ff9a8a'})};
+  return g}};
+
+/* --- 2. いろタイルにのれ：お題の色のタイル以外が 落ちる --- */
+const TILE_COLS=[['#e5473c','あか'],['#3a7fdc','あお'],['#ffc531','きいろ'],['#2fb36b','みどり']];
+MGS.tiles={name:'いろタイルにのれ',modes:['ffa','2v2'],desc:m=>m==='ffa'?'お題の 色の タイルに のろう！ 時間に なると ほかの 色の タイルは 落ちるよ。さいごまで のこった人の 勝ち。':'お題の 色の タイルに のろう！ さいごに のこっている人数が 多いチームの 勝ち。',ctl:'いどう：スティック / 十字 / WASD / 矢印',
+ create(mode,teams){const PL=PLs(teams);const COLS=5,ROWS=4,TW=180,TH=110;const ar={x:(W-COLS*TW)/2,y:200,w:COLS*TW,h:ROWS*TH};
+  const pos=[[ar.x+TW*.5,ar.y+TH*.5],[ar.x+ar.w-TW*.5,ar.y+TH*.5],[ar.x+TW*.5,ar.y+ar.h-TH*.5],[ar.x+ar.w-TW*.5,ar.y+ar.h-TH*.5]];
+  const g={ar,el:0,done:false,ai:[],actors:[0,1,2,3].map(i=>mkActor(i,pos[i][0],pos[i][1])),grid:[],tgt:0,round:0,phase:'pick',pt:0,lim:2.6,alive:[0,1,2,3].map(i=>PL.includes(i)),lastDeath:[],rt:[0,0,0,0],plan:[null,null,null,null],fall:[]};
+  for(const a of g.actors)if(!PL.includes(a.pi))a.alive=false;
+  const newRound=()=>{g.round++;g.grid=[];const bag=[];for(let k=0;k<COLS*ROWS;k++)bag.push(k%4);shuffle(bag);for(let k=0;k<COLS*ROWS;k++)g.grid.push(bag[k]);
+   g.tgt=randi(0,3);const n=g.grid.filter(v=>v===g.tgt).length;if(n<3){let k=0;for(let q=0;q<g.grid.length&&k<3-n;q++)if(g.grid[q]!==g.tgt){g.grid[q]=g.tgt;k++}}
+   g.phase='pick';g.pt=0;g.lim=Math.max(1.15,2.7-g.round*.2);g.plan=[null,null,null,null];sfx('beep')};
+  newRound();
+  const cellAt=(x,y)=>{const cx=Math.floor((x-ar.x)/TW),cy=Math.floor((y-ar.y)/TH);if(cx<0||cy<0||cx>=COLS||cy>=ROWS)return-1;return cy*COLS+cx};
+  g.update=dt=>{g.el+=dt;g.pt+=dt;
+   for(let k=g.fall.length-1;k>=0;k--){const f=g.fall[k];f.t+=dt;if(f.t>1.2)g.fall.splice(k,1)}
+   if(g.phase==='pick'){g.think(dt);for(const a of g.actors)if(a.alive)moveActor(a,mgIn(g,a.pi),330,dt,ar);separate(g.actors.filter(a=>a.alive));
+    if(g.pt>=g.lim){g.phase='drop';g.pt=0;sfx('thud');const died=[];
+     for(const a of g.actors){if(!a.alive)continue;const ci=cellAt(a.x,a.y);if(ci<0||g.grid[ci]!==g.tgt){a.alive=false;g.alive[a.pi]=false;died.push(a.pi);g.fall.push({a,t:0});sfx('lose')}}
+     if(died.length)g.lastDeath=died}}
+   else if(g.phase==='drop'){if(g.pt>1.3){const al=PL.filter(i=>g.alive[i]);
+     let end=g.round>=9;if(mode==='ffa'&&al.length<=1)end=true;if(mode!=='ffa'){const ta=teams.groups.map(gr=>gr.filter(i=>g.alive[i]).length);if(ta[0]===0||ta[1]===0)end=true}
+     if(end)g.done=true;else newRound()}}};
+  g.think=dt=>{const lv=LV();for(const a of g.actors){const i=a.pi;if(!a.alive||P(i).human)continue;
+    if(!g.plan[i]){g.rt[i]=(g.rt[i]||0)+dt;if(g.rt[i]<[.65,.38,.15][lv]+rand(0,.15)){g.ai[i]={x:0,y:0};continue}g.rt[i]=0;
+     const wrong=Math.random()<[.12,.05,0][lv];let best=-1,bd=1e9;g.grid.forEach((v,k)=>{if((v===g.tgt)===wrong)return;const x=ar.x+(k%COLS+.5)*TW,y=ar.y+(Math.floor(k/COLS)+.5)*TH;const d=Math.hypot(x-a.x,y-a.y)+rand(0,40);if(d<bd){bd=d;best=k}});
+     g.plan[i]=best<0?{x:a.x,y:a.y}:{x:ar.x+(best%COLS+.5)*TW+rand(-30,30),y:ar.y+(Math.floor(best/COLS)+.5)*TH+rand(-20,20)}}
+    const s=seek(a,g.plan[i].x,g.plan[i].y,10);g.ai[i]={x:s.x,y:s.y}}};
+  g.scores=()=>[0,1,2,3].map(i=>!PL.includes(i)?-1e9:g.alive[i]?100:0);
+  g.winners=()=>aliveWin(g,teams,g.alive,g.lastDeath);
+  g.draw=c=>{mgBG(c,'#bfe7ff','#6fb6e0');c.fillStyle='#2b6fa3';c.fillRect(0,H-120,W,120);
+   const dropping=g.phase==='drop';
+   g.grid.forEach((v,k)=>{const x=ar.x+(k%COLS)*TW,y=ar.y+Math.floor(k/COLS)*TH;const gone=dropping&&v!==g.tgt;const yo=gone?Math.min(1,g.pt/.6)**2*400:0;if(gone&&yo>380)return;
+    c.save();c.globalAlpha=gone?Math.max(0,1-g.pt):1;rr(c,x+5,y+5+yo,TW-10,TH-10,12);c.fillStyle=TILE_COLS[v][0];c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();
+    c.fillStyle='rgba(255,255,255,.25)';rr(c,x+14,y+12+yo,TW-28,16,8);c.fill();c.restore()});
+   for(const f of g.fall){const a=f.a;const k=Math.min(1,f.t/1);drawChar(c,a.ci,a.x,a.y-a.r*.9+k*k*260,a.r*(1-k*.5),{mood:'dizzy',alpha:1-k})}
+   for(const a of g.actors.filter(a=>a.alive).sort((a,b)=>a.y-b.y))drawActor(c,a);
+   drawMGTop(c,'いろタイルにのれ',null,null,teams);
+   const col=TILE_COLS[g.tgt];rr(c,W/2-180,92,360,76,22);c.fillStyle=C.paper;c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();
+   rr(c,W/2-160,108,70,44,10);c.fillStyle=col[0];c.fill();c.stroke();txt(c,`${col[1]}に のれ！`,W/2+40,130,{s:30,f:FD,w:400});
+   if(g.phase==='pick'){const k=1-g.pt/g.lim;rr(c,W/2-160,158,320*k,8,4);c.fillStyle=k<.35?C.red:C.green;c.fill()}
+   txt(c,`ラウンド ${g.round}`,W-60,44,{s:20,a:'right',col:'#fff'})};
+  return g}};
+
+/* --- 3. カップのゆくえ：ボールが入ったカップを 目で追う --- */
+MGS.cups={name:'カップのゆくえ',modes:['ffa','1v1'],desc:()=>'ボールが 入った カップを 目で 追いかけよう！ カップが まざったら ◀▶で えらんで Aで けってい。3回戦で 当てた数が いちばん 多い人の 勝ち。',ctl:'えらぶ：◀▶　けってい：A',
+ create(mode,teams){const PL=PLs(teams);const g={el:0,done:false,ai:[],round:0,n:3,pos:[],ball:0,phase:'show',pt:0,swaps:[],sw:null,swDur:.42,sel:[1,1,1,1],lock:[0,1,2,3].map(i=>!PL.includes(i)),pts:[0,0,0,0],cpu:[null,null,null,null],lift:0};
+  const cupX=k=>W/2+(k-(g.n-1)/2)*Math.min(260,900/g.n);
+  const start=()=>{g.round++;g.n=g.round>=3?4:3;g.pos=[];for(let k=0;k<g.n;k++)g.pos.push(k);g.ball=randi(0,g.n-1);
+   const ns=[7,10,13][g.round-1];g.swaps=[];for(let k=0;k<ns;k++){let a=randi(0,g.n-1),b=randi(0,g.n-2);if(b>=a)b++;g.swaps.push([a,b])}
+   g.swDur=[.42,.32,.26][g.round-1];g.phase='show';g.pt=0;g.sw=null;g.lift=1;g.sel=[0,1,2,3].map(()=>Math.floor((g.n-1)/2));g.lock=[0,1,2,3].map(i=>!PL.includes(i));g.cpu=[null,null,null,null]};
+  start();
+  g.update=dt=>{g.el+=dt;g.pt+=dt;
+   if(g.phase==='show'){g.lift=g.pt<1.4?1:Math.max(0,1-(g.pt-1.4)/.3);if(g.pt>1.9){g.phase='mix';g.pt=0;sfx('go')}return}
+   if(g.phase==='mix'){if(!g.sw){if(!g.swaps.length){g.phase='pick';g.pt=0;return}const[a,b]=g.swaps.shift();g.sw={a,b,t:0};sfx('step')}
+    g.sw.t+=dt;if(g.sw.t>=g.swDur){const sa=g.pos.indexOf(g.sw.a),sb=g.pos.indexOf(g.sw.b);[g.pos[sa],g.pos[sb]]=[g.pos[sb],g.pos[sa]];g.sw=null}return}
+   if(g.phase==='pick'){const lv=LV();const truth=g.pos.indexOf(g.ball);
+    for(const i of PL){if(g.lock[i])continue;const p=P(i);
+     if(p.human){if(Input.rep(p.dev,'left')){g.sel[i]=Math.max(0,g.sel[i]-1);sfx('blip')}if(Input.rep(p.dev,'right')){g.sel[i]=Math.min(g.n-1,g.sel[i]+1);sfx('blip')}if(g.pt>.25&&Input.pressed(p.dev,'a')){g.lock[i]=true;sfx('ok')}}
+     else{if(!g.cpu[i]){const ok=Math.random()<[.5,.68,.86][lv]-(g.round-1)*.06;let v=truth;if(!ok){v=randi(0,g.n-2);if(v>=truth)v++}g.cpu[i]={v,t:rand(.8,2.6),mv:0}}const cp=g.cpu[i];cp.mv-=dt;
+      if(g.sel[i]!==cp.v){if(cp.mv<=0){g.sel[i]+=g.sel[i]<cp.v?1:-1;cp.mv=.2}}else if(g.pt>cp.t){g.lock[i]=true;sfx('ok')}}}
+    if(PL.every(i=>g.lock[i])||g.pt>6){for(const i of PL){g.lock[i]=true;if(g.sel[i]===truth){g.pts[i]++}}g.phase='reveal';g.pt=0;sfx('drum')}return}
+   if(g.phase==='reveal'){g.lift=Math.min(1,g.pt/.4);if(g.pt>.45&&g.pt-dt<=.45)sfx(PL.some(i=>g.sel[i]===g.pos.indexOf(g.ball))?'coin':'lose');
+    if(g.pt>2.4){if(g.round>=3)g.done=true;else start()}}};
+  g.scores=()=>[0,1,2,3].map(i=>PL.includes(i)?g.pts[i]:-1e9);
+  g.winners=()=>{const w=mgPickWin(g.scores(),teams);return Math.max(...PL.map(i=>g.pts[i]))>0?w:[]};
+  const slotX=k=>cupX(k);
+  g.draw=c=>{mgBG(c,'#4a2f5e','#2a1838');c.fillStyle='#7a4a2e';c.fillRect(0,430,W,290);c.fillStyle='#9c6138';c.fillRect(0,430,W,22);
+   c.fillStyle='rgba(255,230,160,.12)';c.beginPath();c.moveTo(W/2-120,0);c.lineTo(W/2+120,0);c.lineTo(W/2+520,430);c.lineTo(W/2-520,430);c.closePath();c.fill();
+   const cupPos=cup=>{let s=g.pos.indexOf(cup),x=slotX(s),y=0;if(g.sw&&(cup===g.sw.a||cup===g.sw.b)){const k=easeOut(Math.min(1,g.sw.t/g.swDur));const other=cup===g.sw.a?g.sw.b:g.sw.a;const x2=slotX(g.pos.indexOf(other));x=lerp(x,x2,k);y=Math.sin(k*Math.PI)*(cup===g.sw.a?-60:40)}return[x,y]};
+   const showBall=g.phase==='show'||g.phase==='reveal';const[bx]=cupPos(g.ball);
+   if(showBall){c.fillStyle='#fff';circ(c,bx,420,20);c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();c.fillStyle=C.red;circ(c,bx-5,414,6);c.fill()}
+   for(let cup=0;cup<g.n;cup++){const[x,yo]=cupPos(cup);const lift=(showBall&&(g.phase==='show'||true))?g.lift*110:0;const y=440+yo-lift;
+    c.lineWidth=5;c.strokeStyle=C.ink;c.fillStyle=C.red;c.beginPath();c.moveTo(x-70,y);c.lineTo(x-48,y-150);c.lineTo(x+48,y-150);c.lineTo(x+70,y);c.closePath();c.fill();c.stroke();
+    c.fillStyle='#ff8a7a';c.beginPath();c.moveTo(x-40,y-20);c.lineTo(x-26,y-130);c.lineTo(x-12,y-130);c.lineTo(x-22,y-20);c.closePath();c.fill();
+    rr(c,x-76,y-12,152,18,8);c.fillStyle=C.redD;c.fill();c.stroke()}
+   if(g.phase==='pick'||g.phase==='reveal'){const truth=g.pos.indexOf(g.ball);PL.forEach((i,k)=>{const p=P(i);const x=slotX(g.sel[i])+(k-(PL.length-1)/2)*34,y=520;
+     drawChar(c,p.ci,x,y,16,{mood:g.phase==='reveal'?(g.sel[i]===truth?'happy':'sad'):null});if(g.lock[i]&&g.phase==='pick'){txt(c,'OK',x,y+34,{s:14,f:FD,w:400,col:'#fff',st:C.ink,sw:4})}});
+    if(g.phase==='pick'){const k=Math.max(0,1-g.pt/6);rr(c,W/2-200,640,400,14,7);c.fillStyle='rgba(255,255,255,.25)';c.fill();rr(c,W/2-200,640,400*k,14,7);c.fillStyle=C.gold;c.fill();
+     txt(c,'ボールは どれ？',W/2,600,{s:34,f:FD,w:400,col:'#fff',st:C.ink,sw:8})}}
+   if(g.phase==='show')txt(c,'ボールは ここ！ よく 見ててね',W/2,600,{s:30,f:FD,w:400,col:'#fff',st:C.ink,sw:8});
+   drawMGTop(c,`カップのゆくえ　${g.round} / 3`,null,g.pts.map((v,i)=>PL.includes(i)?v:null),teams)};
+  return g}};
+
+/* --- 4. なわとびジャンプ：回る なわを ジャンプで よける --- */
+MGS.rope={name:'なわとびジャンプ',modes:['ffa'],desc:()=>'まわってくる 大なわを ジャンプで よけよう！ だんだん 速くなるよ。ひっかかったら アウト。さいごまで 残った人の 勝ち。',ctl:'ジャンプ：A / Space / Enter',
+ create(mode,teams){const PL=PLs(teams);const GY=520,AIR=.52;const g={el:0,done:false,ai:[],th:Math.PI*.9,w:3.4,air:[0,0,0,0],alive:[0,1,2,3].map(i=>PL.includes(i)),out:[0,0,0,0],lastDeath:[],crosses:0,endT:-1,plan:[null,null,null,null]};
+  const xs=i=>W/2+(PL.indexOf(i)-(PL.length-1)/2)*150;
+  g.update=dt=>{g.el+=dt;
+   if(g.endT>=0){g.endT-=dt;for(const i of PL)if(!g.alive[i])g.out[i]+=dt;if(g.endT<=0)g.done=true;return}
+   const sp=g.w*(1+Math.min(2.1,g.el/16))*(g.surge>0?1.3:1);g.surge=Math.max(0,(g.surge||0)-dt);if(Math.random()<dt*.09&&g.el>6)g.surge=1.1;
+   const prev=g.th;g.th+=sp*dt;
+   for(const i of PL){if(g.air[i]>0)g.air[i]=Math.max(0,g.air[i]-dt);if(!g.alive[i]){g.out[i]+=dt;continue}const inp=mgIn(g,i);if(inp.a&&g.air[i]<=0){g.air[i]=AIR;sfx('hop')}}
+   g.think(sp);
+   if(Math.floor(prev/(Math.PI*2))!==Math.floor(g.th/(Math.PI*2))){g.crosses++;sfx('tick');const died=[];for(const i of PL){if(!g.alive[i])continue;const h=g.air[i]>0?Math.sin(Math.PI*(1-g.air[i]/AIR))*1:0;if(h<.2){g.alive[i]=false;died.push(i);sfx('lose');burst(xs(i),GY-20,10,['#fff',C.gold],{max:180})}}
+    if(died.length)g.lastDeath=died;const al=PL.filter(i=>g.alive[i]);if(al.length<=1||g.el>40)g.endT=1.2}};
+  g.think=sp=>{const lv=LV();const toCross=(Math.PI*2-(g.th%(Math.PI*2)))/sp;for(const i of PL){if(P(i).human||!g.alive[i]){continue}
+    if(!g.plan[i]||g.plan[i].c!==g.crosses){g.plan[i]={c:g.crosses,at:AIR*.5+gauss()*[.11,.065,.03][lv]*(1+g.el/14),done:false}}const pl=g.plan[i];
+    g.ai[i]={a:false};if(!pl.done&&toCross<=pl.at&&g.air[i]<=0){g.ai[i]={a:true};pl.done=true}}};
+  g.scores=()=>[0,1,2,3].map(i=>!PL.includes(i)?-1e9:g.alive[i]?1e6:-g.out[i]);
+  g.winners=()=>aliveWin(g,teams,g.alive,g.lastDeath);
+  g.draw=c=>{mgBG(c,'#ffe8b0','#ffc38a');c.fillStyle='#86cc63';c.fillRect(0,GY,W,H-GY);c.fillStyle='#7bc157';for(let x=0;x<W;x+=80)c.fillRect(x,GY,40,H-GY);
+   const L=150,R=W-150;const ry=th=>GY-10-(1+Math.cos(th))/2*300;const front=Math.sin(g.th)<0;
+   const drawRope=()=>{c.lineWidth=7;c.strokeStyle=C.ink;c.beginPath();c.moveTo(L,GY-120);c.quadraticCurveTo(W/2,ry(g.th)*2-(GY-120),R,GY-120);c.stroke();c.lineWidth=4;c.strokeStyle='#ff7ab6';c.stroke()};
+   for(const x of[L,R]){c.fillStyle='#8a5a2e';c.fillRect(x-8,GY-140,16,140);c.lineWidth=3;c.strokeStyle=C.ink;c.strokeRect(x-8,GY-140,16,140);circ(c,x,GY-124,14);c.fillStyle=C.gold;c.fill();c.stroke()}
+   if(!front)drawRope();
+   for(const i of PL){const h=g.air[i]>0?Math.sin(Math.PI*(1-g.air[i]/AIR))*120:0;if(g.alive[i])drawChar(c,P(i).ci,xs(i),GY-30,30,{jump:h,mood:null});else drawChar(c,P(i).ci,xs(i),GY-20,30,{mood:'dizzy',rot:.6,alpha:.7})
+    if(P(i).human&&g.alive[i])txt(c,aLabel(P(i).dev),xs(i),GY+40,{s:15,col:'#fff',st:C.ink,sw:4})}
+   if(front)drawRope();
+   drawMGTop(c,'なわとびジャンプ',null,null,teams);txt(c,`${g.crosses} かい`,W/2,44,{s:30,f:FD,w:400,col:C.gold})};
+  return g}};
+
+/* --- 5. つみあげタワー：ずれた分は 落ちる。高く 積んだ人の 勝ち --- */
+MGS.tower={name:'つみあげタワー',modes:['ffa','1v1'],desc:()=>'左右に 動く ブロックを Aで 落として 積みあげよう！ はみだした 部分は 落ちて、ブロックが 小さくなるよ。30秒で いちばん 高く 積んだ人の 勝ち。',ctl:'おとす：A / Space / Enter',
+ create(mode,teams){const PL=PLs(teams);const LW=Math.min(280,1120/PL.length),BH=26,BASE=150;const g={el:0,done:false,ai:[],dur:30,tw:[0,1,2,3].map(()=>({stack:[{x:0,w:BASE}],cur:{x:-LW/2,w:BASE,dir:1},sp:150,dead:false,cut:[],aim:0,fall:0}))};
+  const laneX=i=>W/2+(PL.indexOf(i)-(PL.length-1)/2)*(LW+16);
+  g.update=dt=>{g.el+=dt;if(g.el>=g.dur||PL.every(i=>g.tw[i].dead)){g.done=true;return}
+   g.think(dt);
+   for(const i of PL){const t=g.tw[i];for(let k=t.cut.length-1;k>=0;k--){const q=t.cut[k];q.vy+=900*dt;q.y+=q.vy*dt;q.t+=dt;if(q.t>1.2)t.cut.splice(k,1)}if(t.dead)continue;t.fall=Math.max(0,t.fall-dt*6);
+    const cu=t.cur;cu.x+=cu.dir*t.sp*dt;const lim=LW/2-cu.w/2;if(cu.x>lim){cu.x=lim;cu.dir=-1}if(cu.x<-lim){cu.x=-lim;cu.dir=1}
+    if(mgIn(g,i).a){const top=t.stack[t.stack.length-1];const l=Math.max(cu.x-cu.w/2,top.x-top.w/2),r=Math.min(cu.x+cu.w/2,top.x+top.w/2);const h=t.stack.length;
+     if(r-l<=2){t.dead=true;t.cut.push({x:cu.x,w:cu.w,y:0,vy:0,t:0,h});sfx('lose');continue}
+     const nb={x:(l+r)/2,w:r-l};if(Math.abs(nb.w-top.w)<4&&Math.abs(nb.x-top.x)<4){nb.x=top.x;nb.w=top.w;sfx('star');burst(laneX(i)+nb.x,300,8,[C.gold,'#fff'],{max:120})}else{sfx('thud');const lw=cu.w-nb.w;const lx=cu.x<top.x?cu.x-cu.w/2+lw/2:cu.x+cu.w/2-lw/2;t.cut.push({x:lx,w:lw,y:0,vy:0,t:0,h})}
+     t.stack.push(nb);t.cur={x:(Math.random()<.5?-1:1)*(LW/2-nb.w/2),w:nb.w,dir:Math.random()<.5?1:-1};t.sp=Math.min(420,150+t.stack.length*14);t.fall=1}}};
+  g.think=dt=>{const lv=LV();for(const i of PL){if(P(i).human)continue;const t=g.tw[i];g.ai[i]={a:false};if(t.dead)continue;t.aim-=dt;if(t.aim>0)continue;const top=t.stack[t.stack.length-1];
+    const tol=[22,11,4][lv]+t.sp*.01;if(Math.abs(t.cur.x-top.x)<tol*rand(.4,1)){g.ai[i]={a:true};t.aim=[.5,.35,.25][lv]}else if(Math.random()<[.004,.002,0][lv]){g.ai[i]={a:true};t.aim=.5}}};
+  g.scores=()=>[0,1,2,3].map(i=>PL.includes(i)?g.tw[i].stack.length-1+(g.tw[i].dead?0:.001*g.tw[i].stack[g.tw[i].stack.length-1].w):-1e9);
+  g.winners=()=>{const sc=[0,1,2,3].map(i=>PL.includes(i)?g.tw[i].stack.length:-1e9);const m=Math.max(...PL.map(i=>sc[i]));return m>1?PL.filter(i=>sc[i]===m):[]};
+  g.draw=c=>{mgBG(c,'#bfe7ff','#e8f6ff');for(const i of PL){const x0=laneX(i),t=g.tw[i];const col=CHARS[P(i).ci].col;
+    rr(c,x0-LW/2,100,LW,580,18);c.fillStyle='rgba(255,255,255,.55)';c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();
+    c.save();rr(c,x0-LW/2,100,LW,580,18);c.clip();
+    const n=t.stack.length;const scroll=Math.max(0,(n-14)*BH);const by=k=>640-k*BH+scroll;
+    for(let k=0;k<n;k++){const b=t.stack[k];const y=by(k)-(k===n-1?t.fall*6:0);if(y>700||y<80)continue;rr(c,x0+b.x-b.w/2,y-BH,b.w,BH-2,5);c.fillStyle=k===0?'#8a8496':(k%2?col:CHARS[P(i).ci].dark);c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke()}
+    for(const q of t.cut){const y=by(q.h)+q.y;rr(c,x0+q.x-q.w/2,y-BH,q.w,BH-2,5);c.fillStyle='rgba(150,140,170,.8)';c.fill();c.stroke()}
+    if(!t.dead){const y=by(n)-70;rr(c,x0+t.cur.x-t.cur.w/2,y-BH,t.cur.w,BH-2,5);c.fillStyle=col;c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();c.setLineDash([6,8]);c.strokeStyle='rgba(43,33,64,.35)';c.beginPath();c.moveTo(x0+t.cur.x,y);c.lineTo(x0+t.cur.x,by(n));c.stroke();c.setLineDash([])}
+    c.restore();
+    drawChar(c,P(i).ci,x0-LW/2+34,660,20,{mood:t.dead?'sad':null,noShadow:true});txt(c,(n-1)+'だん',x0+LW/2-16,660,{s:26,a:'right',f:FD,w:400,col:t.dead?'#8a8496':C.ink});
+    if(t.dead)txt(c,'おわり',x0,380,{s:30,f:FD,w:400,col:'#fff',st:C.ink,sw:7})}
+   drawMGTop(c,'つみあげタワー',Math.max(0,g.dur-g.el),null,teams)};
+  return g}};
+
+const MG_ORDER=['coin','mash','quick','stop10','rock','sumo','dodge','paint','jump','memory','flags','count','boat','pilot','bomb','tug','tag','hammer','keeper','tunnel','hotbomb','tiles','cups','rope','tower'];
 const PLs=t=>t.players||[0,1,2,3];
 
 
