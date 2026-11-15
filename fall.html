@@ -546,7 +546,7 @@ function lobbyScreen(){scr='lobby';G.active=false;touchEl.hidden=true;const m=S.
 function lobbyInput(){if(!S.meta||S.meta.st!=='lobby')return;for(const id in devs){if(id==='any'||id==='touch')continue;const d=devs[id];const pid=Object.keys(S.local).find(p=>S.local[p].dev===id);
     if(!pid){if(d.pa){audioInit();addLocal(id);}continue;}const p=S.players[pid];if(!p)continue;
     if(d.px&&!p.ok){S.db.update(rp('p/'+pid),{char:((p.char||0)+d.px+CHARS.length)%CHARS.length});sfx('ui');}
-    if(d.py&&!p.ok)setMd(pid,(p.md||'t')==='t'?'p':'t');
+    if(d.py&&!d.a&&!p.ok)setMd(pid,(p.md||'t')==='t'?'p':'t');
     if(d.pa){S.db.update(rp('p/'+pid),{ok:!p.ok});sfx('ok');}
     const back=id.startsWith('gp')?d.pb:d.pst;if(back){if(p.ok)S.db.update(rp('p/'+pid),{ok:false});else removeLocal(pid);}}}
 function endScreen(){scr='end';const m=S.meta;const ord=m.order.slice().sort((a,b)=>(m.wins[b]||0)-(m.wins[a]||0));
