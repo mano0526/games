@@ -2443,7 +2443,56 @@ MGS.race={name:'ぐるぐるレース',modes:['ffa'],desc:()=>'トラックを �
    drawMGTop(c,'ぐるぐるレース',g.time,g.actors.map(a=>a.done?(g.fin.indexOf(a.pi)+1)+'位':a.lap+'周'),teams)};
   return g}};
 
-const MG_ORDER=['coin','mash','quick','stop10','rock','sumo','dodge','paint','jump','memory','flags','count','boat','pilot','bomb','tug','tag','hammer','keeper','tunnel','hotbomb','tiles','cups','rope','tower','fish','mole','balloon','treasure','math','silhouette','cannon','raft','volley','fruit','snow','fall','rhythm','sushi','firefly','race'];
+/* --- ドッスンよけ（1vs3）：1人は 空から 岩を 落とす。3人は かげを 見て にげる --- */
+MGS.crush={name:'ドッスンよけ',modes:['1v3'],roles:()=>['岩で ぜんいん つぶせ','かげを 見て にげきれ'],
+ desc:()=>'1人チームは 岩を 動かして Aで ドッスン！ 3人チームは 地面の かげが こくなったら にげよう。1回 つぶされたら アウト。25秒 だれか のこれば 3人チームの 勝ち。後半は 岩が はやくなる！',
+ ctl:'1人：スティックで 岩を 動かす　A 落とす ／ 3人：スティックで にげる',
+ create(mode,teams){const solo=teams.groups[0][0],run=teams.groups[1];const ar={x:150,y:150,w:980,h:520};
+  const g={ar,time:25,done:false,ai:[],endT:-1,rk:{x:ar.x+ar.w/2,y:ar.y+ar.h/2,vx:0,vy:0,st:'move',t:0,cd:.8},R:78,plan:null,react:{}};
+  g.actors=run.map((i,k)=>mkActor(i,ar.x+120+k*370,ar.y+ar.h-80));
+  const wind=()=>g.time>10?.52:.38;
+  g.update=dt=>{g.time-=dt;if(g.endT>=0){g.endT-=dt;if(g.endT<=0)g.done=true}if(g.time<=0){g.time=0;g.done=true;return}g.think(dt);
+   const rk=g.rk,sp=P(solo),si=sp.human?{...Input.axis(sp.dev),a:Input.pressed(sp.dev,'a')}:(g.ai[solo]||{x:0,y:0,a:false});
+   rk.cd=Math.max(0,rk.cd-dt);
+   if(rk.st==='move'){const s=g.time>10?340:400;rk.vx+=((si.x||0)*s-rk.vx)*Math.min(1,dt*10);rk.vy+=((si.y||0)*s-rk.vy)*Math.min(1,dt*10);rk.x=clamp(rk.x+rk.vx*dt,ar.x+40,ar.x+ar.w-40);rk.y=clamp(rk.y+rk.vy*dt,ar.y+40,ar.y+ar.h-40);
+    if(si.a&&rk.cd<=0&&g.endT<0){rk.st='wind';rk.t=0;rk.n=(rk.n||0)+1;sfx('tick')}}
+   else if(rk.st==='wind'){rk.t+=dt;if(rk.t>=wind()){rk.st='hit';rk.t=0;sfx('boom');burst(rk.x,rk.y,18,['#cdb89a','#a48a68','#fff'],{max:320});
+     for(const a of g.actors){if(!a.alive)continue;if(Math.hypot(a.x-rk.x,(a.y-rk.y)*1.8)<g.R){a.alive=false;a.deadT=0;floatText(a.x,a.y-70,'ぺちゃんこ！','#fff',{size:26});sfx('lose')}}}}
+   else if(rk.st==='hit'){rk.t+=dt;if(rk.t>.5){rk.st='move';rk.cd=g.time>10?.55:.35}}
+   for(const a of g.actors){if(!a.alive){a.deadT+=dt;continue}const inp=mgIn(g,a.pi);moveActor(a,inp,285,dt,ar)}
+   separate(g.actors.filter(a=>a.alive));if(g.endT<0&&g.actors.every(a=>!a.alive))g.endT=1};
+  g.think=dt=>{const lv=LV(),rk=g.rk;
+   if(!P(solo).human){const al=g.actors.filter(a=>a.alive);let tg=null,bd=1e9;for(const a of al){const d=Math.hypot(a.x-rk.x,a.y-rk.y);if(d<bd){bd=d;tg=a}}
+    if(tg){const lead=wind()*[.3,.6,.85][lv];const tx=clamp(tg.x+tg.vx*lead,ar.x+40,ar.x+ar.w-40),ty=clamp(tg.y+tg.vy*lead,ar.y+40,ar.y+ar.h-40);const s=seek(rk,tx,ty,6);const d=Math.hypot(tx-rk.x,ty-rk.y);
+     g.ai[solo]={x:s.x,y:s.y,a:rk.st==='move'&&d<[50,60,68][lv]&&Math.random()<[.1,.25,.5][lv]}}else g.ai[solo]={x:0,y:0,a:false}}
+   for(const a of g.actors){const i=a.pi;if(P(i).human||!a.alive)continue;
+    // かげが こくなったら よける（反応の 早さは 強さで かわる）
+    const r=g.react[i]=g.react[i]||{};if(rk.st==='wind'&&r.slam!==rk.n){r.slam=rk.n;r.freeze=Math.random()<[.4,.25,.12][lv]}const danger=rk.st==='wind'&&!r.freeze?rk.t:-1;
+    let haz=[];if(danger>[.2,.13,.07][lv])haz.push({x:rk.x,y:rk.y,r:g.R,t:0});
+    const dd=lv>0?dodgeDir(a,haz,1,ar,24):(haz.length?dodgeDir(a,haz,1,ar,10):null);
+    if(dd){g.ai[i]={x:dd.x,y:dd.y};continue}
+    // ふだんは 岩から はなれた 場所へ ぶらぶら
+    const dx=a.x-rk.x,dy=a.y-rk.y,d=Math.hypot(dx,dy)||1;if(d<[110,150,180][lv]){g.ai[i]={x:dx/d,y:dy/d};continue}
+    if(!a.wt||Math.hypot(a.wt.x-a.x,a.wt.y-a.y)<30||Math.random()<.01)a.wt={x:rand(ar.x+60,ar.x+ar.w-60),y:rand(ar.y+60,ar.y+ar.h-60)};const s=seek(a,a.wt.x,a.wt.y,20);g.ai[i]={x:s.x*.7,y:s.y*.7}}};
+  g.winners=()=>g.actors.every(a=>!a.alive)?[solo]:run.slice();
+  g.draw=c=>{drawFloor(c,ar,'quarry');const rk=g.rk;
+   // かげ
+   const k=rk.st==='wind'?rk.t/wind():rk.st==='hit'?1:0;c.fillStyle=`rgba(30,20,40,${.18+k*.45})`;ell(c,rk.x,rk.y,g.R*(.7+k*.3),g.R*.55*(.7+k*.3));c.fill();
+   if(rk.st==='wind'&&(rk.t*12%1)<.5){c.strokeStyle='rgba(255,60,60,.8)';c.lineWidth=4;ell(c,rk.x,rk.y,g.R,g.R*.55);c.stroke()}
+   const all=g.actors.slice().sort((p,q)=>p.y-q.y);
+   for(const a of all){if(!a.alive){drawChar(c,a.ci,a.x,a.y-10,26,{sq:.9,mood:'dizzy',alpha:Math.max(.35,1-a.deadT)});continue}drawActor(c,a)}
+   // 岩（上に うかんでいる → 落ちる）
+   const H0=110;const hgt=rk.st==='move'?H0:rk.st==='wind'?H0+Math.sin(rk.t*40)*4:Math.max(0,(1-rk.t*6))*H0;const bx=rk.x,by=Math.max(150,rk.y-hgt-40);
+   c.fillStyle='#8f8a9c';c.strokeStyle=C.ink;c.lineWidth=5;rr(c,bx-62,by-50,124,104,18);c.fill();c.stroke();c.fillStyle='#a9a4b6';rr(c,bx-52,by-42,104,22,10);c.fill();
+   c.fillStyle='#6f6a80';for(const[sx,sy]of[[-40,30],[40,30],[-44,-6],[44,-6]]){circ(c,bx+sx,by+sy,6);c.fill()}
+   c.fillStyle='#fff';c.lineWidth=3;for(const sx of[-1,1]){ell(c,bx+sx*22,by,13,11);c.fill();c.stroke();c.fillStyle=C.ink;circ(c,bx+sx*20,by+2,5);c.fill();c.fillStyle='#fff'}
+   c.lineWidth=5;c.beginPath();c.moveTo(bx-36,by-18);c.lineTo(bx-10,by-10);c.moveTo(bx+36,by-18);c.lineTo(bx+10,by-10);c.stroke();
+   c.beginPath();c.moveTo(bx-20,by+30);c.lineTo(bx+20,by+30);c.stroke();
+   drawChar(c,P(solo).ci,bx,by-80,22,{mood:rk.st==='hit'?'happy':null});
+   if(rk.st==='hit'&&rk.t<.25){c.strokeStyle='#fff';c.lineWidth=4;for(let j=0;j<8;j++){const an=j/8*Math.PI*2;c.beginPath();c.moveTo(rk.x+Math.cos(an)*g.R*.9,rk.y+Math.sin(an)*g.R*.4);c.lineTo(rk.x+Math.cos(an)*g.R*1.3,rk.y+Math.sin(an)*g.R*.6);c.stroke()}}
+   drawMGTop(c,'ドッスンよけ',g.time,[0,1,2,3].map(i=>i===solo?null:(g.actors.find(a=>a.pi===i).alive?'○':'×')),teams)};
+  return g}};
+const MG_ORDER=['coin','mash','quick','stop10','rock','sumo','dodge','paint','jump','memory','flags','count','boat','pilot','bomb','tug','tag','hammer','keeper','tunnel','hotbomb','tiles','cups','rope','tower','fish','mole','balloon','treasure','math','silhouette','cannon','raft','volley','fruit','snow','fall','rhythm','sushi','firefly','race','crush'];
 const PLs=t=>t.players||[0,1,2,3];
 
 

@@ -7,7 +7,7 @@
 | ファイル | 中身 |
 |---|---|
 | index.html | ゲーム一覧（入口） |
-| party.html | コロコロ島パーティ（マリオパーティ風、最大4人）。ミニゲーム41個（MG_ORDER）。被り防止は localStorage `kk_mghist_v1` |
+| party.html | コロコロ島パーティ（マリオパーティ風、最大4人）。ミニゲーム42個（MG_ORDER）。被り防止は localStorage `kk_mghist_v1` |
 | kart.html | ターボカートGP（マリオカート風、画面分割、WebGL `#gl` + 2D `#hud`）。オンラインは netplay.js を使わず自前（各自の端末で動かす方式） |
 | kitchen.html | てんやわんやキッチン（オーバークック風）。元は js/*.js 分割だったのを1ファイルに統合済み |
 | trap.html | ワナワナ・ラン（アルチキ風パーティ足場ゲーム、2D canvas、最大4人＋CPU）。オンラインは自前（各自の端末で動かす方式） |
