@@ -1288,7 +1288,7 @@ function titleScreen(){app.screen='title';show();if(race){engineStop();}music.st
    <button class="btn big" data-nav data-a="ta">タイムアタック<small>ひとりで最速タイムに挑戦。ゴーストつき</small></button>
    <button class="btn big" data-nav data-a="online" style="grid-column:1/-1;background:var(--sun)">オンライン<small style="color:var(--ink)">友達とそれぞれの端末で走る（最大4人）</small></button>
   </div>
-  <div class="row"><button class="btn ghost" data-nav data-a="help">あそびかた</button><button class="btn ghost" data-nav data-a="snd">サウンド設定</button><button class="btn ghost" data-nav data-a="pad">コントローラー設定</button>
+  <div class="row"><button class="btn ghost" data-nav data-a="help">あそびかた</button><button class="btn ghost" data-nav data-a="snd">サウンド設定</button><button class="btn ghost" data-nav data-a="pad">コントローラー設定</button><a class="btn ghost" data-nav href="index.html">ゲーム一覧（ホーム）へ</a>
    <span class="hint">接続中のコントローラー：${pads}台　${pads?'':'（ボタンを押すと認識されます）'}</span></div></div>`);
   bindMenu(2,null,{gp:0,vs:1,battle:2,ta:3}[app.mode]||0);
   ui.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='snd')return soundScreen();if(a==='pad')return padScreen();
@@ -1445,8 +1445,8 @@ function launch(o){ensureMeshes();audioInit();app.paused=false;startRace({course
   touchEl.hidden=!app.players.some(p=>p.dev==='touch');menu.items=[];menu.custom=null;}
 
 function pauseMenu(){app.paused=true;engineStopSoft();ui.hidden=false;ui.classList.add('overlay');touchEl.hidden=true;
-  h(`<div class="wrap" style="max-width:420px"><h2>ポーズ</h2><div class="menu"><button class="btn big" data-nav data-a="r">つづける</button><button class="btn big" data-nav data-a="x">やり直す</button><button class="btn big" data-nav data-a="q">やめる</button></div></div>`);
-  bindMenu(1,resume);ui.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='r')resume();else if(a==='x'){launch({course:race.cfg.course,arena:race.cfg.arena,grid:race.cfg.grid,noIntro:true});}else titleScreen();});}
+  h(`<div class="wrap" style="max-width:420px"><h2>ポーズ</h2><div class="menu"><button class="btn big" data-nav data-a="r">つづける</button><button class="btn big" data-nav data-a="x">やり直す</button><button class="btn big" data-nav data-a="q">やめる</button><button class="btn" data-nav data-a="home">ゲーム一覧（ホーム）へ</button></div></div>`);
+  bindMenu(1,resume);ui.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='home'){location.href='index.html';return}if(a==='r')resume();else if(a==='x'){launch({course:race.cfg.course,arena:race.cfg.arena,grid:race.cfg.grid,noIntro:true});}else titleScreen();});}
 function resume(){app.paused=false;ui.hidden=true;ui.innerHTML='';menu.items=[];touchEl.hidden=!app.players.some(p=>p.dev==='touch');}
 function engineStopSoft(){for(let i=0;i<AU.engines.length;i++)engineSet(i,0,false,false,0);}
 
@@ -1632,8 +1632,8 @@ function netEvent(key,ev){const rn=race&&race.net;if(!rn||!ev||ev.f===NET.pid||r
   else if(ev.ty==='th'){const src=byRid(ev.src);race.flash=.35;sfx('thunder');for(const o of race.karts)if(!o.remote&&o!==src&&o.starT<=0){if(o.item&&o.roulT<=0){o.item=null;o.itemN=0;}o.holding=false;hitKart(o,'thunder');o.shrinkT=5.5-o.rank*.2;}}
   else if(ev.ty==='hit'){const k=byRid(ev.v);if(k&&!k.remote)hitKart(k,ev.kind);}}
 function netPauseMenu(){app.netMenu=true;ui.hidden=false;ui.classList.add('overlay');
-  h(`<div class="wrap" style="max-width:420px"><h2>メニュー</h2><p class="hint">オンライン中はレースは止まりません。</p><div class="menu"><button class="btn big" data-nav data-a="r">つづける</button><button class="btn big" data-nav data-a="q">部屋を出る</button></div></div>`);
-  bindMenu(1,netResume);ui.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{if(b.dataset.a==='r')netResume();else netLeave('');});}
+  h(`<div class="wrap" style="max-width:420px"><h2>メニュー</h2><p class="hint">オンライン中はレースは止まりません。</p><div class="menu"><button class="btn big" data-nav data-a="r">つづける</button><button class="btn big" data-nav data-a="q">部屋を出る</button><button class="btn" data-nav data-a="home">ゲーム一覧（ホーム）へ</button></div></div>`);
+  bindMenu(1,netResume);ui.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{if(b.dataset.a==='r')netResume();else if(b.dataset.a==='home'){try{netLeave('')}catch(e){}location.href='index.html'}else netLeave('');});}
 function netResume(){app.netMenu=false;ui.hidden=true;ui.innerHTML='';menu.items=[];}
 function netResults(){const r=race,rn=r.net,order=r.order;const db=NET.db;const m=NET.meta||{};const gp=rn.gp;
   const label=k=>k.netHuman||k.human?(k.human?NET.name:k.netName):k.ch.name;const idOf=k=>k.human?NET.pid:k.rid;

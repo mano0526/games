@@ -995,11 +995,11 @@ const PLAYSCENE={
   if(P.curtain>=0){if(sPressed(P.curtain,'a')||sClicks(P.curtain).length){P.viewer=P.curtain;P.curtain=-1;sfx('ok');In.clear()}return}
   if(isCom(s)){if(NET&&!NET.host)return;P.cpuT-=dt;if(P.cpuT<=0){const m=g.ai(SEATS[s].lv);if(m!=null)doMove(m);P.cpuT=rand(.5,.9)}}
   else{P.cpuT=rand(.5,.9);const m=window.__abAuto&&seatDev(s)!=='net'?(Math.random()<.1?g.ai(1):null):g.human(s);if(m!=null)doMove(m)}},
- opts(){return['つづける','あそびかたを 見る','音：'+(SOUND?'ON':'OFF'),'全画面に する／もどす',NET?'部屋を 出る':'やめて ゲームを えらぶ']},
+ opts(){return['つづける','あそびかたを 見る','音：'+(SOUND?'ON':'OFF'),'全画面に する／もどす',NET?'部屋を 出る':'やめて ゲームを えらぶ','ゲーム一覧（ホーム）へ']},
  pauseUpdate(){const P=PLAY;const opts=this.opts();for(const id of In.devs){if(In.rep(id,'down')||In.rep(id,'right')){P.psel=(P.psel+1)%opts.length;sfx('blip')}if(In.rep(id,'up')||In.rep(id,'left')){P.psel=(P.psel+opts.length-1)%opts.length;sfx('blip')}}
   let go=In.any('a')?P.psel:-1;for(const p of In.clicks){opts.forEach((o,i)=>{if(hit(p,W/2-200,PY0+i*64,400,54))go=i})}if(In.any('b')||In.any('start'))go=0;
   if(NET)PLAY.g.update(DT);// オンラインでは ポーズ中も ゲームは すすむ
-  if(go===0){P.pause=false;In.clear()}else if(go===1){P.help=!P.help;sfx('blip')}else if(go===2){SOUND=!SOUND;document.getElementById('bSnd').textContent='音：'+(SOUND?'ON':'OFF');sfx('ok')}else if(go===3){/* 全画面は 押した その場（イベントの 中）で きりかえる */}else if(go===4){if(NET)leaveRoom();scene=TITLE;PLAY=null;In.clear()}},
+  if(go===0){P.pause=false;In.clear()}else if(go===1){P.help=!P.help;sfx('blip')}else if(go===2){SOUND=!SOUND;document.getElementById('bSnd').textContent='音：'+(SOUND?'ON':'OFF');sfx('ok')}else if(go===3){/* 全画面は 押した その場（イベントの 中）で きりかえる */}else if(go===4){if(NET)leaveRoom();scene=TITLE;PLAY=null;In.clear()}else if(go===5){if(NET)leaveRoom();location.href='index.html'}},
  draw(c){const P=PLAY;P.g.draw(c);
   // 上の まん中に「だれの 番か」を 大きく（席の 色）
   if(!P.g.done&&!P.pause&&P.def.key!=='wolf'&&(!P.def.hidden||P.curtain<0)&&!(P.g.phase&&P.g.phase!=='play'&&P.g.phase!=='roll'&&P.g.phase!=='move'&&P.g.phase!=='auto')){const s=P.g.turn;const d=seatDev(s);const me=!isCom(s)&&d!=='net';const msg=isCom(s)?`${seatName(s)} の番`:d==='net'?`${seatName(s)} の番`:(NET||(P.locals&&P.locals.length===1)?'あなたの番！':`${seatName(s)} の番`);
@@ -1008,9 +1008,9 @@ const PLAYSCENE={
   if(P.g.done){c.fillStyle=`rgba(0,0,0,${Math.min(.4,P.end*.4)})`;c.fillRect(0,0,W,H);txt(c,'おしまい！',W/2,H/2,{s:80,f:FD,w:400,col:C.gold,st:C.ink,sw:12})}
   if(P.pause){c.fillStyle='rgba(20,14,38,.75)';c.fillRect(0,0,W,H);if(P.help){c.font=`800 15px ${FB}`;const L=[];for(const r of P.def.rules)for(const l of wrap(c,'・'+r,700))L.push(l);const hh=L.length*22+30,ty=Math.max(8,PY0-hh-10);panel(c,W/2-370,ty,740,hh);L.forEach((l,i)=>txt(c,l,W/2-350,ty+26+i*22,{s:15,a:'left'}))}
    this.opts().forEach((o,i)=>{const sel=i===P.psel;panel(c,W/2-200,PY0+i*64,400,54,{fill:sel?C.gold:C.paper,stroke:C.ink,lw:sel?5:3});txt(c,o,W/2,PY0+27+i*64,{s:22,f:FD,w:400})});
-   if(NET)txt(c,'オンラインでは ポーズ中も ゲームは すすみます',W/2,PY0+5*64+14,{s:15,col:'#fff'})}
+   if(NET)txt(c,'オンラインでは ポーズ中も ゲームは すすみます',W/2,PY0+6*64+8,{s:15,col:'#fff'})}
   if(!P.pause){rr(c,MENUB.x,MENUB.y,MENUB.w,MENUB.h,14);c.fillStyle='rgba(16,25,20,.75)';c.fill();c.lineWidth=2;c.strokeStyle='rgba(255,255,255,.5)';c.stroke();for(let i=0;i<3;i++){c.fillStyle='#fff';c.fillRect(MENUB.x+14,MENUB.y+12+i*8,20,4)}txt(c,'メニュー',MENUB.x+72,MENUB.y+MENUB.h/2,{s:16,col:'#fff'})}}};
-const MENUB={x:W-136,y:6,w:126,h:42},PY0=300;
+const MENUB={x:W-136,y:6,w:126,h:42},PY0=268;
 function toggleFS(){try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}catch(e){}}
 // 全画面は ブラウザの きまりで「押した その場」でしか 切りかえられないので、ここで 先に 見る
 addEventListener('pointerdown',e=>{if(scene!==PLAYSCENE||!PLAY||!PLAY.pause)return;const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,y=(e.clientY-r.top)/r.height*H;if(hit({x,y},W/2-200,PY0+3*64,400,54))toggleFS()});

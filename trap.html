@@ -614,8 +614,8 @@ function endScreen(){scr='end';const m=S.meta;const ord=m.order.slice().sort((a,
   const c=ui.querySelector('#wc').getContext('2d');drawChar(c,CHARS[charOf(m.win)],120,185,130,1,0,true,0);
   const a=ui.querySelector('[data-a=again]');if(a)a.onclick=()=>{for(const pid in S.players){if(S.players[pid].cpu)S.db.remove(rp('p/'+pid));else S.db.update(rp('p/'+pid),{ok:false});}S.db.update(rp('m'),{st:'lobby',rd:null,last:null,win:null});if(S.pub)S.pub.update({st:'lobby'});};
   ui.querySelector('[data-back]').onclick=()=>leaveRoom('');}
-function pauseMenu(){G.menu=true;scr='pause';for(const k in devs){devs[k].pst=false;devs[k].pb=false;devs[k].pa=false;}h(`<div class="wrap" style="max-width:420px"><h2>メニュー</h2><p class="hint">メニュー中もゲームは止まりません。</p><div class="menu"><button class="btn big" data-nav data-back>つづける</button><button class="btn big" data-nav data-a="q">${S.online?'部屋を出る':'タイトルへ'}</button></div></div>`);
-  ui.querySelector('[data-back]').onclick=()=>{G.menu=false;scr='game';ui.hidden=true;ui.innerHTML='';};ui.querySelector('[data-a=q]').onclick=()=>{G.menu=false;leaveRoom('');};}
+function pauseMenu(){G.menu=true;scr='pause';for(const k in devs){devs[k].pst=false;devs[k].pb=false;devs[k].pa=false;}h(`<div class="wrap" style="max-width:420px"><h2>メニュー</h2><p class="hint">メニュー中もゲームは止まりません。</p><div class="menu"><button class="btn big" data-nav data-back>つづける</button><button class="btn big" data-nav data-a="q">${S.online?'部屋を出る':'タイトルへ'}</button><button class="btn" data-nav data-a="home">ゲーム一覧（ホーム）へ</button></div></div>`);
+  ui.querySelector('[data-back]').onclick=()=>{G.menu=false;scr='game';ui.hidden=true;ui.innerHTML='';};ui.querySelector('[data-a=q]').onclick=()=>{G.menu=false;leaveRoom('');};ui.querySelector('[data-a=home]').onclick=()=>{try{leaveRoom('')}catch(e){}location.href='index.html'};}
 // ============ ステージづくり ============
 const ED={grid:null,start:[1,17],goal:[44,14],lava:0,theme:0,name:'',id:'',tool:'g',msg:'',ver:0,built:-1,down:false};
 function loadCustom(){try{const a=JSON.parse(localStorage.getItem('wn_custom')||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
