@@ -1265,7 +1265,7 @@ function bindMenu(cols,onBack,focus){menu.items=[...ui.querySelectorAll('[data-n
   menu.items.forEach((el,i)=>{el.addEventListener('mouseenter',()=>{menu.focus=i;paintFocus();});el.addEventListener('click',()=>{audioInit();});});paintFocus();}
 function paintFocus(){menu.items.forEach((el,i)=>el.classList.toggle('focus',i===menu.focus));}
 function menuStep(devs){if(menu.custom&&menu.custom(devs))return;if(!menu.items.length)return;
-  for(const id in devs){const p=devs[id].pressed;if(id==='touch')continue;let mv=0;
+  for(const id in devs){const p=devs[id].pressed;if(id==='touch'||id==='any')continue;let mv=0;
     if(p.left)mv=-1;if(p.right)mv=1;if(p.up)mv=-menu.cols;if(p.down)mv=menu.cols;
     const fe=menu.items[menu.focus];if(fe&&fe.dataset.vol&&(p.left||p.right)){volAdj(fe.dataset.vol,p.left?-1:1);return;}
     if(mv){const nf=menu.focus+mv;if(nf>=0&&nf<menu.items.length){menu.focus=nf;paintFocus();sfx('ui');}}
@@ -1368,7 +1368,7 @@ function joinScreen(){app.screen='join';show();if(!app.keepPlayers)app.players=[
   const toggleAssist=i=>{const p=app.players[i];if(!p||p.ok)return;p.assist=!p.assist;sfx('ui');render();};
   const cycle=(i,d)=>{const p=app.players[i];if(!p||p.ok)return;p.char=(p.char+d+CHARS.length)%CHARS.length;sfx('ui');render();};
   render();
-  menu.custom=devs=>{for(const id in devs){const s=devs[id],pr=s.pressed;if(id==='touch')continue;const pi=app.players.findIndex(p=>p.dev===id);
+  menu.custom=devs=>{for(const id in devs){const s=devs[id],pr=s.pressed;if(id==='touch'||id==='any')continue;const pi=app.players.findIndex(p=>p.dev===id);
       if(pi<0){if(pr.confirm)join(id);else if(pr.back&&!app.players.length){sfx('back');titleScreen();return true;}continue;}
       const p=app.players[pi];if(pr.left)cycle(pi,-1);if(pr.right)cycle(pi,1);if(pr.up)fcycle(pi,-1);if(pr.down)fcycle(pi,1);if(pr.item&&!pr.confirm&&!pr.back)toggleAssist(pi);
       if(pr.confirm){if(p.ok&&app.players.every(q=>q.ok)){afterJoin();return true;}if(!p.ok){p.ok=true;sfx('ok');render();}}
