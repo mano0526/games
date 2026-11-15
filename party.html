@@ -2492,7 +2492,63 @@ MGS.crush={name:'ドッスンよけ',modes:['1v3'],roles:()=>['岩で ぜんい�
    if(rk.st==='hit'&&rk.t<.25){c.strokeStyle='#fff';c.lineWidth=4;for(let j=0;j<8;j++){const an=j/8*Math.PI*2;c.beginPath();c.moveTo(rk.x+Math.cos(an)*g.R*.9,rk.y+Math.sin(an)*g.R*.4);c.lineTo(rk.x+Math.cos(an)*g.R*1.3,rk.y+Math.sin(an)*g.R*.6);c.stroke()}}
    drawMGTop(c,'ドッスンよけ',g.time,[0,1,2,3].map(i=>i===solo?null:(g.actors.find(a=>a.pi===i).alive?'○':'×')),teams)};
   return g}};
-const MG_ORDER=['coin','mash','quick','stop10','rock','sumo','dodge','paint','jump','memory','flags','count','boat','pilot','bomb','tug','tag','hammer','keeper','tunnel','hotbomb','tiles','cups','rope','tower','fish','mole','balloon','treasure','math','silhouette','cannon','raft','volley','fruit','snow','fall','rhythm','sushi','firefly','race','crush'];
+/* --- エアホッケー（1vs1／2vs2）：パックを はじいて 相手の ゴールへ --- */
+MGS.hockey={name:'エアホッケー',modes:['1v1','2v2'],roles:m=>['左の ゴールを まもれ','右の ゴールを まもれ'],
+ desc:m=>'スティックで マレットを 動かして パックを はじこう！ 相手の ゴールに 入れたら 1点。自分の 陣地からは 出られないよ。先に 5点 か、40秒で 多い ほうの 勝ち。Aで ダッシュ（強く 打てる）。',
+ ctl:'いどう：スティック / 十字　A：ダッシュして 強打',
+ create(mode,teams){const ar={x:110,y:140,w:1060,h:540},MX=ar.x+ar.w/2,GH=250,GY0=ar.y+ar.h/2-GH/2,GY1=GY0+GH,PR=20,MR=34;
+  const side=i=>teamOf(teams,i); // 0=左 1=右
+  const g={ar,time:40,done:false,ai:[],sc:[0,0],pk:{x:MX+(Math.random()<.5?-70:70),y:ar.y+ar.h/2,vx:0,vy:0},serve:1.2,flash:0,endT:-1,trail:[]};
+  const PL=PLs(teams);g.actors=PL.map(i=>{const s=side(i),mates=teams.groups[s],k=mates.indexOf(i),n=mates.length;const a=mkActor(i,s?ar.x+ar.w-150:ar.x+150,ar.y+ar.h*(n===1?.5:(k?.72:.28)));a.side=s;a.dash=0;a.cd=0;a.hx=a.x;a.hy=a.y;return a});
+  const resetPk=to=>{g.pk={x:MX+(to?60:-60),y:ar.y+ar.h/2+rand(-80,80),vx:0,vy:0};g.serve=1};
+  g.update=dt=>{g.time-=dt;g.flash=Math.max(0,g.flash-dt);if(g.endT>=0){g.endT-=dt;if(g.endT<=0)g.done=true}if(g.time<=0){g.time=0;g.done=true;return}g.think(dt);
+   for(const a of g.actors){const inp=mgIn(g,a.pi);a.cd=Math.max(0,a.cd-dt);a.dash=Math.max(0,a.dash-dt);if(inp.a&&a.cd<=0){a.dash=.18;a.cd=.7;sfx('hop')}
+    const ox=a.x,oy=a.y;const half={x:a.side?MX:ar.x,y:ar.y,w:ar.w/2,h:ar.h};moveActor(a,inp,a.dash>0?760:430,dt,half);a.mvx=(a.x-ox)/dt;a.mvy=(a.y-oy)/dt}
+   separate(g.actors);
+   const p=g.pk;if(g.serve>0){g.serve-=dt}else{
+    const sub=4;for(let s=0;s<sub;s++){const h=dt/sub;p.x+=p.vx*h;p.y+=p.vy*h;
+     if(p.y<ar.y+PR){p.y=ar.y+PR;p.vy=Math.abs(p.vy)*.95;sfx('blip')}if(p.y>ar.y+ar.h-PR){p.y=ar.y+ar.h-PR;p.vy=-Math.abs(p.vy)*.95;sfx('blip')}
+     const inGoal=p.y>GY0+PR*.4&&p.y<GY1-PR*.4;
+     if(p.x<ar.x+PR){if(inGoal){g.sc[1]++;g.flash=1;sfx('fanfare');burst(ar.x,p.y,24,[teams.colors[1],'#fff',C.gold],{max:360});resetPk(0);break}p.x=ar.x+PR;p.vx=Math.abs(p.vx)*.95;sfx('blip')}
+     if(p.x>ar.x+ar.w-PR){if(inGoal){g.sc[0]++;g.flash=1;sfx('fanfare');burst(ar.x+ar.w,p.y,24,[teams.colors[0],'#fff',C.gold],{max:360});resetPk(1);break}p.x=ar.x+ar.w-PR;p.vx=-Math.abs(p.vx)*.95;sfx('blip')}
+     for(const a of g.actors){const dx=p.x-a.x,dy=p.y-a.y,d=Math.hypot(dx,dy);if(d<PR+MR&&d>0){const nx=dx/d,ny=dy/d;p.x=a.x+nx*(PR+MR);p.y=a.y+ny*(PR+MR);
+       const rvx=p.vx-(a.mvx||0),rvy=p.vy-(a.mvy||0),dot=rvx*nx+rvy*ny;if(dot<0){p.vx-=1.9*dot*nx;p.vy-=1.9*dot*ny}const push=a.dash>0?520:220;p.vx+=nx*push*.25+(a.mvx||0)*.35;p.vy+=ny*push*.25+(a.mvy||0)*.35;if(a.dash>0)sfx('hit');else sfx('tick')}}
+     p.y=clamp(p.y,ar.y+PR,ar.y+ar.h-PR);if(!(p.y>GY0+PR*.4&&p.y<GY1-PR*.4))p.x=clamp(p.x,ar.x+PR,ar.x+ar.w-PR)}
+    p.vx*=Math.pow(.72,dt);p.vy*=Math.pow(.72,dt);{const sp0=Math.hypot(p.vx,p.vy),nearW=p.x<ar.x+70||p.x>ar.x+ar.w-70||p.y<ar.y+70||p.y>ar.y+ar.h-70;if(sp0<90&&nearW){const cx=MX+(p.x<MX?-ar.w*.2:ar.w*.2),cy=ar.y+ar.h/2,dl=Math.hypot(cx-p.x,cy-p.y)||1;p.vx+=(cx-p.x)/dl*260*dt;p.vy+=(cy-p.y)/dl*260*dt}}const s=Math.hypot(p.vx,p.vy),mx=1250;if(s>mx){p.vx*=mx/s;p.vy*=mx/s}}
+   if(g.serve<=0&&Math.hypot(p.vx,p.vy)<150){g.stall=(g.stall||0)+dt;if(g.stall>2.5){g.stall=0;g.flip=!g.flip;resetPk(g.flip?1:0);sfx('whistle')}}else g.stall=0;
+   g.trail.push({x:p.x,y:p.y});if(g.trail.length>10)g.trail.shift();
+   if(g.endT<0&&(g.sc[0]>=5||g.sc[1]>=5))g.endT=1.2};
+  g.think=dt=>{const lv=LV(),p=g.pk;for(const a of g.actors){const i=a.pi;if(P(i).human)continue;
+    const gx=a.side?ar.x+ar.w:ar.x,dir=a.side?-1:1;const mates=g.actors.filter(b=>b.side===a.side);const role=mates.length>1?mates.indexOf(a):-1; // 2人なら 0=前 1=うしろ
+    const coming=(p.vx*dir<-60);const inMine=a.side?p.x>MX:p.x<MX;let tx,ty,dash=false;
+    const keeper=role===1||(role===-1&&coming&&!inMine);
+    if(keeper||(coming&&role!==0&&Math.abs(p.x-gx)<ar.w*.35)){tx=gx+dir*90;ty=clamp(p.y+(p.vy*[0,.1,.18][lv]),GY0+10,GY1-10)}
+    else if(inMine||role===0){const og=a.side?ar.x:ar.x+ar.w;const foes=g.actors.filter(b=>b.side!==a.side);const fy=foes.length?foes.reduce((s,b)=>s+b.y,0)/foes.length:ar.y+ar.h/2;
+      if(a.aimT===undefined||(a.aimT-=dt)<=0){a.aimT=rand(.6,1.2);a.aimY=fy<ar.y+ar.h/2?GY1-30:GY0+30;if(Math.random()<.3)a.aimY=(Math.random()<.5?ar.y:ar.y+ar.h)}
+      const ax=og-p.x,ay=a.aimY-p.y,al=Math.hypot(ax,ay)||1,ux=ax/al,uy=ay/al;const bx=p.x-ux*(PR+MR+8),by=p.y-uy*(PR+MR+8);tx=bx;ty=by;const d=Math.hypot(bx-a.x,by-a.y);
+      if(d<26&&(p.x-a.x)*dir>0){tx=p.x+ux*50;ty=p.y+uy*50;dash=Math.random()<[.05,.12,.25][lv]}}
+    else{tx=gx+dir*ar.w*.25;ty=clamp(p.y,ar.y+60,ar.y+ar.h-60)}
+    const s=seek(a,tx,ty,8);const k=[.6,.82,1][lv];g.ai[i]={x:s.x*k,y:s.y*k,a:dash}}};
+  g.scores=()=>PLs(teams).map(i=>g.sc[side(i)]);
+  g.winners=()=>g.sc[0]===g.sc[1]?[]:teams.groups[g.sc[0]>g.sc[1]?0:1].slice();
+  g.draw=c=>{mgBG(c,'#1d2a4a','#0f1830');
+   rr(c,ar.x-22,ar.y-22,ar.w+44,ar.h+44,40);c.fillStyle='#c9d3e4';c.fill();c.lineWidth=6;c.strokeStyle=C.ink;c.stroke();
+   rr(c,ar.x,ar.y,ar.w,ar.h,30);c.fillStyle='#eef6ff';c.fill();
+   c.save();rr(c,ar.x,ar.y,ar.w,ar.h,30);c.clip();c.fillStyle='rgba(120,160,220,.12)';for(let x=ar.x+20;x<ar.x+ar.w;x+=40)for(let y=ar.y+20;y<ar.y+ar.h;y+=40){circ(c,x,y,2.5);c.fill()}
+    c.fillStyle=teams.colors[0]+'22';c.fillRect(ar.x,ar.y,ar.w/2,ar.h);c.fillStyle=teams.colors[1]+'22';c.fillRect(MX,ar.y,ar.w/2,ar.h);c.restore();
+   c.strokeStyle='#e5473c';c.lineWidth=5;c.beginPath();c.moveTo(MX,ar.y);c.lineTo(MX,ar.y+ar.h);c.stroke();circ(c,MX,ar.y+ar.h/2,70);c.stroke();
+   c.strokeStyle='#3a7fdc';c.lineWidth=4;for(const s of[0,1]){const gx=s?ar.x+ar.w:ar.x;c.beginPath();c.arc(gx,ar.y+ar.h/2,130,s?Math.PI/2:-Math.PI/2,s?Math.PI*1.5:Math.PI/2,false);c.stroke()}
+   for(const s of[0,1]){const gx=s?ar.x+ar.w:ar.x-14;c.fillStyle=C.ink;c.fillRect(gx,GY0,14,GH);c.fillStyle=teams.colors[s];c.fillRect(gx+(s?0:8),GY0-10,6,10);c.fillRect(gx+(s?0:8),GY1,6,10)}
+   c.lineWidth=5;c.strokeStyle=C.ink;rr(c,ar.x,ar.y,ar.w,ar.h,30);c.stroke();
+   const p=g.pk;g.trail.forEach((t,k)=>{c.fillStyle=`rgba(229,71,60,${k/g.trail.length*.25})`;circ(c,t.x,t.y,PR*(k/g.trail.length));c.fill()});
+   c.fillStyle='rgba(0,0,0,.2)';ell(c,p.x+3,p.y+5,PR,PR*.8);c.fill();c.fillStyle=g.serve>0&&(g.serve*6%1)<.5?'#fff':'#e5473c';circ(c,p.x,p.y,PR);c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();c.fillStyle='rgba(255,255,255,.4)';circ(c,p.x-5,p.y-6,6);c.fill();
+   for(const a of g.actors){const col=teams.colors[a.side];c.fillStyle='rgba(0,0,0,.2)';ell(c,a.x+3,a.y+6,MR,MR*.8);c.fill();c.fillStyle=col;circ(c,a.x,a.y,MR);c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();c.fillStyle='#fff';circ(c,a.x,a.y,MR*.55);c.fill();c.stroke();
+    if(a.dash>0){c.strokeStyle=C.gold;c.lineWidth=5;circ(c,a.x,a.y,MR+6);c.stroke()}drawChar(c,a.ci,a.x,a.y-6,16,{noShadow:true})}
+   drawMGTop(c,'エアホッケー',g.time,null,teams);
+   rr(c,W/2-150,82,300,48,24);c.fillStyle=C.ink;c.fill();txt(c,''+g.sc[0],W/2-70,106,{s:34,f:FD,w:400,col:teams.colors[0]==='#3a7fdc'?'#7fb5ff':teams.colors[0]});txt(c,'−',W/2,106,{s:24,col:'#fff'});txt(c,''+g.sc[1],W/2+70,106,{s:34,f:FD,w:400,col:'#ff8a7a'});
+   if(g.flash>0)txt(c,'ゴール！',W/2,H/2,{s:90*(1+g.flash*.2),f:FD,w:400,col:C.gold,st:C.ink,sw:12})};
+  return g}};
+const MG_ORDER=['coin','mash','quick','stop10','rock','sumo','dodge','paint','jump','memory','flags','count','boat','pilot','bomb','tug','tag','hammer','keeper','tunnel','hotbomb','tiles','cups','rope','tower','fish','mole','balloon','treasure','math','silhouette','cannon','raft','volley','fruit','snow','fall','rhythm','sushi','firefly','race','crush','hockey'];
 const PLs=t=>t.players||[0,1,2,3];
 
 
