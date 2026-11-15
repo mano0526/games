@@ -34,10 +34,36 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
 .play{align-self:flex-start;margin-top:4px;font-weight:800;font-size:15px;text-decoration:none;color:#fff;background:var(--c);border-radius:10px;padding:10px 18px}
 .play:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 .how{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.box h2{font-size:18px;margin:0}
+.rooms{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.rooms li{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.rooms .dot{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
+.rooms .t{flex:1;min-width:0}
+.rooms .t b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rooms .t small{color:var(--mute)}
+.rooms a{font-weight:800;text-decoration:none;color:#fff;background:var(--c);border-radius:8px;padding:8px 14px;flex:none}
+.rooms .busy{font-size:12px;color:var(--mute);flex:none}
+.empty{color:var(--mute);font-size:14px;margin:0}
+.set{display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:center}
+.set label{font-weight:800}
+.set input[type=text]{font:inherit;font-weight:800;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg);color:var(--ink);min-width:0}
+.set input[type=range]{width:100%}
+.btn2{white-space:nowrap;font:inherit;font-weight:800;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);padding:6px 12px;cursor:pointer}
+.pads{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.pad{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.pad .btns{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.pad .btns span{min-width:26px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:0 4px;font-variant-numeric:tabular-nums}
+.pad .btns span.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.warn{color:var(--acc);font-weight:800;font-size:13px;margin:0}
+
 .how h2{font-size:18px;margin:0 0 8px}
 .how ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px}
 .how small{color:var(--mute)}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="netdb.js"></script>
 </head>
 <body>
 <main>
@@ -45,6 +71,11 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
     <h1>友達と遊ぶゲーム棚</h1>
     <p class="lead">どれもブラウザで開くだけ。アカウント登録はいりません。オンラインで遊ぶときは、1人が部屋を作って、4文字のコードか招待リンクを友達に送ります。</p>
   </header>
+  <section class="box" aria-live="polite">
+    <h2>いま開いている部屋</h2>
+    <ul class="rooms" id="rooms"></ul>
+    <p class="empty" id="roomsEmpty">今は開いている部屋がありません。だれかが部屋をつくると、ここに出ます（押すだけで参加できます）。</p>
+  </section>
   <ul class="shelf">
     <li class="game" style="--c:var(--party)"><div class="band"></div><div class="body">
       <h2>コロコロ島パーティ</h2>
@@ -68,21 +99,48 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
       <a class="play" href="trap.html">遊ぶ</a></div></li>
     
   </ul>
+  <section class="box">
+    <h2>共通の設定</h2>
+    <div class="set">
+      <label for="nm">なまえ</label><input type="text" id="nm" maxlength="10" placeholder="オンラインで表示される名前">
+      <label for="vol">音量</label><div style="display:flex;gap:10px;align-items:center"><input type="range" id="vol" min="0" max="100" step="5"><button class="btn2" id="beep" type="button">テスト音</button></div>
+    </div>
+    <p class="empty">4つのゲームすべてに使われます。ゲームの中の音量設定は、この音量に掛け算されます。</p>
+  </section>
+  <section class="box">
+    <h2>コントローラー確認</h2>
+    <p class="empty" id="padMsg">コントローラーをつないで、どれかのボタンを押してください（ブラウザはボタンを押すまでコントローラーを認識しません）。</p>
+    <div class="pads" id="pads"></div>
+  </section>
   <section class="how">
-    <h2>オンラインの遊び方（パーティ・キッチン）</h2>
+    <h2>オンラインは2つの方式があります</h2>
     <ol>
-      <li>ホストになる人が、画面左上の「オンライン」→「部屋を作る」を押す。</li>
-      <li>出てきた4文字のコードか招待リンクを友達に送る。</li>
-      <li>友達は同じゲームを開いて「オンライン」→コードを入れて「参加する」。友達は 2P・3P・4P のコントローラーになります。</li>
+      <li><b>各自の端末で動かす方式</b>（ターボカートGP・ワナワナ・ラン）：それぞれが自分の端末でゲームを動かし、位置だけを送り合います。全員が全画面でなめらかに遊べて、つながりにくい回線でも遊べます。</li>
+      <li><b>リモートプレイ方式</b>（コロコロ島パーティ・てんやわんやキッチン）：ホストの端末だけがゲームを動かし、友達には画面と音が映像で届きます。ホストはPCがおすすめです。学校・会社のWi-Fiや一部のスマホ回線どうしだと、つながらないことがあります（25秒たつと理由が表示されます）。</li>
     </ol>
-    <p><small>ゲームを動かすのはホストの端末だけで、友達にはその画面と音が映像で届きます。ホストはPC、友達はWi-Fiがおすすめです。友達側はキーボード、コントローラー、画面のボタンで操作できます。</small></p>
-      <h2 style="margin-top:16px">ターボカートGPのオンライン</h2>
-    <ol>
-      <li>タイトルの「オンライン」→ ホストは「部屋をつくる」。</li>
-      <li>招待リンク（LINEで送るボタンあり）かコードを送る。友達は「いま開いている部屋」から押すだけでも入れます。</li>
-      <li>全員が「準備OK」→ ホストが「スタート！」。それぞれの端末で自分のカートを動かします。</li>
-    </ol>
-</section>
+    <p><small>部屋のつくり方：ゲームの「オンライン」→「部屋をつくる」。出てきた4文字のコードか招待リンクを送るか、友達がこのページの「いま開いている部屋」から押せば参加できます。</small></p>
+  </section>
 </main>
+<script>
+'use strict';
+// ---- open rooms (all games) ----
+(function(){const ul=document.getElementById('rooms'),em=document.getElementById('roomsEmpty');const G=NetDB.lobby.GAMES;const C={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)'};
+  const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  NetDB.lobby.watch(list=>{em.hidden=list.length>0;ul.innerHTML=list.slice(0,12).map(r=>{const full=(r.n||0)>=(r.max||4),busy=r.st&&r.st!=='lobby';
+    return`<li style="--c:${C[r.g]}"><span class="dot"></span><span class="t"><b>${esc(G[r.g].name)}</b><small>${esc(r.host||'')}さんの部屋・${r.n||1}/${r.max||4}人・コード ${esc(r.code)}</small></span>${full?'<span class="busy">満員</span>':busy&&(r.g==='kart'||r.g==='trap')?'<span class="busy">ゲーム中</span>':`<a href="${NetDB.lobby.joinUrl(r)}">参加</a>`}</li>`;}).join('');});})();
+// ---- shared settings ----
+(function(){const nm=document.getElementById('nm'),vol=document.getElementById('vol');nm.value=NetDB.name.get();vol.value=Math.round(NetDB.vol.get()*100);
+  nm.addEventListener('change',()=>{nm.value=NetDB.name.set(nm.value);});vol.addEventListener('input',()=>NetDB.vol.set(vol.value/100));
+  let ac=null;document.getElementById('beep').onclick=()=>{try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=660;g.gain.value=.25*NetDB.vol.get();g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.35);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.36);}catch(e){}};})();
+// ---- controller check ----
+(function(){const el=document.getElementById('pads'),msg=document.getElementById('padMsg');const NAMES=['A','B','X','Y','L','R','ZL','ZR','SELECT','START','Lスティック','Rスティック','↑','↓','←','→','HOME'];let last='';
+  function tick(){let ps=[];try{ps=[...(navigator.getGamepads?navigator.getGamepads():[])].filter(Boolean);}catch(e){}
+    let h=ps.map(p=>{const on=p.buttons.map((b,i)=>b.pressed?i:-1).filter(i=>i>=0);const ax=p.axes.slice(0,2).map(v=>Math.abs(v)>.2?v.toFixed(1):'0');
+      return`<div class="pad"><b>${p.index+1}台目</b>　<small>${p.id.replace(/</g,'')}</small>${p.mapping!=='standard'?'<p class="warn">このコントローラーは標準の配置ではありません。ボタンの位置がずれることがあります（カートは「コントローラー設定」で割り当て直せます）。</p>':''}
+        <div class="btns">${NAMES.slice(0,Math.max(16,p.buttons.length)).map((n,i)=>i<p.buttons.length?`<span class="${p.buttons[i].pressed?'on':''}">${n}</span>`:'').join('')}<span>スティック ${ax.join(', ')}</span></div></div>`;}).join('');
+    if(ps.length>1&&new Set(ps.map(p=>p.id)).size<ps.length)h+='<p class="warn">同じ名前のコントローラーが2台見えています。1台しかつないでいないなら、ブラウザが二重に認識しています（Steamを開いている場合は閉じると直ることがあります）。この状態だとボタンが2回分反応します。</p>';
+    msg.hidden=ps.length>0;if(h!==last){el.innerHTML=h;last=h;}requestAnimationFrame(tick);}
+  requestAnimationFrame(tick);})();
+</script>
 </body>
 </html>

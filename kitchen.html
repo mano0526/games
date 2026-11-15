@@ -272,6 +272,7 @@ p{margin:0;line-height:1.7;color:var(--muted);font-weight:500}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="netdb.js"></script>
 <script src="netplay.js" data-game="kitchen" data-fps="30" data-mirror=".screen" data-keys="{&quot;KeyW&quot;:[12],&quot;ArrowUp&quot;:[12],&quot;KeyS&quot;:[13],&quot;ArrowDown&quot;:[13],&quot;KeyA&quot;:[14],&quot;ArrowLeft&quot;:[14],&quot;KeyD&quot;:[15],&quot;ArrowRight&quot;:[15],&quot;Space&quot;:[0],&quot;Enter&quot;:[0],&quot;KeyE&quot;:[2],&quot;KeyF&quot;:[2],&quot;ShiftLeft&quot;:[1],&quot;KeyR&quot;:[1],&quot;Tab&quot;:[3],&quot;Backspace&quot;:[1]}" data-keyhelp="移動：WASD / 矢印　つかむ・決定：Space / Enter　調理・洗う：E / F　ダッシュ：Shift / R　交代：Tab"></script>
 <script>
 'use strict';
@@ -583,7 +584,7 @@ if(SET.vib===undefined)SET.vib=true;
 let AC=null,master=null,sfxGain=null,musGain=null,muted=false,noiseBuf=null;
 function ensureAudio(){
   try{
-    if(!AC){const A=window.AudioContext||window.webkitAudioContext;if(!A)return;AC=new A();master=AC.createGain();master.gain.value=SET.vol*.8;master.connect(AC.destination);
+    if(!AC){const A=window.AudioContext||window.webkitAudioContext;if(!A)return;AC=new A();master=AC.createGain();master.gain.value=SET.vol*.8*(window.NetDB?NetDB.vol.get():1);master.connect(AC.destination);
       sfxGain=AC.createGain();sfxGain.gain.value=1;sfxGain.connect(master);musGain=AC.createGain();musGain.gain.value=SET.bgm?.13:0;musGain.connect(master);
       noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;}
     if(AC.state==='suspended')AC.resume();
@@ -652,7 +653,7 @@ function musicTick(){if(!AC)return;while(Music.next<AC.currentTime+.15){const s=
   if(SG.mel[s]!=null)tone(mf(SG.mel[s]),.14,'square',.2,1,t,musGain);
   if(e%2===1)(function(tt){if(!AC)return;const st=AC.currentTime+tt;const src=AC.createBufferSource();src.buffer=noiseBuf;const f=AC.createBiquadFilter();f.type='highpass';f.frequency.value=7000;const g=AC.createGain();g.gain.setValueAtTime(.25,st);g.gain.exponentialRampToValueAtTime(.0001,st+.04);src.connect(f);f.connect(g);g.connect(musGain);src.start(st);src.stop(st+.05);})(t);
   Music.next+=60/(Music.tempo+(Music.fire?14:0))/2;Music.step++;}}
-function applyVol(){if(master)master.gain.value=SET.vol*.8;if(musGain)musGain.gain.value=SET.bgm?.13:0;document.getElementById('b-sound').textContent='音量：'+Math.round(SET.vol*100)+'%';document.getElementById('b-bgm').textContent='BGM：'+(SET.bgm?'ON':'OFF');}
+function applyVol(){if(master)master.gain.value=SET.vol*.8*(window.NetDB?NetDB.vol.get():1);if(musGain)musGain.gain.value=SET.bgm?.13:0;document.getElementById('b-sound').textContent='音量：'+Math.round(SET.vol*100)+'%';document.getElementById('b-bgm').textContent='BGM：'+(SET.bgm?'ON':'OFF');}
 function setMuted(){if(SET.vol>0){SET.lastVol=SET.vol;SET.vol=0;}else SET.vol=SET.lastVol||.75;saveSet();applyVol();}
 
 

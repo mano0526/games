@@ -100,6 +100,7 @@ kbd{font-family:var(--body);font-weight:800;border:2px solid var(--ink);border-b
 <div id="ui"></div>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="netdb.js"></script>
 
 <script>
 'use strict';
@@ -194,12 +195,12 @@ class MB{constructor(){this.d=[];this.m=null;this.em=0;}
 const AU={ctx:null,master:null,on:true,music:null,engines:[],vol:{bgm:6,sfx:8,eng:4}};
 try{AU.on=localStorage.getItem('tkgp_sound')!=='off';const v=JSON.parse(localStorage.getItem('tkgp_vol')||'null');if(v)Object.assign(AU.vol,v);}catch(e){}
 function audioInit(){if(AU.ctx){if(AU.ctx.state==='suspended')AU.ctx.resume();return;}
-  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;AU.ctx=new C();AU.master=AU.ctx.createGain();AU.master.gain.value=AU.on?0.8:0;const comp=AU.ctx.createDynamicsCompressor();comp.threshold.value=-14;comp.knee.value=10;comp.ratio.value=4;comp.attack.value=.004;comp.release.value=.2;AU.master.connect(comp);comp.connect(AU.ctx.destination);
+  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;AU.ctx=new C();AU.master=AU.ctx.createGain();AU.master.gain.value=AU.on?0.8*NetDB.vol.get():0;const comp=AU.ctx.createDynamicsCompressor();comp.threshold.value=-14;comp.knee.value=10;comp.ratio.value=4;comp.attack.value=.004;comp.release.value=.2;AU.master.connect(comp);comp.connect(AU.ctx.destination);
   AU.musicGain=AU.ctx.createGain();AU.musicGain.connect(AU.master);AU.sfxGain=AU.ctx.createGain();AU.sfxGain.connect(AU.master);AU.engGain=AU.ctx.createGain();AU.engGain.connect(AU.master);applyVol();
   const len=AU.ctx.sampleRate;const b=AU.ctx.createBuffer(1,len,AU.ctx.sampleRate);const d=b.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;AU.noise=b;if(AU.onInit)AU.onInit();}
 function applyVol(){if(!AU.ctx)return;const v=AU.vol;AU.musicGain.gain.value=.34*(v.bgm/10)**1.5;AU.sfxGain.gain.value=.75*(v.sfx/10)**1.5;AU.engGain.gain.value=.9*(v.eng/10)**1.5;}
 function setVol(k,val){AU.vol[k]=clamp(val,0,10);try{localStorage.setItem('tkgp_vol',JSON.stringify(AU.vol));}catch(e){}applyVol();}
-function setSound(on){AU.on=on;try{localStorage.setItem('tkgp_sound',on?'on':'off');}catch(e){}if(AU.master)AU.master.gain.value=on?0.8:0;}
+function setSound(on){AU.on=on;try{localStorage.setItem('tkgp_sound',on?'on':'off');}catch(e){}if(AU.master)AU.master.gain.value=on?0.8*NetDB.vol.get():0;}
 const midi=n=>440*Math.pow(2,(n-69)/12);
 function tone(type,f0,f1,dur,vol,when,dest){const c=AU.ctx;if(!c)return;const t=when||c.currentTime;const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(f0,t);
   if(f1&&f1!==f0)o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0008,t+dur);o.connect(g);g.connect(dest||AU.sfxGain);o.start(t);o.stop(t+dur+0.02);}
@@ -1478,35 +1479,13 @@ function standings(){const g=app.gp;const last=g.race>=g.courses.length-1;const 
 // ============ online：各自の端末で動かす方式 ============
 // 中継は Firebase Realtime Database（np/kart2/...）。映像は送らず、カートの位置とアイテムの出来事だけを送り合う。
 // ?np=local で同じブラウザ内（BroadcastChannel）だけでつながるテストモード。
-const FB_CFG={apiKey:'AIzaSyBTuzvBh9qtf5F8JnHVa5bv1-igP3E_ebA',authDomain:'claude-4d377.firebaseapp.com',databaseURL:'https://claude-4d377-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'claude-4d377',storageBucket:'claude-4d377.firebasestorage.app',messagingSenderId:'652412386711',appId:'1:652412386711:web:a6033541ef4fa62da998d2'};
-const NET_LOCAL=new URLSearchParams(location.search).get('np')==='local';
-const NET={db:null,pid:'',code:'',host:false,meta:null,players:{},hc:0,race:null,listen:[],snap:{},sendT:0,pts:{},lastRaceId:'',name:'',me:{char:0,frame:0,ok:false},rooms:{},err:''};
-function netName(){let n='';try{n=localStorage.getItem('tkgp_name')||'';}catch(e){}if(!n)n='プレイヤー'+(100+Math.floor(Math.random()*900));return n.slice(0,10);}
+// 通信は共通部品 netdb.js（ワナワナ・ランと同じ）
+const NET_LOCAL=NetDB.LOCAL;
+const NET={db:null,pid:'',code:'',host:false,meta:null,players:{},hc:0,race:null,listen:[],snap:{},sendT:0,pts:{},lastRaceId:'',name:'',me:{char:0,frame:0,ok:false},rooms:[],err:''};
+function netName(){return NetDB.name.get()||'プレイヤー'+(100+Math.floor(Math.random()*900));}
 NET.name=netName();NET.pid=(()=>{let p='';try{p=sessionStorage.getItem('tkgp_pid')||'';}catch(e){}if(!p){p='p'+Math.random().toString(36).slice(2,9);try{sessionStorage.setItem('tkgp_pid',p);}catch(e){}}return p;})();
 // --- tiny database layer (Firebase or local emulation) ---
-function dbOpen(){if(NET.db)return NET.db;
-  if(!NET_LOCAL){if(!window.firebase||!firebase.database){NET.err='通信の部品を読み込めませんでした。ネットにつながっているか確認して、ページを開き直してください。';return null;}
-    let app;try{app=firebase.apps&&firebase.apps.length?firebase.app():firebase.initializeApp(FB_CFG);}catch(e){NET.err='通信の準備に失敗しました：'+e.message;return null;}
-    const db=firebase.database(app);let off=0;db.ref('.info/serverTimeOffset').on('value',s=>{off=s.val()||0;});const root='np/kart2/';
-    NET.db={now:()=>Date.now()+off,set:(p,v)=>db.ref(root+p).set(v),update:(p,v)=>db.ref(root+p).update(v),remove:p=>db.ref(root+p).remove(),
-      on:(p,ty,cb)=>{const r=db.ref(root+p);const f=s=>cb(s.key,s.val());r.on(ty,f);return()=>r.off(ty,f);},
-      dis:p=>db.ref(root+p).onDisconnect().remove(),undis:p=>db.ref(root+p).onDisconnect().cancel()};return NET.db;}
-  // local emulation: every page keeps the whole tree; writes are broadcast
-  const bc=new BroadcastChannel('tkgp-kart2');const tree={};const L=[];const mine=new Set();
-  const get=p=>{let o=tree;for(const k of p.split('/').filter(Boolean)){if(o==null||typeof o!=='object')return null;o=o[k];}return o===undefined?null:o;};
-  const put=(p,v)=>{const ks=p.split('/').filter(Boolean);let o=tree;for(let i=0;i<ks.length-1;i++){if(o[ks[i]]==null||typeof o[ks[i]]!=='object')o[ks[i]]={};o=o[ks[i]];}if(v==null)delete o[ks[ks.length-1]];else o[ks[ks.length-1]]=JSON.parse(JSON.stringify(v));};
-  const fire=()=>{for(const l of L){const v=get(l.p);if(l.ty==='value'){const j=JSON.stringify(v);if(j!==l.last){l.last=j;l.cb(l.p.split('/').pop(),v==null?null:JSON.parse(j));}continue;}
-      const cur={};if(v&&typeof v==='object')for(const k in v)cur[k]=JSON.stringify(v[k]);const old=l.kids;
-      for(const k in cur){if(!(k in old)){if(l.ty==='child_added')l.cb(k,JSON.parse(cur[k]));}else if(old[k]!==cur[k]&&l.ty==='child_changed')l.cb(k,JSON.parse(cur[k]));}
-      for(const k in old)if(!(k in cur)&&l.ty==='child_removed')l.cb(k,JSON.parse(old[k]));l.kids=cur;}};
-  const apply=(op,p,v)=>{if(op==='set')put(p,v);else if(op==='update'){for(const k in v)put(p+'/'+k,v[k]);}else if(op==='remove')put(p,null);fire();};
-  bc.onmessage=e=>{const m=e.data;if(m.op==='dump?'){bc.postMessage({op:'dump',tree});return;}if(m.op==='dump'){const mg=(dst,src)=>{for(const k in src){if(!(k in dst))dst[k]=src[k];else if(dst[k]&&typeof dst[k]==='object'&&src[k]&&typeof src[k]==='object')mg(dst[k],src[k]);}};mg(tree,m.tree);fire();return;}apply(m.op,m.p,m.v);};
-  bc.postMessage({op:'dump?'});
-  addEventListener('pagehide',()=>{for(const p of mine){apply('remove',p);bc.postMessage({op:'remove',p});}});
-  const w=(op)=>(p,v)=>{apply(op,p,v);bc.postMessage({op,p,v});return Promise.resolve();};
-  NET.db={now:()=>Date.now(),set:w('set'),update:w('update'),remove:w('remove'),
-    on:(p,ty,cb)=>{const l={p,ty,cb,last:undefined,kids:{}};L.push(l);setTimeout(fire,0);return()=>{const i=L.indexOf(l);if(i>=0)L.splice(i,1);};},
-    dis:p=>{mine.add(p);},undis:p=>{mine.delete(p);}};return NET.db;}
+function dbOpen(){if(NET.db)return NET.db;const db=NetDB.open('kart2');if(!db){NET.err='通信の部品を読み込めませんでした。ネットにつながっているか確認して、ページを開き直してください。';return null;}NET.db=db;return db;}
 function netRaceOff(){for(const f of NET.raceL||[])try{f();}catch(e){}NET.raceL=[];}
 function netOff(){netRaceOff();for(const f of NET.listen)try{f();}catch(e){}NET.listen=[];}
 function netSend(ev){if(!race||!race.net)return;ev.f=NET.pid;ev.k=++NET.hc;NET.db.set('r/'+NET.code+'/e/'+race.net.id+'/'+NET.pid+'_'+NET.hc,ev);}
@@ -1517,14 +1496,14 @@ function newCode(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i
 function netJoin(code,asHost){const db=dbOpen();if(!db){onlineScreen();return;}netOff();NET.code=code;NET.host=asHost;NET.meta=null;NET.seenMeta=false;NET.players={};NET.pts={};NET.lastRaceId='';NET.me.ok=false;
   const pp=roomPath('p/'+NET.pid);db.set(pp,{name:NET.name,char:NET.me.char,frame:NET.me.frame,ok:false,t:db.now()});db.dis(pp);
   if(asHost){const m={host:NET.pid,hostName:NET.name,st:'lobby',course:app.course||0,cc:1,cpu:app.cpuLv+1,t:db.now(),pts:{}};db.set(roomPath('m'),m);db.dis(roomPath('m'));db.dis(roomPath('e'));db.dis(roomPath('s'));
-    db.set('list/'+code,{host:NET.name,n:1,st:'lobby',t:db.now()});db.dis('list/'+code);}
+    NET.pub=NetDB.lobby.publish('kart',code,{host:NET.name,n:1,st:'lobby'});}
   NET.listen.push(db.on(roomPath('m'),'value',(k,v)=>{const prev=NET.meta;NET.meta=v;
     if(v)NET.seenMeta=true;if(!v&&!NET.seenMeta)return;
     if(!v){if(app.screen==='room'||app.screen==='race'&&race&&race.net||app.screen==='results'&&race&&race.net){netLeave('部屋がなくなりました（ホストが退出しました）');}return;}
     if(v.st==='race'&&v.race&&v.race.id!==NET.lastRaceId&&NET.players[NET.pid]&&v.race.grid.some(g=>g.rid===NET.pid)){NET.lastRaceId=v.race.id;startOnlineRace(v.race);return;}
     if(v.st==='lobby'&&(app.screen==='results'||app.screen==='race')&&race&&race.net){roomScreen();return;}
     if(app.screen==='room')roomScreen();}));
-  NET.listen.push(db.on(roomPath('p'),'value',(k,v)=>{NET.players=v||{};if(NET.host&&NET.meta)db.update('list/'+NET.code,{n:Object.keys(NET.players).length,t:db.now()});
+  NET.listen.push(db.on(roomPath('p'),'value',(k,v)=>{NET.players=v||{};if(NET.host&&NET.pub)NET.pub.update({n:Object.keys(NET.players).length});
     if(!NET.players[NET.pid]&&app.screen==='room'){netLeave('部屋から外れました');return;}
     {const ord=Object.entries(NET.players).sort((a,b)=>(a[1].t||0)-(b[1].t||0)).map(e=>e[0]);if(ord.indexOf(NET.pid)>=4){netLeave('部屋が満員です（4人まで）');return;}}
     if(app.screen==='room')roomScreen();}));
@@ -1532,13 +1511,13 @@ function netJoin(code,asHost){const db=dbOpen();if(!db){onlineScreen();return;}n
   // a guest whose room does not exist gets told after a moment
   if(!asHost)setTimeout(()=>{if(NET.code===code&&!NET.meta&&app.screen==='room'){netLeave('部屋「'+code+'」が見つかりません。コードを確かめてください。');}},5000);}
 function netLeave(msg){const db=NET.db;if(db&&NET.code){db.remove(roomPath('p/'+NET.pid));db.undis(roomPath('p/'+NET.pid));if(race&&race.net)db.remove(roomPath('s/'+NET.pid));
-    if(NET.host){db.remove(roomPath());db.remove('list/'+NET.code);}}
+    if(NET.host){db.remove(roomPath());}}if(NET.pub){NET.pub.close();NET.pub=null;}
   netOff();NET.code='';NET.meta=null;if(race&&race.net){race.net=null;engineStop();music.stop();race=null;}NET.err=msg||'';onlineScreen();}
 
 // --- screens ---
 function onlineScreen(){app.screen='online';show();if(race){engineStop();race=null;}music.stop();const db=dbOpen();
   const q=new URLSearchParams(location.search).get('room');
-  const list=Object.entries(NET.rooms||{}).filter(([c,r])=>r&&db&&db.now()-(r.t||0)<180000&&r.st==='lobby'&&(r.n||0)<4).slice(0,6);
+  const list=(NET.rooms||[]).filter(r=>r.st==='lobby'&&(r.n||0)<4).slice(0,6).map(r=>[r.code,r]);
   h(`<div class="wrap" style="max-width:760px"><h2>オンライン（各自の端末で走る）</h2>
    ${NET.err?`<div class="panel" style="background:#ffe3dc"><b>${NET.err}</b></div>`:''}
    <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>なまえ</b><input id="nm" maxlength="10" value="${NET.name.replace(/"/g,'')}" style="font:inherit;font-weight:800;font-size:18px;border:3px solid var(--ink);border-radius:6px;padding:6px 10px;flex:1;min-width:0"></div>
@@ -1550,14 +1529,14 @@ function onlineScreen(){app.screen='online';show();if(race){engineStop();race=nu
    <p class="hint">それぞれが自分の端末でレースを動かし、カートの位置とアイテムだけを送り合います。ホストのPCに負担が集中しないので、全員が全画面でなめらかに遊べます。最大4人＋CPU。</p>
    <div class="row"><button class="btn ghost" data-nav data-back>もどる</button></div></div>`);
   bindMenu(1,()=>{NET.err='';titleScreen();},q?2:0);
-  const nm=ui.querySelector('#nm');const saveName=()=>{NET.name=(nm.value||'').trim().slice(0,10)||NET.name;try{localStorage.setItem('tkgp_name',NET.name);}catch(e){}};nm.onchange=saveName;
+  const nm=ui.querySelector('#nm');const saveName=()=>{NET.name=NetDB.name.set(nm.value)||NET.name;};nm.onchange=saveName;
   ui.querySelector('[data-a=make]').onclick=()=>{saveName();NET.err='';netJoin(newCode(),true);};
   ui.querySelector('[data-a=join]').onclick=()=>{saveName();const c=(ui.querySelector('#cd').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==4){NET.err='コードは4文字です。';onlineScreen();return;}NET.err='';netJoin(c,false);};
   ui.querySelectorAll('[data-room]').forEach(b=>b.onclick=()=>{saveName();NET.err='';netJoin(b.dataset.room,false);});
   ui.querySelector('[data-back]').onclick=menu.onBack;
   // typing in the inputs must not drive the menu
   ui.querySelectorAll('input').forEach(i=>{i.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){i.blur();if(i.id==='cd')ui.querySelector('[data-a=join]').click();}});});
-  if(db&&!NET.roomsOff){NET.roomsOff=db.on('list','value',(k,v)=>{NET.rooms=v||{};if(app.screen==='online'&&document.activeElement.tagName!=='INPUT')onlineScreen();});}
+  if(db&&!NET.roomsOff){NET.roomsOff=NetDB.lobby.watch(l=>{const prev=JSON.stringify(NET.rooms);NET.rooms=l.filter(r=>r.g==='kart');if(prev!==JSON.stringify(NET.rooms)&&app.screen==='online'&&document.activeElement.tagName!=='INPUT')onlineScreen();});}
   if(q&&!onlineScreen._auto){onlineScreen._auto=true;setTimeout(()=>{if(app.screen==='online')ui.querySelector('[data-a=join]').click();},300);}}
 function roomScreen(){if(race){netRaceOff();if(race.net&&NET.db)NET.db.remove(roomPath('s/'+NET.pid));race.net=null;engineStop();music.stop();race=null;}app.screen='room';show();const m=NET.meta;const db=NET.db;if(!db)return;
   const ps=Object.entries(NET.players).sort((a,b)=>(a[1].t||0)-(b[1].t||0)).slice(0,4);const meP=NET.players[NET.pid];
@@ -1600,7 +1579,7 @@ function netStartRace(){const m=NET.meta,db=NET.db;const ps=Object.entries(NET.p
   // humans start at the back (fewest points first)
   const hs=ps.map(([pid,p])=>({rid:pid,char:p.char||0,frame:p.frame||0,name:p.name||'',pts:(m.pts||{})[pid]||0})).sort((a,b)=>a.pts-b.pts);grid.push(...hs);
   const raceCfg={id:'r'+Date.now().toString(36),course:m.course,cc:m.cc,cpuLv:Math.max(0,m.cpu-1),grid,startAt:db.now()+6500,host:NET.pid};
-  db.remove(roomPath('e'));db.remove(roomPath('s'));db.update(roomPath('m'),{st:'race',race:raceCfg});db.update('list/'+NET.code,{st:'race',t:db.now()});}
+  db.remove(roomPath('e'));db.remove(roomPath('s'));db.update(roomPath('m'),{st:'race',race:raceCfg});if(NET.pub)NET.pub.update({st:'race'});}
 function startOnlineRace(rc){const db=NET.db;const meP=NET.players[NET.pid]||{};ensureMeshes();audioInit();app.paused=false;app.netMenu=false;
   const touch=matchMedia('(pointer:coarse)').matches;const players=[{dev:'any',char:meP.char||0,frame:meP.frame||0,assist:touch}];
   const grid=rc.grid.map(g=>({char:g.char,frame:g.frame,rid:g.rid,pi:g.rid===NET.pid?0:undefined}));app.mode='vs';
@@ -1653,7 +1632,7 @@ function netResults(){const r=race,rn=r.net,order=r.order;const db=NET.db;const 
   if(rn.isHost&&!rn.saved){rn.saved=true;const pts=Object.assign({},m.pts||{});order.forEach((k,i)=>{if(k.human||k.netHuman){const id=k.human?NET.pid:k.rid;pts[id]=(pts[id]||0)+(PTS[i]||0);}});db.update(roomPath('m'),{pts});}
   h(`<div class="wrap" style="max-width:620px"><h2>${r.track.def.name}　結果</h2><div class="panel"><table class="res">${rows}</table></div>
    <div class="menu cols2">${rn.isHost?`<button class="btn big" data-nav data-a="lobby">部屋にもどる</button>`:`<span class="hint">ホストが部屋にもどると次のレースを選べます。</span>`}<button class="btn big ghost" data-nav data-a="q">部屋を出る</button></div></div>`);
-  bindMenu(2,null);const lb=ui.querySelector('[data-a=lobby]');if(lb)lb.onclick=()=>{NET.me.ok=false;db.update(roomPath('m'),{st:'lobby',race:null});db.update('list/'+NET.code,{st:'lobby',t:db.now()});
+  bindMenu(2,null);const lb=ui.querySelector('[data-a=lobby]');if(lb)lb.onclick=()=>{NET.me.ok=false;db.update(roomPath('m'),{st:'lobby',race:null});if(NET.pub)NET.pub.update({st:'lobby'});
     for(const pid in NET.players)db.update(roomPath('p/'+pid),{ok:false});};
   ui.querySelector('[data-a=q]').onclick=()=>netLeave('');}
 

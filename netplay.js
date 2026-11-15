@@ -382,6 +382,8 @@
       var self = this;
       return sig.createRoom().then(function (room) {
         self.room = room;
+        // 一覧ページの「いま開いている部屋」に出す（netdb.js があるとき）
+        if (window.NetDB) self.pub = NetDB.lobby.publish(GAME, room.code, { host: NetDB.name.get() || 'ホスト', n: 1, max: MAX_GUESTS + 1 });
         room.onGuest(function (api) { self.addGuest(api); });
         return room.code;
       });
@@ -398,6 +400,7 @@
       var g = { id: api.id, api: api, slot: slot, pc: null, dc: null, pad: null, ping: null, state: 'つないでいます', order: ++this.order };
       this.guests[api.id] = g;
       var pc = g.pc = new RTCPeerConnection({ iceServers: ICE });
+      setTimeout(function () { if (self.guests[g.id] === g && pc.connectionState !== 'connected') { g.state = 'つながりませんでした（回線の相性）'; UI.refresh(); setTimeout(function () { if (self.guests[g.id] === g && pc.connectionState !== 'connected') self.drop(g.id); }, 4000); } }, 25000);
       pc.onicecandidate = function (e) { if (e.candidate) api.sendCand(candJSON(e.candidate)); };
       api.onCand(function (c) { pc.addIceCandidate(c).catch(function () {}); });
       pc.ondatachannel = function (e) {
@@ -413,7 +416,7 @@
       pc.onconnectionstatechange = function () {
         var s = pc.connectionState;
         if (s === 'connected') { g.state = 'つながりました'; if (!g.pad) g.pad = addVPad(g.slot + 2); tuneSender(g.videoSender, self.canvas, g.q); }
-        else if (s === 'failed') { g.state = 'つながりませんでした'; self.drop(g.id); }
+        else if (s === 'failed') { g.state = 'つながりませんでした（回線の相性）'; UI.refresh(); setTimeout(function () { self.drop(g.id); }, 4000); }
         else if (s === 'disconnected') g.state = '通信が不安定です';
         UI.refresh();
       };
@@ -445,6 +448,7 @@
     },
     sendInfo: function () {
       var list = this.list();
+      if (this.pub) this.pub.update({ n: list.length + 1 });
       for (var k in this.guests) {
         var g = this.guests[k];
         if (g.dc && g.dc.readyState === 'open') { try { g.dc.send(JSON.stringify({ t: 'i', slot: g.slot, n: list.length + 1 })); } catch (e) {} }
@@ -462,6 +466,7 @@
     guestGone: function (id) { this.drop(id); },
     stop: function () {
       for (var k in this.guests) this.drop(k);
+      if (this.pub) { this.pub.close(); this.pub = null; }
       if (this.room) { try { this.room.close(); } catch (e) {} }
       this.room = null;
       if (this.videoTrack) { try { this.videoTrack.stop(); } catch (e) {} this.videoTrack = null; }
@@ -552,7 +557,9 @@
         pc.addTransceiver('video', { direction: 'recvonly' });
         pc.addTransceiver('audio', { direction: 'recvonly' });
         var dc = self.dc = pc.createDataChannel('in', { ordered: false, maxRetransmits: 0 });
-        dc.onopen = function () { self.startSending(); UI.guestStatus('つながりました'); self.sendQuality(); };
+        dc.onopen = function () { self.connected = true; self.startSending(); UI.guestStatus('つながりました'); self.sendQuality(); };
+        self.connected = false;
+        setTimeout(function () { if (self.pc === pc && !self.connected) { UI.guestFail('25秒たってもつながりませんでした。この方式は、回線の組み合わせ（学校・会社のWi-Fi、一部のスマホ回線など）によってはつながりません。片方がWi-Fiとスマホ回線を切り替えると、つながることがあります。カートとワナワナ・ランは別の方式なので、そちらは遊べます。'); self.leave(true); } }, 25000);
         dc.onmessage = function (m) { self.onMsg(m.data); };
         var uc = pc.createDataChannel('ui', { ordered: true });
         uc.onmessage = function (m) { self.onMsg(m.data); };

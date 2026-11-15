@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="netdb.js"></script>
 <style>
 /* 画面：ステージ全体を1枚のキャンバスに表示。メニューは上に重ねるHTML */
 :root{--bg:#f6d27a;--ink:#1d1a24;--paper:#fffaf0;--red:#e2483b;--teal:#2aa59a;--sun:#ffc93c;--muted:#6b6478;
@@ -67,7 +68,7 @@ const clamp=(v,a,b)=>v<a?a:v>b?b:v,lerp=(a,b,t)=>a+(b-a)*t;
 function rng(seed){let s=seed>>>0||1;return()=>{s+=0x6D2B79F5;let t=s;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // ============ sound (tiny synth) ============
-const AU={ctx:null,vol:.5};
+const AU={ctx:null,vol:.5*NetDB.vol.get()};
 function audioInit(){if(AU.ctx)return;try{AU.ctx=new(window.AudioContext||window.webkitAudioContext)();AU.g=AU.ctx.createGain();AU.g.gain.value=AU.vol;AU.g.connect(AU.ctx.destination);}catch(e){}}
 function tone(f,d,type,v,slide){const a=AU.ctx;if(!a)return;const o=a.createOscillator(),g=a.createGain();o.type=type||'square';o.frequency.setValueAtTime(f,a.currentTime);if(slide)o.frequency.exponentialRampToValueAtTime(slide,a.currentTime+d);
   g.gain.setValueAtTime(v||.18,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+d);o.connect(g);g.connect(AU.g);o.start();o.stop(a.currentTime+d);}
@@ -114,28 +115,9 @@ const STAGES=[
 const RULES={goal:3,first:1,kill:1,pickT:12,placeT:25,runT:50,scoreT:5};
 // ============ database layer：Firebase / 同じブラウザ内(テスト) / メモリ(1台で遊ぶとき) ============
 // 1台で遊ぶときもオンラインと同じ仕組み（ホスト＝自分）で動かすので、遊び方の違いでズレが出ない。
-const FB_CFG={apiKey:'AIzaSyBTuzvBh9qtf5F8JnHVa5bv1-igP3E_ebA',authDomain:'claude-4d377.firebaseapp.com',databaseURL:'https://claude-4d377-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'claude-4d377',storageBucket:'claude-4d377.firebasestorage.app',messagingSenderId:'652412386711',appId:'1:652412386711:web:a6033541ef4fa62da998d2'};
-const QS=new URLSearchParams(location.search);const NET_LOCAL=QS.get('np')==='local';
-let FBDB=null,MEMDB=null;
-function dbFirebase(){if(FBDB)return FBDB;if(!window.firebase||!firebase.database)return null;let app;try{app=firebase.apps&&firebase.apps.length?firebase.app():firebase.initializeApp(FB_CFG);}catch(e){return null;}
-  const db=firebase.database(app);let off=0;db.ref('.info/serverTimeOffset').on('value',s=>{off=s.val()||0;});const root='np/trap/';
-  FBDB={kind:'fb',now:()=>Date.now()+off,set:(p,v)=>db.ref(root+p).set(v),update:(p,v)=>db.ref(root+p).update(v),remove:p=>db.ref(root+p).remove(),
-    on:(p,ty,cb)=>{const r=db.ref(root+p);const f=s=>cb(s.key,s.val());r.on(ty,f);return()=>r.off(ty,f);},dis:p=>db.ref(root+p).onDisconnect().remove(),undis:p=>db.ref(root+p).onDisconnect().cancel()};return FBDB;}
-function dbTree(bcName){const tree={};const L=[];const mine=new Set();const bc=bcName?new BroadcastChannel(bcName):null;
-  const get=p=>{let o=tree;for(const k of p.split('/').filter(Boolean)){if(o==null||typeof o!=='object')return null;o=o[k];}return o===undefined?null:o;};
-  const put=(p,v)=>{const ks=p.split('/').filter(Boolean);let o=tree;for(let i=0;i<ks.length-1;i++){if(o[ks[i]]==null||typeof o[ks[i]]!=='object')o[ks[i]]={};o=o[ks[i]];}if(v==null)delete o[ks[ks.length-1]];else o[ks[ks.length-1]]=JSON.parse(JSON.stringify(v));};
-  let pend=false;const fire=()=>{pend=false;for(const l of L.slice()){if(l.dead)continue;const v=get(l.p);if(l.ty==='value'){const j=JSON.stringify(v);if(j!==l.last){l.last=j;l.cb(l.p.split('/').pop(),v==null?null:JSON.parse(j));}continue;}
-      const cur={};if(v&&typeof v==='object')for(const k in v)cur[k]=JSON.stringify(v[k]);const old=l.kids;
-      for(const k in cur){if(!(k in old)){if(l.ty==='child_added')l.cb(k,JSON.parse(cur[k]));}else if(old[k]!==cur[k]&&l.ty==='child_changed')l.cb(k,JSON.parse(cur[k]));}l.kids=cur;}};
-  const soon=()=>{if(!pend){pend=true;Promise.resolve().then(fire);}};
-  const apply=(op,p,v)=>{if(op==='set')put(p,v);else if(op==='update'){for(const k in v)put(p+'/'+k,v[k]);}else if(op==='remove')put(p,null);soon();};
-  if(bc){bc.onmessage=e=>{const m=e.data;if(m.op==='dump?'){bc.postMessage({op:'dump',tree});return;}
-      if(m.op==='dump'){const mg=(d,s)=>{for(const k in s){if(!(k in d))d[k]=s[k];else if(d[k]&&typeof d[k]==='object'&&s[k]&&typeof s[k]==='object')mg(d[k],s[k]);}};mg(tree,m.tree);soon();return;}apply(m.op,m.p,m.v);};
-    bc.postMessage({op:'dump?'});addEventListener('pagehide',()=>{for(const p of mine){apply('remove',p);bc.postMessage({op:'remove',p});}});}
-  const w=op=>(p,v)=>{apply(op,p,v);if(bc)bc.postMessage({op,p,v});return Promise.resolve();};
-  return{kind:bc?'bc':'mem',now:()=>Date.now(),set:w('set'),update:w('update'),remove:w('remove'),
-    on:(p,ty,cb)=>{const l={p,ty,cb,last:undefined,kids:{}};L.push(l);soon();return()=>{l.dead=true;const i=L.indexOf(l);if(i>=0)L.splice(i,1);};},dis:p=>mine.add(p),undis:p=>mine.delete(p)};}
-function dbOnline(){if(NET_LOCAL){if(!window._bcdb)window._bcdb=dbTree('tkwana');return window._bcdb;}return dbFirebase();}
+const QS=new URLSearchParams(location.search);const NET_LOCAL=NetDB.LOCAL;
+// 通信まわりは共通部品 netdb.js（カートと同じ）。1台で遊ぶときはメモリだけのDB。
+let MEMDB=null;function dbTree(){return NetDB.mem();}function dbOnline(){return NetDB.open('trap');}
 const DEV=(()=>{let p='';try{p=sessionStorage.getItem('wn_dev')||'';}catch(e){}if(!p){p='d'+Math.random().toString(36).slice(2,8);try{sessionStorage.setItem('wn_dev',p);}catch(e){}}return p;})();
 // ============ input ============
 const keys={},keyPrev={},keyHit={};let touchK={l:0,r:0,j:0,b:0},touchHit={};
@@ -160,24 +142,24 @@ function readDevs(){const out={};const any=k=>k.some(c=>keys[c]||keyHit[c]);
     d.px=rep('x',d.x);d.py=rep('y',d.y);}
   for(const k in keyHit)delete keyHit[k];for(const k in touchHit)delete touchHit[k];devPrev=out;devs=out;return out;}
 // ============ session / room ============
-const S={db:null,code:'',online:false,host:false,meta:null,players:{},picks:{},places:{},states:{},buf:{},L:[],seenMeta:false,name:'',err:'',local:{},rooms:{}};
+const S={db:null,code:'',online:false,host:false,meta:null,players:{},picks:{},places:{},states:{},buf:{},L:[],seenMeta:false,name:'',err:'',local:{},rooms:[]};
 // S.local: pid -> {dev} for humans on this device. CPUs are owned by the host.
-S.name=(()=>{let n='';try{n=localStorage.getItem('wn_name')||'';}catch(e){}return n||'プレイヤー'+(100+Math.floor(Math.random()*900));})();
+S.name=NetDB.name.get()||'プレイヤー'+(100+Math.floor(Math.random()*900));
 const rp=x=>'r/'+S.code+(x?'/'+x:'');
 function owns(pid){return!!S.local[pid]||(S.host&&pid[0]==='c');}
 function offAll(){for(const f of S.L)try{f();}catch(e){}S.L=[];}
 function openRoom(db,code,asHost){offAll();S.db=db;S.code=code;S.host=asHost;S.meta=null;S.players={};S.picks={};S.places={};S.states={};S.buf={};S.local={};S.seenMeta=false;S.online=db.kind!=='mem';
   if(asHost){db.set(rp('m'),{host:DEV,hostName:S.name,st:'lobby',stage:0,target:15,cpu:S.online?0:2,scores:{},t:db.now()});db.dis(rp('m'));db.dis(rp('pk'));db.dis(rp('pl'));db.dis(rp('s'));
-    if(S.online){db.set('list/'+code,{host:S.name,n:0,st:'lobby',t:db.now()});db.dis('list/'+code);}}
+    if(S.online)S.pub=NetDB.lobby.publish('trap',code,{host:S.name,n:0,st:'lobby'});}
   S.L.push(db.on(rp('m'),'value',(k,v)=>onMeta(v)));
-  S.L.push(db.on(rp('p'),'value',(k,v)=>{S.players=v||{};if(S.host&&S.online)db.update('list/'+S.code,{n:Object.keys(S.players).length,t:db.now()});if(scr==='lobby')lobbyScreen();}));
+  S.L.push(db.on(rp('p'),'value',(k,v)=>{S.players=v||{};if(S.host&&S.pub)S.pub.update({n:Object.values(S.players).filter(p=>!p.cpu).length});if(scr==='lobby')lobbyScreen();}));
   S.L.push(db.on(rp('pk'),'value',(k,v)=>{S.picks=v||{};}));
   S.L.push(db.on(rp('pl'),'value',(k,v)=>{S.places=v||{};placesChanged();}));
   const st=(pid,v)=>{if(!v||owns(pid))return;S.states[pid]=v;const B=S.buf[pid]||(S.buf[pid]=[]);if(!B.length||B[B.length-1].t<v.t){B.push(v);if(B.length>20)B.shift();}};
   S.L.push(db.on(rp('s'),'child_added',st),db.on(rp('s'),'child_changed',st));
   if(!asHost)setTimeout(()=>{if(S.code===code&&!S.seenMeta&&scr==='lobby')leaveRoom('部屋「'+code+'」が見つかりません。コードを確かめてください。');},5000);
   lobbyScreen();}
-function leaveRoom(msg){const db=S.db;if(db&&S.code){for(const pid in S.local){db.remove(rp('p/'+pid));db.remove(rp('s/'+pid));db.undis(rp('p/'+pid));}if(S.host){db.remove(rp());if(S.online)db.remove('list/'+S.code);}}
+function leaveRoom(msg){const db=S.db;if(db&&S.code){for(const pid in S.local){db.remove(rp('p/'+pid));db.remove(rp('s/'+pid));db.undis(rp('p/'+pid));}if(S.host){db.remove(rp());}}if(S.pub){S.pub.close();S.pub=null;}
   offAll();const wasOnline=S.online;S.code='';S.meta=null;S.local={};G.active=false;S.err=msg||'';if(wasOnline)onlineScreen();else titleScreen();}
 function addLocal(dev){const db=S.db;if(!db||!S.meta||S.meta.st!=='lobby')return;const humans=Object.values(S.players).filter(p=>!p.cpu).length;if(humans>=4){toast('4人まで');return;}
   if(Object.values(S.local).some(l=>l.dev===dev))return;let slot=0;while(S.local[DEV+'-'+slot])slot++;const pid=DEV+'-'+slot;
@@ -234,7 +216,7 @@ function hostStart(){const db=S.db,m=S.meta;const humans=Object.entries(S.player
   for(let i=0;i<cpuN;i++){let ch=0;while(used.has(ch))ch++;used.add(ch);const pid='c'+(i+1);db.set(rp('p/'+pid),{name:'CPU'+(i+1),char:ch%CHARS.length,ok:true,cpu:true,t:db.now()+i});order.push(pid);}
   const scores={};order.forEach(p=>scores[p]=0);db.remove(rp('pk'));db.remove(rp('pl'));db.remove(rp('s'));
   const seed=Math.floor(Math.random()*1e9);db.update(rp('m'),{st:'game',order,scores,last:null,win:null,rd:{n:1,ph:'pick',offer:newOffer(1,seed,order.length+1),t0:db.now(),seed}});
-  if(S.online)db.update('list/'+S.code,{st:'game'});}
+  if(S.pub)S.pub.update({st:'game'});}
 function hostStep(){const db=S.db,m=S.meta;if(!S.host||!m||m.st!=='game'||!m.rd||!m.rd.offer)return;const rd=m.rd,now=db.now(),order=m.order;const el=(now-rd.t0)/1000;
   if(rd.ph==='pick'){const done=order.every(pid=>myPick(pid)>=0);
     if(el>RULES.pickT||done){if(!done){const pk=Object.assign({},S.picks[rd.n]||{});for(const pid of order){if(myPick(pid)>=0)continue;const free=rd.offer.map((x,i)=>i).filter(i=>!takenBy(i));if(free.length)db.set(rp('pk/'+rd.n+'/'+pid),{i:free[Math.floor(Math.random()*free.length)],t:now});}}
@@ -529,7 +511,7 @@ function helpScreen(){scr='help';h(`<div class="wrap" style="max-width:720px"><h
   <div class="row"><button class="btn ghost" data-nav data-back>もどる</button></div></div>`);ui.querySelector('[data-back]').onclick=titleScreen;}
 function onlineScreen(){scr='online';G.active=false;touchEl.hidden=true;const db=dbOnline();const q=QS.get('room');
   if(!db&&!S.err)S.err='通信の部品を読み込めませんでした。ネットにつながっているか確認して、ページを開き直してください。';
-  const list=Object.entries(S.rooms||{}).filter(([c,r])=>r&&db&&db.now()-(r.t||0)<180000&&r.st==='lobby'&&(r.n||0)<4).slice(0,6);
+  const list=(S.rooms||[]).filter(r=>r.st==='lobby'&&(r.n||0)<4).slice(0,6).map(r=>[r.code,r]);
   h(`<div class="wrap" style="max-width:720px"><h2>オンライン（各自の端末で遊ぶ）</h2>${S.err?`<div class="panel" style="background:#ffe3dc"><b>${esc(S.err)}</b></div>`:''}
    <div class="panel row"><b>なまえ</b><input class="tx" id="nm" maxlength="10" value="${esc(S.name)}" style="flex:1"></div>
    <div class="menu"><button class="btn big" data-nav data-a="make">部屋をつくる<small>4文字のコードと招待リンクが出ます</small></button>
@@ -537,13 +519,13 @@ function onlineScreen(){scr='online';G.active=false;touchEl.hidden=true;const db
    <div class="panel"><b>いま開いている部屋</b>${list.length?`<div class="menu" style="margin-top:8px">${list.map(([c,r])=>`<button class="btn" data-nav data-room="${esc(c)}">${esc(r.host)}さんの部屋（${r.n||0}/4人）<small>コード ${esc(c)}・押すと参加</small></button>`).join('')}</div>`:`<p class="hint" style="margin-top:6px">${db?'今は開いている部屋がありません。':'通信の準備ができていません。'}</p>`}</div>
    <p class="hint">それぞれが自分の端末で自分のキャラを動かし、位置と置いた物だけを送り合います。1台に2人まで（左右キーボード）入ることもできます。</p>
    <div class="row"><button class="btn ghost" data-nav data-back>もどる</button></div></div>`);
-  const nm=ui.querySelector('#nm');const save=()=>{S.name=(nm.value||'').trim().slice(0,10)||S.name;try{localStorage.setItem('wn_name',S.name);}catch(e){}};nm.onchange=save;
+  const nm=ui.querySelector('#nm');const save=()=>{S.name=NetDB.name.set(nm.value)||S.name;};nm.onchange=save;
   ui.querySelector('[data-back]').onclick=()=>{S.err='';titleScreen();};
   ui.querySelector('[data-a=make]').onclick=()=>{save();if(!db){onlineScreen();return;}S.err='';const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let c='';for(let i=0;i<4;i++)c+=A[Math.floor(Math.random()*A.length)];openRoom(db,c,true);};
   ui.querySelector('[data-a=join]').onclick=()=>{save();if(!db){onlineScreen();return;}const c=(ui.querySelector('#cd').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==4){S.err='コードは4文字です。';onlineScreen();return;}S.err='';openRoom(db,c,false);};
   ui.querySelectorAll('[data-room]').forEach(b=>b.onclick=()=>{save();S.err='';openRoom(db,b.dataset.room,false);});
   ui.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){i.blur();if(i.id==='cd')ui.querySelector('[data-a=join]').click();}}));
-  if(db&&!S.roomsOff){S.roomsOff=db.on('list','value',(k,v)=>{S.rooms=v||{};if(scr==='online'&&document.activeElement.tagName!=='INPUT')onlineScreen();});}
+  if(db&&!S.roomsOff){S.roomsOff=NetDB.lobby.watch(l=>{const prev=JSON.stringify(S.rooms);S.rooms=l.filter(r=>r.g==='trap');if(prev!==JSON.stringify(S.rooms)&&scr==='online'&&document.activeElement.tagName!=='INPUT')onlineScreen();});}
   if(q&&!onlineScreen.auto&&db){onlineScreen.auto=true;setTimeout(()=>{if(scr==='online')ui.querySelector('[data-a=join]').click();},400);}}
 function lobbyScreen(){scr='lobby';G.active=false;touchEl.hidden=true;const m=S.meta;const db=S.db;if(!db)return;const host=S.host;
   const ps=Object.entries(S.players).filter(([,p])=>!p.cpu).sort((a,b)=>(a[1].t||0)-(b[1].t||0)).slice(0,4);const cpuN=m?clamp(m.cpu,0,4-ps.length):0;
@@ -585,7 +567,7 @@ function endScreen(){scr='end';const m=S.meta;const ord=m.order.slice().sort((a,
    <table class="sc">${ord.map((p,i)=>`<tr><td>${i+1}</td><td style="color:${colorOf(p)}">${esc(nameOf(p))}</td><td style="text-align:right">${m.scores[p]||0}点</td></tr>`).join('')}</table></div>
    <div class="row">${S.host?`<button class="btn big on" data-nav data-a="again">もう一度（同じメンバー）</button>`:`<span class="hint">ホストが次を選ぶのを待っています。</span>`}<button class="btn ghost" data-nav data-back>${S.online?'部屋を出る':'タイトルへ'}</button></div></div>`);
   const c=ui.querySelector('#wc').getContext('2d');drawChar(c,CHARS[charOf(m.win)],120,185,130,1,0,true,0);
-  const a=ui.querySelector('[data-a=again]');if(a)a.onclick=()=>{for(const pid in S.players){if(S.players[pid].cpu)S.db.remove(rp('p/'+pid));else S.db.update(rp('p/'+pid),{ok:false});}S.db.update(rp('m'),{st:'lobby',rd:null,last:null,win:null});};
+  const a=ui.querySelector('[data-a=again]');if(a)a.onclick=()=>{for(const pid in S.players){if(S.players[pid].cpu)S.db.remove(rp('p/'+pid));else S.db.update(rp('p/'+pid),{ok:false});}S.db.update(rp('m'),{st:'lobby',rd:null,last:null,win:null});if(S.pub)S.pub.update({st:'lobby'});};
   ui.querySelector('[data-back]').onclick=()=>leaveRoom('');}
 function pauseMenu(){G.menu=true;scr='pause';h(`<div class="wrap" style="max-width:420px"><h2>メニュー</h2><p class="hint">メニュー中もゲームは止まりません。</p><div class="menu"><button class="btn big" data-nav data-back>つづける</button><button class="btn big" data-nav data-a="q">${S.online?'部屋を出る':'タイトルへ'}</button></div></div>`);
   ui.querySelector('[data-back]').onclick=()=>{G.menu=false;scr='game';ui.hidden=true;ui.innerHTML='';};ui.querySelector('[data-a=q]').onclick=()=>{G.menu=false;leaveRoom('');};}
