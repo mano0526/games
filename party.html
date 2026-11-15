@@ -2503,11 +2503,19 @@ function drawMGIntro(c,def,mode,teams,S){mgBG(c,'#ffe3a8','#ffb36b');c.fillStyle
   txt(c,pname(p),s.x,540,{s:22});rr(c,s.x-70,560,140,36,18);c.fillStyle=S.ready[s.i]?C.green:'#fff';c.fill();c.lineWidth=3;c.stroke();txt(c,p.human?(S.ready[s.i]?'OK！':aLabel(p.dev)+'でOK'):'COM',s.x,578,{s:18,col:S.ready[s.i]?'#fff':C.ink})}
  if(mode!=='ffa'&&def.roles){const rl=def.roles(mode);gs.forEach((g0,k)=>{const xs=slots.filter(s=>g0.includes(s.i)).map(s=>s.x);const cx=(Math.min(...xs)+Math.max(...xs))/2;c.font=`800 16px ${FB}`;const tw=c.measureText(rl[k]).width+28;rr(c,cx-tw/2,604,tw,28,14);c.fillStyle=teams.colors[k];c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();txt(c,rl[k],cx,618,{s:16,col:'#fff',st:C.ink,sw:4})})}
  txt(c,G.players.some(p=>p.human&&PLs(teams).includes(p.i))?'A：じゅんびOK　　B：れんしゅう　　（全員 OK で スタート）':'まもなく スタート',W/2,652,{s:20,col:'#8a7aa0'})}
+// バトルロイヤルのとき 負けた人にも 順位を出す（scores の向きが 勝ち負けと くいちがう時は 出さない）
+function mgRanks(winners,teams){const sc=winners.scores;if(teams.mode!=='ffa'||!sc||!winners.length)return null;const L=PLs(teams).filter(i=>!winners.includes(i));if(!L.length)return null;
+ const wmin=Math.min(...winners.map(i=>sc[i])),wmax=Math.max(...winners.map(i=>sc[i])),lmax=Math.max(...L.map(i=>sc[i])),lmin=Math.min(...L.map(i=>sc[i]));
+ let dir=0;if(wmin>=lmax)dir=1;else if(wmax<=lmin)dir=-1;if(!dir||L.some(i=>!Number.isFinite(sc[i])))return null;
+ const r={};for(const i of L)r[i]=winners.length+L.filter(j=>dir*sc[j]>dir*sc[i]).length+1;return r}
 function drawMGResult(c,winners,teams,t){c.fillStyle='rgba(20,10,40,.6)';c.fillRect(0,0,W,H);const k=easeBack(Math.min(1,t*2.5));
  txt(c,winners.length?'勝ち！':'ひきわけ',W/2,150,{s:100*k,f:FD,w:400,col:winners.length?C.gold:'#fff',st:C.ink,sw:14});
  const n=winners.length;winners.forEach((i,j)=>{const x=W/2+(j-(n-1)/2)*230;drawChar(c,P(i).ci,x,380,62,{mood:'happy',jump:Math.abs(Math.sin(NOW*6+j))*30});txt(c,pname(P(i)),x,480,{s:28,col:'#fff',st:C.ink,sw:6});
   if(!teams.noCoin){drawCoin(c,x-30,530,16);txt(c,'+10',x+18,532,{s:30,f:FD,w:400,col:C.gold,st:C.ink,sw:6})}});
- const losers=PLs(teams).filter(i=>!winners.includes(i));losers.forEach((i,j)=>{drawChar(c,P(i).ci,W/2+(j-(losers.length-1)/2)*120,640,26,{mood:'sad',alpha:.8})});
+ const losers=PLs(teams).filter(i=>!winners.includes(i));const rk=mgRanks(winners,teams);if(rk)losers.sort((a,b)=>rk[a]-rk[b]);
+ if(losers.length){const bw=losers.length*(rk?150:120)+40;rr(c,W/2-bw/2,572,bw,108,22);c.fillStyle='rgba(20,10,40,.55)';c.fill()}
+ losers.forEach((i,j)=>{const x=W/2+(j-(losers.length-1)/2)*(rk?150:120);drawChar(c,P(i).ci,x,640,26,{mood:'sad',alpha:.8});
+  if(rk&&rk[i]){rr(c,x-30,584,60,26,13);c.fillStyle='#fff';c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();txt(c,rk[i]+'位',x,597,{s:17,f:FD,w:400,col:C.ink})}});
  if(t>1&&!isAuto(-1))txt(c,'A / Space / Enter で つぎへ',W/2,H-24,{s:18,col:'#fff'})}
 
 /* ================= 結果発表 ================= */
