@@ -1036,7 +1036,10 @@ function stepRace(dt){race.flash=Math.max(0,race.flash-dt);if(race.blast){race.b
   if(race.battle){if(race.phase==='race'){const alive=race.karts.filter(k=>!k.out);if(alive.length<=1||race.t>=race.timeLimit||race.humans.every(h=>h.out)){race.endT+=dt;if(race.endT>3)finishRace();}}}
   else if(!race.net&&race.phase==='race'&&race.humans.every(h=>h.finished)){race.endT+=dt;if(race.endT>4.5)finishRace();}
   if(race.t>900)finishRace();}
-function inputFor(k){const d=app.netMenu?null:devCur[k.device];if(!d)return{steer:0,accel:false,brake:false,drift:false,item:false,aimY:0,pressed:{}};return d;}
+// キーボードで1人だけ遊ぶときは、WASD と 矢印キーの どちらでも 操作できる（Space で参加して 矢印で走っても 動くように）
+function mergeKB(a,b){if(!a)return b;if(!b)return a;const o={};for(const k in a)o[k]=typeof a[k]==='boolean'?(a[k]||b[k]):a[k];o.steer=clamp((a.steer||0)+(b.steer||0),-1,1);o.aimY=clamp((a.aimY||0)+(b.aimY||0),-1,1);o.pressed={};for(const k in a.pressed||{})o.pressed[k]=a.pressed[k]||(b.pressed&&b.pressed[k]);return o;}
+function inputFor(k){if((k.device==='kb1'||k.device==='kb2')&&!app.netMenu&&race&&race.humans&&!race.humans.some(h=>h!==k&&(h.device==='kb1'||h.device==='kb2')))return mergeKB(devCur.kb1,devCur.kb2)||{steer:0,accel:false,brake:false,drift:false,item:false,aimY:0,pressed:{}};
+ const d=app.netMenu?null:devCur[k.device];if(!d)return{steer:0,accel:false,brake:false,drift:false,item:false,aimY:0,pressed:{}};return d;}
 
 function stepObs(dt){const tr=race.track;const T=race.phase==='race'?race.t:0;for(const o of tr.obs){const s=tr.S[o.i];const ph=T*Math.PI*2/o.per+o.ph;const lat=Math.sin(ph)*o.amp*s.w;
     o.x=s.x+s.nx*lat;o.z=s.z+s.nz*lat;o.yaw=s.yaw;o.y=s.y+(o.type==='fire'?.8+6*Math.abs(Math.sin(ph*2)):0);o.spin=ph*3;

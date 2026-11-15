@@ -532,6 +532,7 @@ function navStep(){const els=navEls();if(!els.length)return;const d=devs.any;if(
   if(d.px||d.py){nav.show=true;const cur=els[nav.i]||els[0];const a=cur.getBoundingClientRect();let best=-1,bd=1e9;
     els.forEach((e,i)=>{if(i===nav.i)return;const b=e.getBoundingClientRect();const dx=(b.left+b.width/2)-(a.left+a.width/2),dy=(b.top+b.height/2)-(a.top+a.height/2);
       if(d.px&&Math.sign(dx)!==d.px||d.py&&Math.sign(dy)!==d.py)return;if(d.px&&Math.abs(dx)<4||d.py&&Math.abs(dy)<4)return;const dist=d.px?Math.abs(dx)+Math.abs(dy)*2:Math.abs(dy)+Math.abs(dx)*2;if(dist<bd){bd=dist;best=i;}});
+    if(best<0&&d.px){best=(nav.i+d.px+els.length)%els.length;}// 右に 何もなければ 次へ（左なら 前へ）
     if(best>=0){nav.i=best;sfx('ui');els[best].scrollIntoView({block:'nearest'});}markNav();}
   if(d.pa&&nav.show){const e=els[nav.i];if(e){sfx('ok');e.click();}}else if(d.pa){nav.show=true;markNav();}
   if(d.pb||d.pst){const b=ui.querySelector('[data-back]');if(b){sfx('ui');b.click();}}}

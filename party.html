@@ -639,8 +639,8 @@ function choose(text,opts,o={}){const owner=o.owner??G.talk;const auto=isAuto(ow
  const target=auto?clamp(o.cpu?o.cpu():0,0,opts.length-1):0;let at=0,mv=0;
  return until(()=>{const d=DLG;if(d.n<d.text.length){if(!auto&&ownerPressed(owner,'a'))d.n=d.text.length;return false}
   if(auto){at+=DT;if(at<.4*G.tempo)return false;if(d.sel!==target){mv-=DT;if(mv<=0){d.sel+=d.sel<target?1:-1;sfx('blip');mv=.16*G.tempo}return false}if(at>.95*G.tempo){d.res=d.sel;sfx('ok');return true}return false}
-  if(ownerRep(owner,'up')){d.sel=(d.sel-1+opts.length)%opts.length;sfx('blip')}
-  if(ownerRep(owner,'down')){d.sel=(d.sel+1)%opts.length;sfx('blip')}
+  if(ownerRep(owner,'up')||ownerRep(owner,'left')){d.sel=(d.sel-1+opts.length)%opts.length;sfx('blip')}
+  if(ownerRep(owner,'down')||ownerRep(owner,'right')){d.sel=(d.sel+1)%opts.length;sfx('blip')}
   if(ownerPressed(owner,'a')){if(d.dis[d.sel]){sfx('back');return false}sfx('ok');d.res=d.sel;return true}
   if(d.cancel&&ownerPressed(owner,'b')){sfx('back');d.res=-1;return true}return false}).then(()=>{const r=DLG?DLG.res:-1;DLG=null;return r})}
 function banner(text,o={}){const b={text,sub:o.sub||'',col:o.col||C.blue,t:0,dur:o.dur||1.3};G.banners.push(b);return wait(b.dur)}
@@ -1005,9 +1005,9 @@ async function mapView(p){G.mapView=true;overview();await wait(.3);await until((
 async function turnPick(p,used){const u={p,sel:0,sub:-1,isel:0,t:0,used};G.tmenu=u;let res=null;
  await until(()=>{u.t+=DT;const d=p.dev;if(u.t<.2)return false;
   const tA=u.tapA;u.tapA=false;const tB=u.tapB;u.tapB=false;
-  if(u.sub<0){if(Input.rep(d,'up')){u.sel=(u.sel+2)%3;sfx('blip')}if(Input.rep(d,'down')){u.sel=(u.sel+1)%3;sfx('blip')}
+  if(u.sub<0){if(Input.rep(d,'up')||Input.rep(d,'left')){u.sel=(u.sel+2)%3;sfx('blip')}if(Input.rep(d,'down')||Input.rep(d,'right')){u.sel=(u.sel+1)%3;sfx('blip')}
    if(Input.pressed(d,'a')||tA){const o=['dice','item','map'][u.sel];if(o==='item'){if(used||!p.items.length){sfx('beep');u.ng=.5;return false}u.sub=0;u.isel=0;u.t=.2;sfx('ok');return false}res=o;sfx('ok');return true}}
-  else{const n=p.items.length;if(Input.rep(d,'up')){u.isel=(u.isel+n-1)%n;sfx('blip')}if(Input.rep(d,'down')){u.isel=(u.isel+1)%n;sfx('blip')}
+  else{const n=p.items.length;if(Input.rep(d,'up')||Input.rep(d,'left')){u.isel=(u.isel+n-1)%n;sfx('blip')}if(Input.rep(d,'down')||Input.rep(d,'right')){u.isel=(u.isel+1)%n;sfx('blip')}
    if(Input.pressed(d,'b')||tB){u.sub=-1;sfx('back');return false}if(Input.pressed(d,'a')||tA){res={item:p.items[u.isel]};sfx('ok');return true}}
   u.ng=Math.max(0,(u.ng||0)-DT);return false});
  G.tmenu=null;if(res==='map'){await mapView(p);return null}if(res==='dice')return'dice';
@@ -3211,7 +3211,7 @@ function isFF(){return canFF()&&G.players.some(p=>p.human&&Input.down(p.dev,'b')
 
 /* ================= ポーズ ================= */
 let paused=false,pauseSel=0;
-function pauseUpdate(){if(ownerRep(-1,'up')||ownerRep(-1,'down')||Input.rep('kb1','up')||Input.rep('kb1','down')){pauseSel=1-pauseSel;sfx('blip')}
+function pauseUpdate(){if(['up','down','left','right'].some(k=>ownerRep(-1,k)||Input.rep('kb1',k))){pauseSel=1-pauseSel;sfx('blip')}
  if(Input.anyPressed('a')){sfx('ok');if(pauseSel===0)paused=false;else goTitle()}if(Input.anyPressed('b')){paused=false}}
 function drawPause(c){c.fillStyle='rgba(15,10,30,.7)';c.fillRect(0,0,W,H);rr(c,W/2-220,H/2-140,440,280,26);c.fillStyle=C.paper;c.fill();c.lineWidth=5;c.strokeStyle=C.ink;c.stroke();
  txt(c,'ポーズ',W/2,H/2-90,{s:44,f:FD,w:400});['つづける','タイトルに もどる'].forEach((s,i)=>{const y=H/2-10+i*64;if(i===pauseSel){rr(c,W/2-170,y-24,340,48,16);c.fillStyle='#ffe7a1';c.fill()}txt(c,s,W/2,y,{s:26,col:i===1?C.redD:C.ink})})}

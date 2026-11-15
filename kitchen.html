@@ -712,7 +712,7 @@ function navMove(dx,dy){const it=navItems();if(!it.length)return;const cur=it[UI
   it.forEach((e,i)=>{if(e===cur)return;const r=e.getBoundingClientRect();if(!r.width&&!r.height)return;const vx=r.left+r.width/2-cx,vy=r.top+r.height/2-cy;const along=vx*dx+vy*dy;if(along<=4)return;
     const ov=dx?(r.top<r0.bottom-2&&r.bottom>r0.top+2):(r.left<r0.right-2&&r.right>r0.left+2);const perp=Math.abs(vx*dy)+Math.abs(vy*dx);
     const sc=along+(ov?0:perp*2+40);if(sc<bs){bs=sc;best=i;}});
-  if(best<0){if(!dy)return;best=(UI.focus+dy+it.length)%it.length;}
+  if(best<0){const d=dy||dx;best=(UI.focus+d+it.length)%it.length;}// 右に 何もなければ 次へ（左なら 前へ）
   UI.focus=best;updateFocus();sfx.tick();}
 
 

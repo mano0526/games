@@ -11,8 +11,9 @@ html,body{height:100%;margin:0;overflow:hidden}
 body{background:radial-gradient(120% 90% at 50% 40%,#2c4a3b 0%,var(--bg) 55%,var(--edge) 100%);background-color:var(--bg);color:var(--paper);font-family:var(--font-ui);-webkit-user-select:none;user-select:none}
 #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:max(10px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(10px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
 canvas{display:block;border-radius:10px;box-shadow:0 12px 44px rgba(0,0,0,.5);touch-action:none;outline:none;max-width:100%}
-canvas:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+canvas:focus-visible{outline:none}
 .tb{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);right:max(12px,env(safe-area-inset-right,0px));display:flex;gap:6px;z-index:5}
+.tb[hidden]{display:none}
 .tb button,.tb a{font:800 12px var(--font-ui);color:var(--paper);background:var(--pad);border:1px solid rgba(255,255,255,.28);border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none}
 .tb.sm button,.tb.sm a{font-size:10px;padding:4px 7px}
 /* オンラインの 部屋（HTML） */
@@ -66,11 +67,12 @@ const Rint=(a,b)=>a+Math.floor(R()*(b-a+1)),Rshuffle=a=>{for(let i=a.length-1;i>
 function rr(c,x,y,w,h,r){r=Math.min(r,w/2,h/2);c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
 function circ(c,x,y,r){c.beginPath();c.arc(x,y,Math.max(0,r),0,Math.PI*2)}
 function ell(c,x,y,rx,ry){c.beginPath();c.ellipse(x,y,Math.max(0,rx),Math.max(0,ry),0,0,Math.PI*2)}
-function txt(c,s,x,y,o={}){c.font=`${o.w||800} ${o.s||20}px ${o.f||FB}`;c.textAlign=o.a||'center';c.textBaseline='middle';if(o.st){c.lineJoin='round';c.lineWidth=o.sw||4;c.strokeStyle=o.st;c.strokeText(s,x,y)}c.fillStyle=o.col||C.ink;c.fillText(s,x,y)}
+function txt(c,s,x,y,o={}){c.font=`${o.w||800} ${Math.max(o.s||20,o.tiny?0:15)}px ${o.f||FB}`;// スマホで 縮んでも 読めるように 15より 小さい 字は 使わない
+ c.textAlign=o.a||'center';c.textBaseline='middle';if(o.st){c.lineJoin='round';c.lineWidth=o.sw||4;c.strokeStyle=o.st;c.strokeText(s,x,y)}c.fillStyle=o.col||C.ink;c.fillText(s,x,y)}
 function wrap(c,s,w){const out=[];let line='';for(const ch of s){if(c.measureText(line+ch).width>w&&line&&!'、。，．）」』！？ー'.includes(ch)){out.push(line);line=ch}else line+=ch}if(line)out.push(line);return out}
 function panel(c,x,y,w,h,o={}){rr(c,x,y,w,h,o.r||18);c.fillStyle=o.fill||C.paper;c.fill();c.lineWidth=o.lw||4;c.strokeStyle=o.stroke||C.ink;c.stroke()}
 function bgFelt(c){const g=c.createRadialGradient(W/2,H/2,100,W/2,H/2,820);g.addColorStop(0,'#3a8060');g.addColorStop(1,'#1f4d38');c.fillStyle=g;c.fillRect(0,0,W,H);
- c.fillStyle='rgba(255,255,255,.025)';for(let i=0;i<60;i++){c.fillRect((i*197)%W,0,1,H)}}
+ }
 // コマ（席の色の丸い駒、白いふち）
 function token(c,x,y,r,s,o={}){c.fillStyle='rgba(0,0,0,.25)';ell(c,x+r*.08,y+r*.22,r*.95,r*.75);c.fill();circ(c,x,y,r);c.fillStyle=SEATC[s].c;c.fill();c.lineWidth=Math.max(2,r*.14);c.strokeStyle=C.ink;c.stroke();
  circ(c,x,y,r*.62);c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=Math.max(1.5,r*.1);c.stroke();c.fillStyle='rgba(255,255,255,.35)';ell(c,x-r*.3,y-r*.35,r*.28,r*.16);c.fill();if(o.ring){c.strokeStyle=C.gold;c.lineWidth=4;circ(c,x,y,r+5);c.stroke()}}
@@ -252,7 +254,7 @@ function drawCard(c,x,y,w,h,id,o={}){// x,y＝左上
   c.save();c.clip();c.strokeStyle='rgba(255,230,200,.35)';for(let k=-h;k<w+h;k+=w*.16){c.beginPath();c.moveTo(x+k,y);c.lineTo(x+k+h,y+h);c.stroke()}c.restore();c.restore();return}
  c.fillStyle=o.dim?'#d9d2c4':'#fffdf7';c.fill();c.lineWidth=o.sel?Math.max(3,w*.05):Math.max(1.5,w*.03);c.strokeStyle=o.sel?C.gold:C.ink;c.stroke();
  if(id===52){txt(c,'★',x+w/2,y+h*.45,{s:w*.5,col:'#7a3fc2'});txt(c,'JOKER',x+w/2,y+h*.8,{s:w*.16,f:FD,w:400,col:'#7a3fc2'});txt(c,'J',x+w*.16,y+h*.12,{s:w*.2,f:FD,w:400,col:'#7a3fc2'})}
- else{const su=Math.floor(id/13),col=su===1||su===2?'#d23a2e':'#2b2140';txt(c,RK[id%13],x+w*.2,y+h*.12,{s:w*(RK[id%13].length>1?.2:.25),f:FD,w:400,col});txt(c,SUIT[su],x+w*.2,y+h*.27,{s:w*.2,col});txt(c,SUIT[su],x+w/2,y+h*.58,{s:w*.5,col});}
+ else{const su=Math.floor(id/13),col=su===1||su===2?'#d23a2e':'#2b2140';txt(c,RK[id%13],x+w*.22,y+h*.13,{s:w*(RK[id%13].length>1?.26:.32),f:FD,w:400,col,tiny:1});txt(c,SUIT[su],x+w*.22,y+h*.3,{s:w*.24,col,tiny:1});txt(c,SUIT[su],x+w/2,y+h*.58,{s:w*.5,col});}
  if(o.sel){c.strokeStyle=C.gold;c.lineWidth=4;rr(c,x-3,y-3,w+6,h+6,w*.14);c.stroke()}c.restore()}
 GAMES.push({key:'daifugo',name:'大富豪',min:2,max:4,hidden:true,desc:'前の人より 強い カードを 出していく。早く 手札を なくした 人が 大富豪！',
  opts:[{k:'s3',name:'スペ3がえし',vals:[1,0],labels:['あり','なし'],def:0},{k:'kai',name:'階段',vals:[1,0],labels:['あり','なし'],def:0},{k:'shb',name:'しばり',vals:[1,0],labels:['あり','なし'],def:0},{k:'jb',name:'11バック',vals:[0,1],labels:['なし','あり'],def:0}],
@@ -333,17 +335,17 @@ GAMES.push({key:'daifugo',name:'大富豪',min:2,max:4,hidden:true,desc:'前の�
     for(let i=len-1;i>=0;i--){const q=P(i),up=g.sel.has(h[i])?26:0;if(hit(p,q.x,q.y-up,q.w,CH+up)){g.cur=i;toggle(h[i]);break}}}
    if(sPressed(s,'a')){if(g.cur<len)toggle(h[g.cur]);else if(g.cur===len)return submit();else return pass()}return null};
   // 席の 見た目の 位置（自分が 下、ほかは 左・上・右）
-  const oppPos=(v,k,cnt)=>cnt===1?[{x:W/2,y:96}][k]:cnt===2?[{x:380,y:110},{x:W-380,y:110}][k]:[{x:130,y:260},{x:W/2,y:96},{x:W-130,y:260}][k];
+  const oppPos=(v,k,cnt)=>cnt===1?[{x:W/2,y:116}][k]:cnt===2?[{x:380,y:120},{x:W-380,y:120}][k]:[{x:130,y:270},{x:W/2,y:116},{x:W-130,y:270}][k];
   g.draw=c=>{bgFelt(c);const v=PLAY.viewer>=0?PLAY.viewer:0,hidden=PLAY.viewer<0||PLAY.curtain>=0;const others=[];for(let k=1;k<n;k++)others.push((v+k)%n);
    // 左上：回戦・革命
    {const st=[g.rev?'革命中':'',g.jback?'11バック中':'',g.lock?'しばり '+g.lock.split('').map(q=>SUIT[q]).join(''):''].filter(Boolean).join('・');panel(c,16,14,250,64,{fill:'rgba(255,248,236,.92)',r:14});txt(c,`${g.round}／${g.ROUNDS} 回戦`,141,34,{s:20,f:FD,w:400});txt(c,st?st+(R()?'（よわい ほうが 強い）':''):'ふつう',141,60,{s:12,col:st?C.red:C.sub})}
    if(R()){c.strokeStyle='rgba(229,71,60,.55)';c.lineWidth=10;c.strokeRect(5,5,W-10,H-10)}
    // ほかの人
    others.forEach((s,k)=>{const p=oppPos(v,k,others.length),on=s===g.turn&&g.phase==='play';const cnt=g.hands[s].length;
-    panel(c,p.x-110,p.y-62,220,124,{fill:on?'#fff':'rgba(255,248,236,.88)',stroke:on?SEATC[s].c:C.ink,lw:on?6:3});token(c,p.x-80,p.y-32,16,s);txt(c,seatName(s),p.x+10,p.y-32,{s:16,f:FD,w:400,col:SEATC[s].d});
-    const fw=Math.min(14,118/Math.max(1,cnt));for(let i=0;i<Math.min(cnt,27);i++)drawCard(c,p.x-90+i*fw,p.y-10,30,44,0,{back:true});
-    txt(c,cnt?`${cnt}まい`:'',p.x+92,p.y+12,{s:15,a:'right'});
-    const oi=g.out.indexOf(s);txt(c,oi>=0?`${g.TITLES[oi]}！`:`${g.pts[s]}点`,p.x,p.y+48,{s:14,col:oi>=0?'#c4570a':C.sub});
+    panel(c,p.x-120,p.y-62,240,128,{fill:on?'#fff':'rgba(255,248,236,.9)',stroke:on?SEATC[s].c:C.ink,lw:on?6:3});token(c,p.x-92,p.y-34,17,s);txt(c,shortName(s),p.x-66,p.y-34,{s:21,a:'left',f:FD,w:400,col:SEATC[s].d});
+    const fw=Math.min(10,90/Math.max(1,cnt));for(let i=0;i<Math.min(cnt,27);i++)drawCard(c,p.x-104+i*fw,p.y-12,28,42,0,{back:true});
+    txt(c,cnt?`${cnt}まい`:'',p.x+108,p.y+9,{s:22,a:'right',f:FD,w:400});
+    const oi=g.out.indexOf(s);txt(c,oi>=0?`${g.TITLES[oi]}！`:`${g.pts[s]}点`,p.x,p.y+48,{s:18,col:oi>=0?'#c4570a':C.sub});
     if(g.last[s]==='パス'){rr(c,p.x+40,p.y-92,74,32,16);c.fillStyle=C.ink;c.fill();txt(c,'パス',p.x+77,p.y-76,{s:16,col:'#fff'})}});
    // 場
    rr(c,W/2-230,232,460,190,24);c.fillStyle='rgba(0,0,0,.16)';c.fill();
@@ -351,7 +353,7 @@ GAMES.push({key:'daifugo',name:'大富豪',min:2,max:4,hidden:true,desc:'前の�
    else txt(c,g.phase==='play'?`${seatName(g.turn)} から 好きな カードを 出せる`:'',W/2,327,{s:18,col:'rgba(255,255,255,.85)'});
    // 自分
    const me=v,mh=g.hands[me],len=mh.length,P=handPos(len),myTurn=me===g.turn&&g.phase==='play'&&!isCom(me)&&!hidden;
-   const oi=g.out.indexOf(me);panel(c,16,H-236,220,58,{fill:me===g.turn?'#fff':'rgba(255,248,236,.9)',stroke:me===g.turn?SEATC[me].c:C.ink,lw:me===g.turn?5:3,r:14});token(c,42,H-207,15,me);txt(c,seatName(me),68,H-216,{s:15,a:'left',f:FD,w:400,col:SEATC[me].d});txt(c,oi>=0?g.TITLES[oi]+'で あがり！':`${g.pts[me]}点・${len}まい`,68,H-194,{s:13,a:'left',col:C.sub});
+   const oi=g.out.indexOf(me);panel(c,16,H-236,220,58,{fill:me===g.turn?'#fff':'rgba(255,248,236,.9)',stroke:me===g.turn?SEATC[me].c:C.ink,lw:me===g.turn?5:3,r:14});token(c,42,H-207,15,me);txt(c,shortName(me),68,H-217,{s:19,a:'left',f:FD,w:400,col:SEATC[me].d});txt(c,oi>=0?g.TITLES[oi]+'で あがり！':`${g.pts[me]}点・${len}まい`,68,H-193,{s:17,a:'left',col:C.sub});
    if(g.last[me]==='パス'){rr(c,246,H-226,74,32,16);c.fillStyle=C.ink;c.fill();txt(c,'パス',283,H-210,{s:16,col:'#fff'})}
    const playable=myTurn?new Set(options(mh).out.filter(o=>!g.check(o.c)).flatMap(o=>o.c)):null;
    for(let i=0;i<len;i++){const q=P(i),id=mh[i],up=g.sel.has(id)?26:0;drawCard(c,q.x,q.y-up,CW,CH,id,{back:hidden,sel:g.sel.has(id),dim:myTurn&&!playable.has(id)});if(myTurn&&i===g.cur){c.fillStyle=C.gold;c.beginPath();c.moveTo(q.x+Math.min(q.w,CW)/2-10,q.y-up-16);c.lineTo(q.x+Math.min(q.w,CW)/2+10,q.y-up-16);c.lineTo(q.x+Math.min(q.w,CW)/2,q.y-up-4);c.fill()}}
@@ -416,7 +418,7 @@ GAMES.push({key:'ludo',name:'ルドー',min:2,max:4,desc:'サイコロで 1周�
      if(np<=50){const ti=tIdx(s,np);if(!LUDO.SAFE.has(ti)){for(let q=0;q<n;q++){if(q!==s)for(const pp of g.pos[q])if(pp>=0&&pp<=50&&tIdx(q,pp)===ti)v+=70}v-=danger(ti,s)*(lv===2?28:18)}else v+=12}
      if(p>=0&&p<=50&&!LUDO.SAFE.has(tIdx(s,p)))v+=danger(tIdx(s,p),s)*(lv===2?20:10);v+=np*.4;if(lv===1)v+=rand(0,14)}
     if(v>bv){bv=v;best=i}}return{p:best}};
-  const S=44,OX=W/2-7.5*S,OY=362-7.5*S;const xy=(k,p,i)=>{const q=LUDO.cell(k,p,i);return[OX+q[0]*S,OY+q[1]*S]};
+  const S=42,OX=W/2-7.5*S,OY=378-7.5*S;const xy=(k,p,i)=>{const q=LUDO.cell(k,p,i);return[OX+q[0]*S,OY+q[1]*S]};
   const DIE={x:118,y:H-120};
   g.human=s=>{if(g.phase==='roll'){for(const p of sClicks(s))if(Math.hypot(p.x-DIE.x,p.y-DIE.y)<60||hit(p,OX,OY,15*S,15*S))return{roll:1};if(sPressed(s,'a'))return{roll:1};return null}
    if(g.phase!=='move')return null;const L=g.legal;if(sRep(s,'right')||sRep(s,'down')){g.cur=(g.cur+1)%L.length;sfx('blip')}if(sRep(s,'left')||sRep(s,'up')){g.cur=(g.cur+L.length-1)%L.length;sfx('blip')}
@@ -474,7 +476,7 @@ GAMES.push({key:'yacht',name:'ヨット',min:2,max:4,desc:'サイコロ5こを 3
    for(let mask=0;mask<31;mask++){let sum=0;const t=d.slice();for(let r=0;r<K;r++){for(let i=0;i<5;i++)t[i]=(mask>>i&1)?d[i]:1+Math.floor(Math.random()*6);sum+=val(s,t).v}const ev=sum/K;if(ev>bv){bv=ev;bm=mask}}
    if(bm===31)return{c:now.k};return{r:bm}};
   // 画面
-  const TX=30,TY=96,RH=31,CW0=150,CWp=Math.min(130,(700-CW0)/n);const DX=W-470,DY=250,DS=78,DG=90;const RB={x:DX+60,y:DY+86,w:300,h:58};
+  const TX=34,TY=72,RH=37,CW0=170,CWp=Math.min(150,(720-CW0)/n);const DX=W-450,DY=300,DS=86,DG=96;const RB={x:DX+42,y:DY+96,w:300,h:62};
   const rowY=k=>TY+34+(k<6?k:k+2)*RH;const colX=s=>TX+CW0+s*CWp;
   g.human=s=>{const open=[...Array(12).keys()].filter(k=>g.sheet[s][k]==null);const F=g.foc;
    const roll=()=>{if(g.rolls>=3){g.msg='もう ふれないよ。役を えらんでね';g.msgT=1.4;sfx('bad');return null}if(g.rolls>0&&g.held===31){g.msg='ぜんぶ キープ してるよ';g.msgT=1.4;sfx('bad');return null}return{r:g.held}};
@@ -488,23 +490,23 @@ GAMES.push({key:'yacht',name:'ヨット',min:2,max:4,desc:'サイコロ5こを 3
    if(sPressed(s,'a')){if(F.a==='d'){if(F.i<5)toggle(F.i);else return roll()}else return pickC(F.i)}return null};
   g.draw=c=>{bgFelt(c);const cur=g.turn,mine=!isCom(cur)&&seatDev(cur)!=='net'&&!g.done;
    panel(c,TX-10,TY-14,CW0+CWp*n+20,34+15*RH+24,{fill:C.paper,r:16});
-   for(let s=0;s<n;s++){const x=colX(s);c.fillStyle=s===cur?SEATC[s].c+'33':'transparent';c.fillRect(x,TY-6,CWp,34+15*RH+8);token(c,x+18,TY+12,11,s);c.font=`800 14px ${FB}`;const nm=seatName(s);txt(c,nm.length>7?nm.slice(0,7)+'…':nm,x+32,TY+12,{s:13,a:'left',col:SEATC[s].d})}
+   for(let s=0;s<n;s++){const x=colX(s);c.fillStyle=s===cur?SEATC[s].c+'33':'transparent';c.fillRect(x,TY-6,CWp,34+15*RH+8);token(c,x+20,TY+14,13,s);txt(c,shortName(s),x+38,TY+14,{s:18,a:'left',f:FD,w:400,col:SEATC[s].d})}
    const line=y=>{c.strokeStyle='rgba(43,33,64,.18)';c.lineWidth=1;c.beginPath();c.moveTo(TX,y);c.lineTo(TX+CW0+CWp*n,y);c.stroke()};
    const pot=g.rolls>0&&!g.done;
    for(let k=0;k<12;k++){const y=rowY(k);line(y-RH/2);const isF=mine&&g.foc.a==='c'&&g.foc.i===k;if(isF){c.fillStyle='rgba(255,197,49,.45)';c.fillRect(TX,y-RH/2,CW0+CWp*n,RH)}
-    if(k<6)drawDie(c,TX+14,y,20,k+1);txt(c,k<6?['1の目','2の目','3の目','4の目','5の目','6の目'][k]:YCAT[k],TX+(k<6?32:6),y,{s:15,a:'left'});
-    for(let s=0;s<n;s++){const v=g.sheet[s][k],x=colX(s)+CWp/2;if(v!=null){const fresh=g.last&&g.last.s===s&&g.last.c===k&&g.last.t<1;txt(c,String(v),x,y,{s:fresh?22:18,f:FD,w:400,col:fresh?C.red:C.ink})}
-     else if(pot&&s===cur){const pv=yScore(g.dice,k);txt(c,String(pv),x,y,{s:16,col:pv?'#3a7fdc':'#b5aa96'})}}}
-   const ys=rowY(5)+RH;line(ys-RH/2);c.fillStyle='rgba(43,33,64,.06)';c.fillRect(TX,ys-RH/2,CW0+CWp*n,RH*2);txt(c,'小計（63で +35）',TX+6,ys,{s:13,a:'left',col:C.sub});txt(c,'ボーナス',TX+6,ys+RH,{s:13,a:'left',col:C.sub});
-   for(let s=0;s<n;s++){txt(c,`${upper(s)}/63`,colX(s)+CWp/2,ys,{s:14,col:C.sub});txt(c,bonus(s)?'+35':'',colX(s)+CWp/2,ys+RH,{s:16,f:FD,w:400,col:C.green})}
-   const yt=rowY(11)+RH;line(yt-RH/2);txt(c,'合計',TX+6,yt+2,{s:18,a:'left',f:FD,w:400});for(let s=0;s<n;s++)txt(c,String(total(s)),colX(s)+CWp/2,yt+2,{s:22,f:FD,w:400});
+    if(k<6)drawDie(c,TX+16,y,24,k+1);txt(c,k<6?['1の目','2の目','3の目','4の目','5の目','6の目'][k]:YCAT[k],TX+(k<6?36:6),y,{s:19,a:'left'});
+    for(let s=0;s<n;s++){const v=g.sheet[s][k],x=colX(s)+CWp/2;if(v!=null){const fresh=g.last&&g.last.s===s&&g.last.c===k&&g.last.t<1;txt(c,String(v),x,y,{s:fresh?30:24,f:FD,w:400,col:fresh?C.red:C.ink})}
+     else if(pot&&s===cur){const pv=yScore(g.dice,k);txt(c,String(pv),x,y,{s:21,col:pv?'#3a7fdc':'#b5aa96'})}}}
+   const ys=rowY(5)+RH;line(ys-RH/2);c.fillStyle='rgba(43,33,64,.06)';c.fillRect(TX,ys-RH/2,CW0+CWp*n,RH*2);txt(c,'小計（63で+35）',TX+6,ys,{s:16,a:'left',col:C.sub});txt(c,'ボーナス',TX+6,ys+RH,{s:16,a:'left',col:C.sub});
+   for(let s=0;s<n;s++){txt(c,`${upper(s)}/63`,colX(s)+CWp/2,ys,{s:17,col:C.sub});txt(c,bonus(s)?'+35':'',colX(s)+CWp/2,ys+RH,{s:22,f:FD,w:400,col:C.green})}
+   const yt=rowY(11)+RH;line(yt-RH/2);txt(c,'合計',TX+6,yt+2,{s:22,a:'left',f:FD,w:400});for(let s=0;s<n;s++)txt(c,String(total(s)),colX(s)+CWp/2,yt+2,{s:30,f:FD,w:400});
    // サイコロ
-   txt(c,`ラウンド ${Math.min(12,g.round)}／12`,DX+180,TY+6,{s:22,f:FD,w:400,col:'#fff',st:C.ink,sw:5});
-   panel(c,DX-60,DY-100,480,280,{fill:'rgba(255,248,236,.92)',stroke:SEATC[cur].c,lw:5});txt(c,`${seatName(cur)} の番`,DX+180,DY-74,{s:18,f:FD,w:400,col:SEATC[cur].d});
-   const rolling=g.roll&&g.roll.t<.55;for(let i=0;i<5;i++){const hd=g.held>>i&1,x=DX+i*DG,y=DY+(hd?10:0);const rl=rolling&&!hd;drawDie(c,x,y,DS,g.rolls===0?0:rl?randi(1,6):g.dice[i],{held:hd,sel:mine&&g.foc.a==='d'&&g.foc.i===i,rot:rl?Math.sin(g.roll.t*28+i)*.35:0});if(hd)txt(c,'キープ',x,y+DS/2+14,{s:13,col:'#a77c00'})}
+   txt(c,`ラウンド ${Math.min(12,g.round)}／12`,DX+192,DY-150,{s:28,f:FD,w:400,col:'#fff',st:C.ink,sw:5});
+   panel(c,DX-60,DY-110,500,300,{fill:'rgba(255,248,236,.94)',stroke:SEATC[cur].c,lw:6});txt(c,`${seatName(cur)} の番`,DX+192,DY-80,{s:22,f:FD,w:400,col:SEATC[cur].d});
+   const rolling=g.roll&&g.roll.t<.55;for(let i=0;i<5;i++){const hd=g.held>>i&1,x=DX+i*DG,y=DY+(hd?10:0);const rl=rolling&&!hd;drawDie(c,x,y,DS,g.rolls===0?0:rl?randi(1,6):g.dice[i],{held:hd,sel:mine&&g.foc.a==='d'&&g.foc.i===i,rot:rl?Math.sin(g.roll.t*28+i)*.35:0});if(hd)txt(c,'キープ',x,y+DS/2+16,{s:16,col:'#a77c00'})}
    const can=g.rolls<3;panel(c,RB.x,RB.y,RB.w,RB.h,{fill:can?(mine&&g.foc.a==='d'&&g.foc.i===5?C.gold:'#ffe08a'):'#ddd3bf',stroke:mine&&g.foc.a==='d'&&g.foc.i===5?C.red:C.ink,lw:mine&&g.foc.a==='d'&&g.foc.i===5?6:3,r:18});
-   txt(c,can?(g.rolls===0?'サイコロを ふる':`ふりなおす（あと${3-g.rolls}回）`):'役を えらんでね',RB.x+RB.w/2,RB.y+RB.h/2,{s:20,f:FD,w:400});
-   txt(c,mine?(g.rolls===0?'ボタン／Aで ふる':'サイコロを タップで キープ・点数表で 役を えらぶ（B：キープを やめる）'):isCom(cur)?'COM が 考え中…':'ほかの端末の 人の 番',DX+180,DY+160,{s:13,col:C.sub});
+   txt(c,can?(g.rolls===0?'サイコロを ふる':`ふりなおす（あと${3-g.rolls}回）`):'役を えらんでね',RB.x+RB.w/2,RB.y+RB.h/2,{s:23,f:FD,w:400});
+   txt(c,mine?(g.rolls===0?'ボタン／Aで ふる':'サイコロを タップで キープ／点数表で 役を えらぶ'):isCom(cur)?'COM が 考え中…':'ほかの端末の 人の 番',DX+192,DY+178,{s:16,col:C.sub});
    if(g.msgT>0)toast(c,g.msg)};
   return g}});
 
@@ -544,7 +546,7 @@ GAMES.push({key:'diamond',name:'ダイヤモンドゲーム',min:2,max:4,desc:'�
    if(lv>0&&bv<=.3){const pos=all.filter(m=>m.gain>0);if(pos.length){pos.sort((a,b)=>b.v-a.v);best=pos[0]}else{const z=all.filter(m=>m.gain===0);if(z.length){const q=pick(z);best={f:q.f,t:q.t}}}}
    return best};
   // 画面
-  const S=34,CX=W/2,CY=362;const P=i=>{const p=DIA.px(DIA.cells[i]);return[CX+p[0]*S*1.18,CY+p[1]*S*1.18]};
+  const S=34,CX=W/2,CY=380;const P=i=>{const p=DIA.px(DIA.cells[i]);return[CX+p[0]*S*1.18,CY+p[1]*S*1.18]};
   const nearest=(p,list)=>{let b=-1,bd=S*.62;for(const i of list){const[x,y]=P(i);const d=Math.hypot(p.x-x,p.y-y);if(d<bd){bd=d;b=i}}return b};
   const order=list=>list.slice().sort((a,b)=>{const A=P(a),B=P(b);return A[1]-B[1]||A[0]-B[0]});
   g.human=s=>{const mv=order(movable(s));if(!mv.length)return null;
@@ -699,6 +701,7 @@ GAMES.push({key:'wolf',name:'ワードウルフ',min:3,max:4,hidden:true,noCom:t
   return g}});
 
 /* ================= 共通の 描画：プレイヤー欄・お知らせ ================= */
+const shortName=s=>{const q=SEATS[s];if(!q)return'';if(q.name)return q.name.length>5?q.name.slice(0,5)+'…':q.name;return q.com?'COM':`${s+1}P`};
 const seatName=s=>SEATS[s]?(SEATS[s].name?SEATS[s].name+(SEATS[s].com?'（COM）':''):SEATS[s].com?`COM（${SEATC[s].n}）`:`${s+1}P（${SEATC[s].n}）`):'';
 function rankBy(sc){const idx=sc.map((v,i)=>i).sort((a,b)=>sc[b]-sc[a]);const out=[];for(const i of idx){const g=out.find(G=>sc[G[0]]===sc[i]);if(g)g.push(i);else out.push([i])}return out}
 function sidePanels(c,list,scoreFn){const turn=PLAY&&PLAY.g?PLAY.g.turn:-1;const pos=[[18,90],[W-218,90],[18,400],[W-218,400]];
@@ -716,12 +719,13 @@ const TITLE={sel:0,t:0,
   for(const p of In.clicks){const k=R.findIndex(r=>hit(p,r.x,r.y,r.w,r.h));if(k>=0){this.sel=k;this.open();return}if(hit(p,W/2-150,H-58,300,40)){onlineMenu();return}}
   if(In.any('a')&&this.t>.25)this.open()},
  open(){sfx('ok');SETUP.reset(GAMES[this.sel]);scene=SETUP},
- rects(){const cols=5,w=228,h=252,gx=14,gy=18;const n=GAMES.length;return GAMES.map((g,i)=>{const r=Math.floor(i/cols),k=i%cols;return{x:W/2-(cols*w+(cols-1)*gx)/2+k*(w+gx),y:132+r*(h+gy),w,h}})},
+ rects(){const cols=5,w=228,h=240,gx=14,gy=14;const n=GAMES.length;return GAMES.map((g,i)=>{const r=Math.floor(i/cols),k=i%cols;return{x:W/2-(cols*w+(cols-1)*gx)/2+k*(w+gx),y:122+r*(h+gy),w,h}})},
  draw(c){bgFelt(c);txt(c,'あそび大全',W/2,62,{s:64,f:FD,w:400,col:C.gold,st:C.ink,sw:12});txt(c,'2〜4人で あそべる テーブルゲーム集（たりない人数は COM）',W/2,108,{s:18,col:'#fff',st:C.ink,sw:5});
   this.rects().forEach((r,i)=>{const g=GAMES[i],sel=i===this.sel;const bob=sel?Math.sin(NOW*4)*3:0;panel(c,r.x,r.y+bob,r.w,r.h,{fill:sel?'#fff':C.paper,stroke:sel?C.gold:C.ink,lw:sel?7:4});
-   c.save();rr(c,r.x+14,r.y+14+bob,r.w-28,138,12);c.clip();g.thumb(c,r.x+14,r.y+14+bob,r.w-28,138);c.restore();rr(c,r.x+14,r.y+14+bob,r.w-28,138,12);c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();
-   txt(c,g.name,r.x+r.w/2,r.y+178+bob,{s:g.name.length>6?22:27,f:FD,w:400});const pl=g.min===g.max?`${g.min}人`:`${g.min}〜${g.max}人`;rr(c,r.x+r.w-82,r.y+20+bob,62,26,13);c.fillStyle='rgba(43,33,64,.85)';c.fill();txt(c,pl,r.x+r.w-51,r.y+33+bob,{s:14,col:'#fff'});
-   c.font=`800 14px ${FB}`;wrap(c,g.desc,r.w-26).slice(0,3).forEach((l,k)=>txt(c,l,r.x+r.w/2,r.y+204+k*18+bob,{s:13,col:C.sub}))});
+   c.save();rr(c,r.x+12,r.y+12+bob,r.w-24,170,12);c.clip();g.thumb(c,r.x+12,r.y+12+bob,r.w-24,170);c.restore();rr(c,r.x+12,r.y+12+bob,r.w-24,170,12);c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();
+   txt(c,g.name,r.x+r.w/2,r.y+214+bob,{s:g.name.length>7?22:g.name.length>5?26:30,f:FD,w:400});const pl=g.min===g.max?`${g.min}人`:`${g.min}〜${g.max}人`;rr(c,r.x+r.w-92,r.y+20+bob,72,30,15);c.fillStyle='rgba(43,33,64,.88)';c.fill();txt(c,pl,r.x+r.w-56,r.y+35+bob,{s:16,col:'#fff'});
+  });
+  {const g=GAMES[this.sel];rr(c,W/2-420,H-104,840,40,20);c.fillStyle='rgba(16,25,20,.6)';c.fill();txt(c,g.desc,W/2,H-84,{s:17,col:'#fff'})}
   rr(c,W/2-150,H-58,300,40,20);c.fillStyle='rgba(43,33,64,.8)';c.fill();txt(c,'オンラインで あそぶ（部屋）',W/2,H-38,{s:17,col:'#fff'})}};
 
 /* ================= 画面：人数と席えらび ================= */
@@ -738,7 +742,7 @@ const SETUP={game:null,n:2,lv:1,row:0,t:0,seats:[],
   for(const id of In.devs){if(id==='local'||this.game.noCom)continue;if(In.pressed(id,'a')&&!this.seats.slice(0,this.n).some(s=>s.dev===id)){const k=this.seats.findIndex((s,i)=>i<this.n&&s.com);if(k>=0){this.seats[k]={com:false,dev:id};sfx('ok');return}else if(this.n<this.game.max){this.n++;this.seats[this.n-1]={com:false,dev:id};sfx('ok');return}}
    if(In.pressed(id,'b')){const k=this.seats.findIndex(s=>s.dev===id);if(k>0){this.seats[k]={com:true,dev:null};sfx('back');return}}}
   const L='local';if(In.rep(L,'down')){this.row=(this.row+1)%R.length;sfx('blip')}if(In.rep(L,'up')){this.row=(this.row+R.length-1)%R.length;sfx('blip')}
-  if(In.rep(L,'left'))this.change(R[this.row][2],-1);if(In.rep(L,'right'))this.change(R[this.row][2],1);
+  const k0=R[this.row][2];if(k0==='go'||k0==='x'){if(In.rep(L,'right')){this.row=(this.row+1)%R.length;sfx('blip')}if(In.rep(L,'left')){this.row=(this.row+R.length-1)%R.length;sfx('blip')}}else{if(In.rep(L,'left'))this.change(k0,-1);if(In.rep(L,'right'))this.change(k0,1)}
   const rects=this.rects(R);for(const p of In.clicks){const k=rects.findIndex(r=>hit(p,r.x,r.y,r.w,r.h));if(k>=0){this.row=k;const key=R[k][2];if(key==='go')return this.start();if(hit(p,rects[k].x,rects[k].y,rects[k].w/2+120,rects[k].h)&&key[0]==='s')this.change(key,1);else this.change(key,p.x<rects[k].x+rects[k].w*.75?-1:1)}
    if(hit(p,40,H-70,180,44)){sfx('back');scene=TITLE;return}}
   if(In.pressed(L,'a')&&this.t>.2){const key=R[this.row][2];if(key==='go')return this.start();this.change(key,1)}
@@ -771,7 +775,7 @@ function netCheck(){const P=PLAY;if(!P||!NET||scene!==PLAYSCENE)return;for(let k
 function resync(){window.__abResync=(window.__abResync||0)+1;const P=PLAY,keep={viewer:P.viewer,curtain:P.curtain};startGame(P.def,P.n,P.seed,P.o);Object.assign(PLAY,keep);const Q=PLAY;
  for(let k=0;NET.mv[k];k++){const g=Q.g;let guard=0;while(g.busy&&g.busy()&&guard++<600)g.update(.1);let m;try{m=JSON.parse(NET.mv[k].m)}catch(e){break}if(!g.tryMove(m))break;Q.hist.push(NET.mv[k].m);Q.mi++}}
 const PLAYSCENE={
- update(dt){const P=PLAY,g=P.g;if(P.pause)return this.pauseUpdate();if(In.any('start')){P.pause=true;P.psel=0;P.help=false;In.clear();sfx('ok');return}
+ update(dt){const P=PLAY,g=P.g;if(P.pause)return this.pauseUpdate();if(In.any('start')||In.clicks.some(p=>hit(p,MENUB.x,MENUB.y,MENUB.w,MENUB.h))){P.pause=true;P.psel=0;P.help=false;In.clear();sfx('ok');return}
   g.update(dt);if(g.done){P.end+=dt;if(P.end>1.4)RESULT.open();return}
   if(NET&&NET.host){const now=NOW;SEATS.forEach((q,i)=>{if(!q.pid||q.com)return;if(NET.players[q.pid]){delete NET.miss[i];return}NET.miss[i]=NET.miss[i]||now;if(now-NET.miss[i]>4){window.__abDrop=(window.__abDrop||0)+1;NET.db.update(NET.rp('m/drop'),{[i]:true});NET.miss[i]=now+999}})}
   if(NET){const q=NET.mv&&NET.mv[P.mi];if(q){if(!(g.busy&&g.busy())){try{doMove(JSON.parse(q.m),true)}catch(e){console.error(e)}}return}}
@@ -782,19 +786,26 @@ const PLAYSCENE={
   if(P.curtain>=0){if(sPressed(P.curtain,'a')||sClicks(P.curtain).length){P.viewer=P.curtain;P.curtain=-1;sfx('ok');In.clear()}return}
   if(isCom(s)){if(NET&&!NET.host)return;P.cpuT-=dt;if(P.cpuT<=0){const m=g.ai(SEATS[s].lv);if(m!=null)doMove(m);P.cpuT=rand(.5,.9)}}
   else{P.cpuT=rand(.5,.9);const m=window.__abAuto&&seatDev(s)!=='net'?(Math.random()<.1?g.ai(1):null):g.human(s);if(m!=null)doMove(m)}},
- opts(){return['つづける','あそびかたを 見る',NET?'部屋を 出る':'やめて ゲームを えらぶ']},
- pauseUpdate(){const P=PLAY;const opts=this.opts();for(const id of In.devs){if(In.rep(id,'down')){P.psel=(P.psel+1)%opts.length;sfx('blip')}if(In.rep(id,'up')){P.psel=(P.psel+opts.length-1)%opts.length;sfx('blip')}}
-  let go=In.any('a')?P.psel:-1;for(const p of In.clicks){opts.forEach((o,i)=>{if(hit(p,W/2-200,250+i*70,400,56))go=i})}if(In.any('b')||In.any('start'))go=0;
+ opts(){return['つづける','あそびかたを 見る','音：'+(SOUND?'ON':'OFF'),'全画面に する／もどす',NET?'部屋を 出る':'やめて ゲームを えらぶ']},
+ pauseUpdate(){const P=PLAY;const opts=this.opts();for(const id of In.devs){if(In.rep(id,'down')||In.rep(id,'right')){P.psel=(P.psel+1)%opts.length;sfx('blip')}if(In.rep(id,'up')||In.rep(id,'left')){P.psel=(P.psel+opts.length-1)%opts.length;sfx('blip')}}
+  let go=In.any('a')?P.psel:-1;for(const p of In.clicks){opts.forEach((o,i)=>{if(hit(p,W/2-200,PY0+i*64,400,54))go=i})}if(In.any('b')||In.any('start'))go=0;
   if(NET)PLAY.g.update(DT);// オンラインでは ポーズ中も ゲームは すすむ
-  if(go===0){P.pause=false;In.clear()}else if(go===1){P.help=!P.help;sfx('blip')}else if(go===2){if(NET)leaveRoom();scene=TITLE;PLAY=null;In.clear()}},
- draw(c){const P=PLAY;P.g.draw(c);txt(c,P.def.name,W/2,30,{s:24,f:FD,w:400,col:'#fff',st:C.ink,sw:6});
-  if(!P.g.done&&!P.pause&&!P.def.hidden&&!(P.g.msgT>0)){const s=P.g.turn;const d=seatDev(s);const msg=isCom(s)?`${seatName(s)} の番`:d==='net'?`${seatName(s)} の番（ほかの端末）`:`${seatName(s)} の番　${d==='local'||d==='any'?'クリック・タップ／矢印＋決定':'十字＋A'}`;rr(c,W/2-300,H-34,600,28,14);c.fillStyle='rgba(43,33,64,.7)';c.fill();txt(c,msg,W/2,H-20,{s:15,col:'#fff'})}
+  if(go===0){P.pause=false;In.clear()}else if(go===1){P.help=!P.help;sfx('blip')}else if(go===2){SOUND=!SOUND;document.getElementById('bSnd').textContent='音：'+(SOUND?'ON':'OFF');sfx('ok')}else if(go===3){/* 全画面は 押した その場（イベントの 中）で きりかえる */}else if(go===4){if(NET)leaveRoom();scene=TITLE;PLAY=null;In.clear()}},
+ draw(c){const P=PLAY;P.g.draw(c);
+  // 上の まん中に「だれの 番か」を 大きく（席の 色）
+  if(!P.g.done&&!P.pause&&P.def.key!=='wolf'&&(!P.def.hidden||P.curtain<0)&&!(P.g.phase&&P.g.phase!=='play'&&P.g.phase!=='roll'&&P.g.phase!=='move'&&P.g.phase!=='auto')){const s=P.g.turn;const d=seatDev(s);const me=!isCom(s)&&d!=='net';const msg=isCom(s)?`${seatName(s)} の番`:d==='net'?`${seatName(s)} の番`:(NET||(P.locals&&P.locals.length===1)?'あなたの番！':`${seatName(s)} の番`);
+   rr(c,W/2-230,4,460,40,20);c.fillStyle=SEATC[s].c;c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();txt(c,msg,W/2,25,{s:22,f:FD,w:400,col:'#fff',st:SEATC[s].d,sw:4})}
   if(P.curtain>=0){c.fillStyle='#1b2f25';c.fillRect(0,0,W,H);panel(c,W/2-320,H/2-120,640,240,{fill:C.paper});token(c,W/2,H/2-60,30,P.curtain);txt(c,`${seatName(P.curtain)} に わたしてね`,W/2,H/2+4,{s:34,f:FD,w:400,col:SEATC[P.curtain].d});txt(c,'ほかの人は 画面を 見ないでね。じゅんびが できたら タップ／決定',W/2,H/2+60,{s:17,col:C.sub})}
   if(P.g.done){c.fillStyle=`rgba(0,0,0,${Math.min(.4,P.end*.4)})`;c.fillRect(0,0,W,H);txt(c,'おしまい！',W/2,H/2,{s:80,f:FD,w:400,col:C.gold,st:C.ink,sw:12})}
-  if(P.pause){c.fillStyle='rgba(20,14,38,.75)';c.fillRect(0,0,W,H);if(P.help){c.font=`800 15px ${FB}`;const L=[];for(const r of P.def.rules)for(const l of wrap(c,'・'+r,700))L.push(l);const hh=L.length*22+30;panel(c,W/2-370,Math.max(10,240-hh-10),740,hh);L.forEach((l,i)=>txt(c,l,W/2-350,Math.max(10,240-hh-10)+26+i*22,{s:15,a:'left'}))}
-   this.opts().forEach((o,i)=>{const sel=i===P.psel;panel(c,W/2-200,250+i*70,400,56,{fill:sel?C.gold:C.paper,stroke:C.ink,lw:sel?5:3});txt(c,o,W/2,278+i*70,{s:22,f:FD,w:400})});
-   if(NET)txt(c,'オンラインでは ポーズ中も ゲームは すすみます',W/2,480,{s:15,col:'#fff'})}
-  txt(c,'Esc / START：ポーズ',W-14,H-10,{s:11,a:'right',col:'rgba(255,255,255,.55)'})}};
+  if(P.pause){c.fillStyle='rgba(20,14,38,.75)';c.fillRect(0,0,W,H);if(P.help){c.font=`800 15px ${FB}`;const L=[];for(const r of P.def.rules)for(const l of wrap(c,'・'+r,700))L.push(l);const hh=L.length*22+30,ty=Math.max(8,PY0-hh-10);panel(c,W/2-370,ty,740,hh);L.forEach((l,i)=>txt(c,l,W/2-350,ty+26+i*22,{s:15,a:'left'}))}
+   this.opts().forEach((o,i)=>{const sel=i===P.psel;panel(c,W/2-200,PY0+i*64,400,54,{fill:sel?C.gold:C.paper,stroke:C.ink,lw:sel?5:3});txt(c,o,W/2,PY0+27+i*64,{s:22,f:FD,w:400})});
+   if(NET)txt(c,'オンラインでは ポーズ中も ゲームは すすみます',W/2,PY0+5*64+14,{s:15,col:'#fff'})}
+  if(!P.pause){rr(c,MENUB.x,MENUB.y,MENUB.w,MENUB.h,14);c.fillStyle='rgba(16,25,20,.75)';c.fill();c.lineWidth=2;c.strokeStyle='rgba(255,255,255,.5)';c.stroke();for(let i=0;i<3;i++){c.fillStyle='#fff';c.fillRect(MENUB.x+14,MENUB.y+12+i*8,20,4)}txt(c,'メニュー',MENUB.x+72,MENUB.y+MENUB.h/2,{s:16,col:'#fff'})}}};
+const MENUB={x:W-136,y:6,w:126,h:42},PY0=300;
+function toggleFS(){try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}catch(e){}}
+// 全画面は ブラウザの きまりで「押した その場」でしか 切りかえられないので、ここで 先に 見る
+addEventListener('pointerdown',e=>{if(scene!==PLAYSCENE||!PLAY||!PLAY.pause)return;const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,y=(e.clientY-r.top)/r.height*H;if(hit({x,y},W/2-200,PY0+3*64,400,54))toggleFS()});
+addEventListener('keydown',e=>{if(scene===PLAYSCENE&&PLAY&&PLAY.pause&&PLAY.psel===3&&['Enter','Space','KeyZ','KeyJ'].includes(e.code))toggleFS()});
 
 /* ================= 画面：結果 ================= */
 const RESULT={t:0,rk:[],sel:0,
@@ -892,7 +903,7 @@ addEventListener('resize',()=>{resize();setTimeout(placeTopUI,60)});setTimeout(p
 document.getElementById('bSnd').onclick=e=>{initAudio();SOUND=!SOUND;e.target.textContent='音：'+(SOUND?'ON':'OFF')};
 document.getElementById('bFs').onclick=()=>{try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}catch(e){}};
 function step(dt){NOW+=dt;In.poll();if(UI.hidden){try{scene.update(dt)}catch(e){console.error(e)}}else if(PLAY&&PLAY.g&&scene===PLAYSCENE){try{PLAY.g.update(dt)}catch(e){}}In.clicks=[]}
-function frame(){const t=performance.now();if(!frame.t)frame.t=t;let dt=Math.min(.05,(t-frame.t)/1000);frame.t=t;DT=dt||1/60;step(DT);
+function frame(){const t=performance.now();{const tb=document.querySelector('.tb');const hid=scene===PLAYSCENE||scene===RESULT;if(tb&&tb.hidden!==hid)tb.hidden=hid}if(!frame.t)frame.t=t;let dt=Math.min(.05,(t-frame.t)/1000);frame.t=t;DT=dt||1/60;step(DT);
  const s=cv.width/W;ctx.setTransform(s,0,0,s,0,0);try{scene.draw(ctx)}catch(e){console.error(e)}requestAnimationFrame(frame)}
 window.__ab={step:dt=>step(dt),get scene(){return scene===TITLE?'title':scene===SETUP?'setup':scene===PLAYSCENE?'play':scene===RESULT?'result':'?'},get g(){return PLAY&&PLAY.g},GAMES,start:(key,n,lv,seed)=>{const d=GAMES.find(g=>g.key===key);SEATS=[...Array(n)].map(()=>({com:true,dev:null,lv:lv??1}));startGame(d,n,seed)},get NET(){return NET},get PLAY(){return PLAY},onlineMenu:()=>onlineMenu()};
 scene=TITLE;resize();requestAnimationFrame(frame);if(QS.get('room'))setTimeout(onlineMenu,50);
