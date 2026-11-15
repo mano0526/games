@@ -11,7 +11,7 @@
 /* Layout: one column shelf of four game cards; each card = color band + name + how online works */
 :root{
   --bg:#f4f1fb; --ink:#211a33; --mute:#615a75; --card:#ffffff; --line:#d9d2ea; --acc:#ff5a3c;
-  --party:#2fa3d8; --kart:#2048c8; --kitchen:#ef6b3a; --trap:#c9881a; 
+  --party:#2fa3d8; --kart:#2048c8; --kitchen:#ef6b3a; --trap:#c9881a; --asobi:#2f8a57; 
   --f-d:"Dela Gothic One","M PLUS Rounded 1c","Hiragino Sans",sans-serif;
   --f-b:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
 }
@@ -97,6 +97,11 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
       <p>ワナと足場を置いてから、みんなでゴールへ走るパーティ足場ゲーム。全員ゴールすると点なしなので、ほどよく意地悪に。</p>
       <div class="meta"><span class="chip">最大4人</span><span class="chip">各自の端末で動かす方式</span><span class="chip">1台でもOK</span></div>
       <a class="play" href="trap.html">遊ぶ</a></div></li>
+    <li class="game" style="--c:var(--asobi)"><div class="band"></div><div class="body">
+      <h2>あそび大全</h2>
+      <p>リバーシ・四目並べ・ドット＆ボックス・大富豪など、2〜4人で遊べるテーブルゲーム集。手札は自分の端末にだけ見えます。</p>
+      <div class="meta"><span class="chip">2〜4人</span><span class="chip">各自の端末で動かす方式</span><span class="chip">1台でもOK</span></div>
+      <a class="play" href="asobi.html">遊ぶ</a></div></li>
     
   </ul>
   <section class="box">
@@ -105,7 +110,7 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
       <label for="nm">なまえ</label><input type="text" id="nm" maxlength="10" placeholder="オンラインで表示される名前">
       <label for="vol">音量</label><div style="display:flex;gap:10px;align-items:center"><input type="range" id="vol" min="0" max="100" step="5"><button class="btn2" id="beep" type="button">テスト音</button></div>
     </div>
-    <p class="empty">4つのゲームすべてに使われます。ゲームの中の音量設定は、この音量に掛け算されます。</p>
+    <p class="empty">5つのゲームすべてに使われます。ゲームの中の音量設定は、この音量に掛け算されます。</p>
   </section>
   <section class="box">
     <h2>コントローラー確認</h2>
@@ -124,10 +129,10 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
 <script>
 'use strict';
 // ---- open rooms (all games) ----
-(function(){const ul=document.getElementById('rooms'),em=document.getElementById('roomsEmpty');const G=NetDB.lobby.GAMES;const C={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)'};
+(function(){const ul=document.getElementById('rooms'),em=document.getElementById('roomsEmpty');const G=NetDB.lobby.GAMES;const C={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)'};
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   NetDB.lobby.watch(list=>{em.hidden=list.length>0;ul.innerHTML=list.slice(0,12).map(r=>{const full=(r.n||0)>=(r.max||4),busy=r.st&&r.st!=='lobby';
-    return`<li style="--c:${C[r.g]}"><span class="dot"></span><span class="t"><b>${esc(G[r.g].name)}</b><small>${esc(r.host||'')}さんの部屋・${r.n||1}/${r.max||4}人・コード ${esc(r.code)}</small></span>${full?'<span class="busy">満員</span>':busy&&(r.g==='kart'||r.g==='trap')?'<span class="busy">ゲーム中</span>':`<a href="${NetDB.lobby.joinUrl(r)}">参加</a>`}</li>`;}).join('');});})();
+    return`<li style="--c:${C[r.g]}"><span class="dot"></span><span class="t"><b>${esc(G[r.g].name)}</b><small>${esc(r.host||'')}さんの部屋・${r.n||1}/${r.max||4}人・コード ${esc(r.code)}</small></span>${full?'<span class="busy">満員</span>':busy&&(r.g==='kart'||r.g==='trap'||r.g==='asobi')?'<span class="busy">ゲーム中</span>':`<a href="${NetDB.lobby.joinUrl(r)}">参加</a>`}</li>`;}).join('');});})();
 // ---- shared settings ----
 (function(){const nm=document.getElementById('nm'),vol=document.getElementById('vol');nm.value=NetDB.name.get();vol.value=Math.round(NetDB.vol.get()*100);
   nm.addEventListener('change',()=>{nm.value=NetDB.name.set(nm.value);});vol.addEventListener('input',()=>NetDB.vol.set(vol.value/100));

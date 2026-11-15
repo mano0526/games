@@ -11,6 +11,7 @@
 | kart.html | ターボカートGP（マリオカート風、画面分割、WebGL `#gl` + 2D `#hud`）。オンラインは netplay.js を使わず自前（各自の端末で動かす方式） |
 | kitchen.html | てんやわんやキッチン（オーバークック風）。元は js/*.js 分割だったのを1ファイルに統合済み |
 | trap.html | ワナワナ・ラン（アルチキ風パーティ足場ゲーム、2D canvas、最大4人＋CPU）。オンラインは自前（各自の端末で動かす方式） |
+| asobi.html | あそび大全（テーブルゲーム集、2〜4人＋COM、1枚の canvas 1280×720＋オンライン用の HTML `#ui`）。オンラインは自前（各自の端末で動かす方式）。netplay.js は使わない |
 | netplay.js | パーティ・キッチン用のオンライン部品（リモートプレイ方式）。カートとワナワナは使っていない |
 | netdb.js | 共通部品：各自の端末で動かす方式のDB（`NetDB.open(game)`／`NetDB.mem()`）、全ゲーム共通の部屋一覧 `NetDB.lobby`（np/lobby/）、共通の名前 `NetDB.name` と音量 `NetDB.vol`。カート・ワナワナ・一覧ページ・netplay.js が使う |
 
@@ -110,6 +111,16 @@
 - 途中セーブ→再開を新ボード2つで確認（ターン開始時の状態にもどる。ラッキーマスの位置は同じ）。
 - ミニゲーム後の+10コインをボード上のキャラの上にも表示。大会/サバイバルの間の画面でもポーズ（タイトルへ）できる。
 
+## あそび大全（asobi.html、2026-11-16 新規）
+- ゲームは `GAMES.push({key,name,min,max,hidden,desc,rules,thumb,create(n)})`。create は g を返す：`turn`・`tryMove(m)`（正しくなければ false）・`human(s)`（その席の入力から手を返す／null）・`ai(lv)`・`update(dt)`・`busy()`・`draw(c)`・`done`・`ranking()`（[[1位の席…],[2位…]]）・`score(s)`（結果に出す文字）。
+- いまのゲーム：reversi／four（四目並べ）／dots（ドット＆ボックス、2〜4人）／daifugo（大富豪、2〜4人、8切り・革命・ジョーカー、3回戦、2回戦から自動でカード交換）。
+- 運（配る・サイコロ）は必ず `R()`／`Rint`／`Rshuffle`（種 `SEED` つき乱数）を使う。`Math.random` は COM の考え（ホストだけが動かす）と見た目だけ。
+- 手は「n手目」の記録。`doMove(m)` が tryMove して、オンラインなら `np/asobi/r/{code}/mv/{gid}/{n}` に `{s,m:JSON文字列}` を書く。全端末が同じ順にあてはめる（`busy()` の間は待つ）。COM の手はホストだけが決める。ぬけた人の席は COM になる（ホストが動かす）。
+- 部屋：`r/{code}/m`（host,hostName,st=lobby/play,g,n,lv,gid,seed,seats[pid か ''],names）、`p/{pid}`。部屋一覧は共通の np/lobby/（netdb.js の GAMES に asobi を追加）。招待 `?room=XXXX`。オンラインは1台1人、自分の席の dev は 'any'（その端末の全入力）、他の端末の人は 'net'。
+- 手札を隠すゲーム（`hidden:true`）：見る人は `PLAY.viewer`（オンライン＝自分の席、1台で人が1人＝その人）。1台で人が2人以上なら番が変わるたび「○○に わたしてね」画面（`PLAY.curtain`）。
+- 1台のとき：設定画面で席を「人（この端末）」にするか、コントローラーの A で空いた席にすわる。
+- テスト：`__ab.start(key,n,lv,seed)` を `__ab.step` で回す。`window.__abAuto=1` で人の席も自動で打つ（オンラインの2ページテスト用）。
+
 ## テスト方法（この作業環境から外部には通信できない）
 - `python3 -m http.server` で配信し、Playwright の同じブラウザコンテキストで2ページ開く。
 - URL に `?np=local` を付けると Firebase の代わりに同じブラウザ内の仕組み（netplay は BroadcastChannel、fakeroom は localStorage）でつながる。
@@ -133,4 +144,5 @@
 - Firebase のルールはテストモード（2026年12月中旬に期限切れ）。`{"rules":{".read":false,".write":false,"np":{"$game":{".read":true,".write":true}}}}` に変更してもらう必要あり（ユーザー作業）。
 - TURN サーバー未導入。
 - iPhone 実機での確認はまだ少ない。
+- あそび大全は ユーザー未確認。オンライン（Firebase 本番）も未確認。
 - push-test という不要ブランチが残っている（削除は環境から通らなかった）。

@@ -83,7 +83,8 @@
     party: { name: 'コロコロ島パーティ', url: 'party.html', join: 'join' },
     kart: { name: 'ターボカートGP', url: 'kart.html', join: 'room' },
     kitchen: { name: 'てんやわんやキッチン', url: 'kitchen.html', join: 'join' },
-    trap: { name: 'ワナワナ・ラン', url: 'trap.html', join: 'room' }
+    trap: { name: 'ワナワナ・ラン', url: 'trap.html', join: 'room' },
+    asobi: { name: 'あそび大全', url: 'asobi.html', join: 'room' }
   };
   var lobby = {
     GAMES: GAMES,
