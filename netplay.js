@@ -760,7 +760,7 @@
       var j = (QS.get('join') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
       if (j.length === 4) this.show(j);
     },
-    close: function () { if (this.modal) { this.modal.remove(); this.modal = null; } this.open = false; },
+    close: function () { if (this.roomsOff) { this.roomsOff(); this.roomsOff = null; } if (this.modal) { this.modal.remove(); this.modal = null; } this.open = false; },
     card: function (html) {
       this.close();
       var m = this.modal = el('div', 'np-ui np-modal');
@@ -779,6 +779,7 @@
         '<h2>オンライン対戦</h2>' +
         '<p>ホストの画面と音を、参加した人の端末に映して遊びます。参加した人の操作は、ホストのゲームでコントローラーとして扱われます。</p>' +
         '<div class="np-row"><button class="np-btn pri" data-npa="host" type="button">部屋を作る</button></div>' +
+        '<div style="font-size:13px;font-weight:800;margin-top:6px">いま あいている部屋（おすだけで参加）</div><div class="np-rooms" style="display:flex;flex-direction:column;gap:6px;margin:6px 0 10px"><div class="np-note">さがしています…</div></div>' +
         '<label for="np-code" style="font-size:13px;font-weight:800">部屋コードで参加</label>' +
         '<input id="np-code" class="np-in" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD">' +
         '<div class="np-row"><button class="np-btn" data-npa="join" type="button">参加する</button><button class="np-btn ghost" data-npa="x" type="button">閉じる</button></div>' +
@@ -803,6 +804,23 @@
           .catch(function (e) { UI.mode = 'idle'; b.disabled = false; note.className = 'np-note np-err'; note.textContent = errText(e); });
       }
       c.querySelector('[data-npa=join]').onclick = go;
+      // 同じゲームの「いま あいている部屋」を ならべる（ボタン1つで参加）
+      var rl = c.querySelector('.np-rooms');
+      if (window.NetDB && NetDB.lobby) {
+        if (UI.roomsOff) UI.roomsOff();
+        UI.roomsOff = NetDB.lobby.watch(function (list) {
+          var mine = list.filter(function (r) { return r.g === GAME && (!Host.room || r.code !== Host.room.code); });
+          rl.innerHTML = '';
+          if (!mine.length) { rl.innerHTML = '<div class="np-note">いまは ありません。「部屋を作る」で つくれます。</div>'; return; }
+          mine.slice(0, 6).forEach(function (r) {
+            var b = el('button', 'np-btn', '');
+            b.type = 'button'; b.style.cssText = 'text-align:left;flex:none;height:auto;min-height:0;padding:10px 12px';
+            b.textContent = (r.host || 'ホスト') + ' の部屋（' + r.code + '）　' + (r.n || 1) + '/' + (r.max || 4) + '人' + (r.st && r.st !== 'lobby' ? '・あそんでいる最中' : '');
+            b.onclick = function () { inp.value = r.code; go(); };
+            rl.appendChild(b);
+          });
+        });
+      } else rl.innerHTML = '<div class="np-note">部屋の一覧は 使えません。部屋コードで 参加してね。</div>';
       if (joinCode) setTimeout(function () { inp.focus(); }, 50); else setTimeout(function () { c.querySelector('[data-npa=host]').focus(); }, 50);
     },
     hostCard: function () {

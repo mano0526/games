@@ -90,6 +90,10 @@
 - ショップは店ごとに得意な品（1けんめ＝サイコロ屋、2けんめ＝いたずら屋、`BOARD.shops`）。
 - タイトルに「ミニゲーム大会」（`startCup`、先に3/5/7勝、バトルロイヤルだけ／いろいろ）と「サバイバル」（`startSurv`、1人用、負けるまで、3連勝ごとにCOMが強く、最高記録 localStorage `kk_surv_best`）。間の画面は `CUPSCENE`、進行は `cupLoop`。
 
+## パーティ（2026-11-16 ユーザー要望）
+- 設定画面から もどれる：Esc / START はいつでも、だれも参加していなければ B でもタイトルへ（コントローラーの B で参加してしまう仕様はやめた）。
+- タイトルに「オンライン」→ netplay の部屋カードを開く。部屋カードに「いま あいている部屋」（NetDB.lobby、同じゲームだけ）を出し、押すだけで参加（netplay.js、キッチンも同じ）。
+
 ## テスト方法（この作業環境から外部には通信できない）
 - `python3 -m http.server` で配信し、Playwright の同じブラウザコンテキストで2ページ開く。
 - URL に `?np=local` を付けると Firebase の代わりに同じブラウザ内の仕組み（netplay は BroadcastChannel、fakeroom は localStorage）でつながる。
