@@ -60,6 +60,14 @@
 - 全ミニゲーム共通：残り10秒で「ラストスパート！」、残り5秒は毎秒カチ音＋画面のふちが赤く点めつ（g.time が減っていくゲームだけ）。
 - テスト時の注意：`__kk.startCPU` で盤面を動かしたまま `runMG` すると盤面側も勝手にミニゲームを始めて衝突する。ミニゲームだけ試すときは `setBoard(0);G.players=[0,1,2,3].map(i=>({i,ci:i,human:false,dev:null,coins:10,dc:10,stars:0,items:[],node:0,color:'blue',mgCoins:0,maxCoins:10,haps:0,alpha:1,face:1}))` のように直接作ってから `__kk.runMG(key,mode)` を `__kk.step` で進める。
 
+## パーティ 夜の自動改善（2026-11-15 13:40〜19:40、40分ごと）
+- キャラ10人：fox コンタ／mouse チュチュ／panda パンパン（体は白、CHARS.col は UI 用の濃い灰色）／seal ゴマリ（足の代わりに尾びれ）を追加。COM のキャラは空きからランダム（slotPlayers）。キャラえらびに顔の列。
+- 盤面：上に「★まで あと○マス」（`STK` にキャッシュ）、スターが画面外なら画面のはしに★矢印（cam.z>.8 のときだけ）。
+- ミニゲーム結果：バトルロイヤルで負けた人にも順位（`mgRanks`。scores の向きが勝敗と矛盾するときは出さない）。
+- 新ミニゲーム：crush（ドッスンよけ 1v3）、hockey（エアホッケー 1v1/2v2、止まって2.5秒で中央から再開）。
+- アイテムのマークを絵に（`drawItemIcon`／`miniDie`）。床テーマ：quarry=石だたみ、ice=雪だまり＋キラキラ、castle=石板＋青いじゅうたん（たいほうよけの赤いねらい線と重ならないよう赤は使わない）。
+- 確認：全43ミニゲーム全形式（71通り）と盤面3つを COM で通し、pageerror なし。人の操作・実機は未確認。
+
 ## テスト方法（この作業環境から外部には通信できない）
 - `python3 -m http.server` で配信し、Playwright の同じブラウザコンテキストで2ページ開く。
 - URL に `?np=local` を付けると Firebase の代わりに同じブラウザ内の仕組み（netplay は BroadcastChannel、fakeroom は localStorage）でつながる。
