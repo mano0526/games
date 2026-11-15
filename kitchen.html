@@ -123,6 +123,7 @@ p{margin:0;line-height:1.7;color:var(--muted);font-weight:500}
 .lv-detail b{font-family:var(--f-display);font-weight:400;font-size:16px}
 .lv-detail span{color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.btn{transition:none}.star.pop{animation:none}}
+@media (max-height:500px){.logo span{font-size:20px}.logo b{font-size:42px}.panel{padding:16px 20px;gap:10px}}
 </style>
 
 <canvas id="cv" aria-label="ゲーム画面"></canvas>
@@ -273,7 +274,7 @@ p{margin:0;line-height:1.7;color:var(--muted);font-weight:500}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="netdb.js"></script>
-<script src="netplay.js" data-game="kitchen" data-fps="30" data-mirror=".screen" data-keys="{&quot;KeyW&quot;:[12],&quot;ArrowUp&quot;:[12],&quot;KeyS&quot;:[13],&quot;ArrowDown&quot;:[13],&quot;KeyA&quot;:[14],&quot;ArrowLeft&quot;:[14],&quot;KeyD&quot;:[15],&quot;ArrowRight&quot;:[15],&quot;Space&quot;:[0],&quot;Enter&quot;:[0],&quot;KeyE&quot;:[2],&quot;KeyF&quot;:[2],&quot;ShiftLeft&quot;:[1],&quot;KeyR&quot;:[1],&quot;Tab&quot;:[3],&quot;Backspace&quot;:[1]}" data-keyhelp="移動：WASD / 矢印　つかむ・決定：Space / Enter　調理・洗う：E / F　ダッシュ：Shift / R　交代：Tab"></script>
+<script src="netplay.js" data-game="kitchen" data-fps="30" data-pos="tr" data-mirror=".screen" data-keys="{&quot;KeyW&quot;:[12],&quot;ArrowUp&quot;:[12],&quot;KeyS&quot;:[13],&quot;ArrowDown&quot;:[13],&quot;KeyA&quot;:[14],&quot;ArrowLeft&quot;:[14],&quot;KeyD&quot;:[15],&quot;ArrowRight&quot;:[15],&quot;Space&quot;:[0],&quot;Enter&quot;:[0],&quot;KeyE&quot;:[2],&quot;KeyF&quot;:[2],&quot;ShiftLeft&quot;:[1],&quot;KeyR&quot;:[1],&quot;Tab&quot;:[3],&quot;Backspace&quot;:[1]}" data-keyhelp="移動：WASD / 矢印　つかむ・決定：Space / Enter　調理・洗う：E / F　ダッシュ：Shift / R　交代：Tab"></script>
 <script>
 'use strict';
 /* ================= setup ================= */
@@ -1861,7 +1862,7 @@ function drawHUD(){
   // level name
   ctx.font=`800 ${Math.round(coinR*.62)}px ${FB}`;ctx.textAlign='right';ctx.textBaseline='alphabetic';let nameX=tx-14;
   if(endl){for(let i=0;i<3;i++){const hx=tx-22-i*coinR*1.3,hy=by-th/2;const on=i<G.lives;ctx.save();ctx.translate(hx,hy);ctx.scale(coinR/20,coinR/20);ctx.beginPath();ctx.moveTo(0,8);ctx.bezierCurveTo(-14,-2,-8,-14,0,-6);ctx.bezierCurveTo(8,-14,14,-2,0,8);ctx.fillStyle=on?'#f0453a':'rgba(255,255,255,.2)';ctx.fill();ctx.restore();}nameX=tx-30-coinR*3.9;}
-  {const nm=G.L.id+' '+G.L.name+(endl?' エンドレス':'');const nw=ctx.measureText(nm).width;if(CW>560){rr(nameX-nw-10,by-th*.32-coinR*.75,nw+20,coinR*1.15,coinR*.5);ctx.fillStyle='rgba(28,22,40,.55)';ctx.fill();ctx.fillStyle='rgba(255,255,255,.85)';ctx.fillText(nm,nameX,by-th*.32);}}
+  {const nm=G.L.id+' '+G.L.name+(endl?' エンドレス':'');const nw=ctx.measureText(nm).width;if(CW>560&&!(G.hintT>0&&G.state==='play')){rr(nameX-nw-10,by-th*.32-coinR*.75,nw+20,coinR*1.15,coinR*.5);ctx.fillStyle='rgba(28,22,40,.55)';ctx.fill();ctx.fillStyle='rgba(255,255,255,.85)';ctx.fillText(nm,nameX,by-th*.32);}}
   }
   // hint
   const touchOn=G.players.some(p=>p.dev==='touch');

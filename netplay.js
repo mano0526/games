@@ -676,7 +676,7 @@
     '.np-fab,.np-card,.np-card *,.np-gbar,.np-gbar *,.np-pad,.np-pad *{box-sizing:border-box}',
     '.np-fab,.np-card button,.np-gbar button,.np-pad button{font:inherit;color:inherit;cursor:pointer}',
     '.np-fab:focus-visible,.np-card button:focus-visible,.np-gbar button:focus-visible,.np-card input:focus-visible{outline:2px solid var(--np-acc);outline-offset:2px}',
-    '.np-fab{position:fixed;z-index:2147483000;font-weight:800;font-size:13px;background:rgba(20,24,38,.82);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:7px 13px;display:flex;align-items:center;gap:7px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}',
+    '.np-fab{position:fixed;z-index:2147483000;font-weight:800;font-size:13px!important;color:#fff!important;line-height:1.2;width:auto;min-width:0;height:auto;background:rgba(20,24,38,.82);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:7px 13px;display:flex;align-items:center;gap:7px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}',
     '.np-fab{transition:opacity .3s}',
     '.np-fab.idle{opacity:.18}',
     '.np-fab.idle:hover,.np-fab:focus-visible{opacity:1}',
