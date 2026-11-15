@@ -57,7 +57,7 @@ const FB='"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif
 const C={ink:'#2b2140',paper:'#fff8ec',cream:'#fbefd5',sand:'#f2d593',sandD:'#d9b46b',grass:'#7cc65a',grassD:'#5ca449',road:'#f0dfb2',roadD:'#b99659',
  blue:'#3a7fdc',blueD:'#22559f',red:'#e5473c',redD:'#9f2a22',green:'#2fb36b',greenD:'#1b7a47',gold:'#ffc531',goldD:'#c98a06',purple:'#6a3fae',purpleD:'#3f2470',
  orange:'#f39322',orangeD:'#ad5f0b',teal:'#17b3ae',tealD:'#0b7773',night:'#1b2440',dim:'rgba(20,14,38,.62)'};
-const SPC={blue:[C.blue,C.blueD],start:[C.blue,C.blueD],red:[C.red,C.redD],happening:[C.green,C.greenD],chance:[C.orange,C.orangeD],item:[C.teal,C.tealD],pinch:[C.purple,C.purpleD],volcano:['#e8572a','#9c2f12'],battle:['#c2255c','#7d1239'],duel:['#5a5f73','#33374a'],coaster:['#ff7ab6','#b83f79'],avalanche:['#7fb3e6','#3f6f9e']};
+const SPC={blue:[C.blue,C.blueD],start:[C.blue,C.blueD],red:[C.red,C.redD],happening:[C.green,C.greenD],chance:[C.orange,C.orangeD],item:[C.teal,C.tealD],pinch:[C.purple,C.purpleD],volcano:['#e8572a','#9c2f12'],battle:['#c2255c','#7d1239'],duel:['#5a5f73','#33374a'],coaster:['#ff7ab6','#b83f79'],avalanche:['#7fb3e6','#3f6f9e'],lucky:['#8bd13c','#4f8a1c']};
 const rand=(a=1,b)=>b===undefined?Math.random()*a:a+Math.random()*(b-a);
 const randi=(a,b)=>Math.floor(rand(a,b+1));
 const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -212,7 +212,8 @@ function drawVillain(c,x,y,s,t){ // 雷雲の王「ドンガラ」
 
 /* ================= せってい保存 ================= */
 const OPT_KEY='kk_opt_v1',SAVE_KEY='kk_save_v1';
-function loadOpt(){const d={turns:1,lv:1,tempo:0,bonus:0,swap:0,board:0,mgrule:0};const lim={turns:3,lv:3,tempo:2,bonus:2,swap:3,board:3,mgrule:3};try{const s=JSON.parse(localStorage.getItem(OPT_KEY)||'null');if(s&&typeof s==='object')for(const k in d)if(Number.isInteger(s[k])&&s[k]>=0&&s[k]<lim[k])d[k]=s[k]}catch(e){}return d}
+const TURN_OPTS=[5,10,15,20,25,30];
+function loadOpt(){const d={tn:2,lv:1,tempo:0,bonus:0,swap:0,board:0,mgrule:0};const lim={tn:6,lv:3,tempo:2,bonus:2,swap:3,board:20,mgrule:3};try{const s=JSON.parse(localStorage.getItem(OPT_KEY)||'null');if(s&&typeof s==='object')for(const k in d)if(Number.isInteger(s[k])&&s[k]>=0&&s[k]<lim[k])d[k]=s[k]}catch(e){}return d}
 function saveOpt(o){try{localStorage.setItem(OPT_KEY,JSON.stringify(o))}catch(e){}}
 let SWAP=loadOpt().swap; // 0:じどう 1:下ボタンで決定 2:右ボタンで決定
 
@@ -393,6 +394,7 @@ function buildBoard(){const def=BD,wp=def.wp;
  for(const nd of nodes)if(nd.type===def.spec&&!spec.includes(nd.id))spec.push(nd.id);
  for(const t of['battle','duel'])if(!nodes.some(nd=>nd.type===t)){const c0=nodes.find(nd=>!nd.branch&&nd.type==='blue'&&!ex.has(nd.id)&&nd.id>5);if(c0)c0.type=t}
  {const a=nodes[J],b=nodes[bids[0]],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;let best=[mx+40,my],bs=-1;for(let k=0;k<16;k++){const an=k/16*Math.PI*2;for(const r of[56,72]){const x=mx+Math.cos(an)*r,y=my+Math.sin(an)*r;let md=1e9;for(const nd of nodes){md=Math.min(md,Math.hypot(nd.x-x,nd.y-(y-45)),Math.hypot(nd.x-x,nd.y-y))}if(md>bs){bs=md;best=[x,y]}}}BOARD.gatePos=best}
+ {const cand=nodes.filter(nd=>!nd.branch&&nd.type==='blue'&&!ex.has(nd.id)&&nd.id>3);const want=3;for(let k=0;k<want&&cand.length;k++){const idx=Math.floor((k+.5)/want*cand.length);const nd=cand[Math.min(idx,cand.length-1)];if(nd)nd.type='lucky'}}
  BOARD.spec=spec;BOARD.base=base;BOARD.starCands=[...sc,bm];BOARD.nodes=nodes;BOARD.J=J;BOARD.M=M;BOARD.bids=bids;BOARD.branchPts=bd;BOARD.lamps=[];
 }
 const NODE=i=>BOARD.nodes[i];
@@ -535,7 +537,8 @@ function drawBoat(g,x,y,s){g.save();g.translate(x,y);g.scale(s,s);g.strokeStyle=
 const ITEMS={double:{name:'ダブルダイス',desc:'サイコロを2こ ふれる',price:5,col:C.blue,lab:'2'},triple:{name:'トリプルダイス',desc:'サイコロを3こ ふれる',price:10,col:C.red,lab:'3'},
  custom:{name:'えらべるダイス',desc:'1〜10の すきな目を えらべる',price:8,col:C.purple,lab:'?'},warp:{name:'ワープブロック',desc:'だれかと 場所を 入れかえる',price:8,col:C.teal,lab:'⇄'},
  steal_coin:{name:'コインどろぼう',desc:'だれかから コインを 5〜15まい うばう',price:8,col:'#c98a06',lab:'盗'},steal_star:{name:'スターどろぼう',desc:'だれかから スターを 1こ うばう',price:28,col:'#3f2470',lab:'★'},
- curse:{name:'ちびダイスのろい',desc:'だれかの つぎの サイコロを 1〜5に する',price:6,col:'#8a2f6b',lab:'↓'},trap:{name:'わなマス',desc:'いまの マスに わなを しかけて、止まった人から 10コイン もらう',price:6,col:'#7a5230',lab:'!'}};
+ curse:{name:'ちびダイスのろい',desc:'だれかの つぎの サイコロを 1〜5に する',price:6,col:'#8a2f6b',lab:'↓'},trap:{name:'わなマス',desc:'いまの マスに わなを しかけて、止まった人から 10コイン もらう',price:6,col:'#7a5230',lab:'!'},
+ pipe:{name:'ゴールドパイプ',desc:'スターの 1マス手前まで ワープ',price:20,col:'#2f9e44',lab:'P'},mini:{name:'ちびサイコロ',desc:'1〜3しか 出ない サイコロ（ねらって 止まる）',price:3,col:'#f08c00',lab:'3'}};
 // アイテムの絵（文字ではなく 形で 見分けられるように）
 function miniDie(c,x,y,d,n,col){rr(c,x-d/2,y-d/2,d,d,d*.22);c.fillStyle=col||'#fff';c.fill();c.lineWidth=Math.max(1,d*.1);c.strokeStyle=C.ink;c.stroke();c.fillStyle=C.ink;
  const P={1:[[0,0]],2:[[-1,-1],[1,1]],3:[[-1,-1],[0,0],[1,1]],5:[[-1,-1],[1,-1],[0,0],[-1,1],[1,1]]}[n]||[[0,0]];for(const[px,py]of P){circ(c,x+px*d*.26,y+py*d*.26,d*.1);c.fill()}}
@@ -549,6 +552,8 @@ function drawItemIcon(c,id,x,y,s){const it=ITEMS[id];rr(c,x-s/2,y-s/2,s,s,s*.25)
   c.fillStyle='#a07a40';rr(c,x-s*.14,y-s*.3,s*.28,s*.12,s*.05);c.fill();c.stroke();
   if(id==='steal_coin'){c.fillStyle=C.gold;circ(c,x,y+s*.08,s*.13);c.fill();c.stroke()}else drawStar(c,x,y+s*.08,s*.15,0,C.gold,lw*.7)}
  else if(id==='curse'){miniDie(c,x-s*.06,y+s*.06,s*.38,1,'#e8d6f0');c.fillStyle='#fff';c.beginPath();c.moveTo(x+s*.28,y-s*.32);c.lineTo(x+s*.28,y-s*.02);c.lineTo(x+s*.38,y-s*.02);c.lineTo(x+s*.22,y+s*.14);c.lineTo(x+s*.06,y-s*.02);c.lineTo(x+s*.16,y-s*.02);c.lineTo(x+s*.16,y-s*.32);c.closePath();c.fill();c.lineWidth=lw*.6;c.stroke()}
+ else if(id==='pipe'){c.fillStyle='#8ce99a';rr(c,x-s*.2,y-s*.12,s*.4,s*.42,s*.04);c.fill();c.lineWidth=lw*.8;c.strokeStyle=C.ink;c.stroke();rr(c,x-s*.3,y-s*.3,s*.6,s*.2,s*.05);c.fill();c.stroke();drawStar(c,x,y+s*.1,s*.12,0,C.gold,lw*.5)}
+ else if(id==='mini'){miniDie(c,x,y+s*.04,s*.38,3);txt(c,'1-3',x,y-s*.3,{s:s*.24,f:FD,w:400,col:'#fff',st:C.ink,sw:2})}
  else if(id==='trap'){c.fillStyle=C.gold;c.beginPath();c.moveTo(x,y-s*.3);c.lineTo(x+s*.32,y+s*.26);c.lineTo(x-s*.32,y+s*.26);c.closePath();c.fill();c.lineWidth=lw*.8;c.stroke();txt(c,'!',x,y+s*.06,{s:s*.4,f:FD,w:400,col:C.ink})}
  else txt(c,it.lab,x,y+s*.04,{s:s*.62,f:FD,w:400,col:'#fff'});
  c.restore()}
@@ -663,15 +668,17 @@ function followPlayer(p){cam.follow=p;cam.tz=1}
 async function panTo(x,y,z=1,t=.9){cam.follow=null;cam.tx=x;cam.ty=y;cam.tz=z;await wait(t)}
 function overview(){cam.follow=null;cam.tx=WW/2;cam.ty=WH/2-10;cam.tz=.62}
 function crowdOffset(p){const group=G.players.filter(q=>!q.hop&&q.node===p.node);const k=group.indexOf(p),n=group.length;
- const T={1:[[0,0]],2:[[-17,0],[17,0]],3:[[-20,4],[20,4],[0,-12]],4:[[-18,-8],[18,-8],[-18,9],[18,9]]};return(T[n]||T[1])[Math.max(0,k)]||[0,0]}
+ const T={1:[[0,0]],2:[[-24,0],[24,0]],3:[[-44,0],[0,4],[44,0]],4:[[-63,0],[-21,4],[21,0],[63,0]]};
+ // 今の番の人は いつも 手前の まん中寄り（見失わないように）
+ let ord=group;if(G.cur>=0&&group.includes(P(G.cur))&&n>1){ord=group.filter(q=>q!==P(G.cur));ord.splice(1,0,P(G.cur))}const kk=ord.indexOf(p);return(T[n]||T[1])[Math.max(0,kk)]||[0,0]}
 function updatePlayersBoard(dt){G.shake=Math.max(0,(G.shake||0)-dt);for(const p of G.players){let x,y;if(p.hop){const t=clamp(p.hop.t,0,1);x=lerp(p.hop.fx,p.hop.tx,t);y=lerp(p.hop.fy,p.hop.ty,t)-Math.sin(Math.PI*t)*36}else{const n=NODE(p.node);const o=crowdOffset(p);x=n.x+o[0];y=n.y+o[1]}
  p.wx=p.wx===undefined?x:lerp(p.wx,x,Math.min(1,dt*18));p.wy=p.wy===undefined?y:lerp(p.wy,y,Math.min(1,dt*18));if(p.hop){p.wx=x;p.wy=y}
  p.jumpT=Math.max(0,(p.jumpT||0)-dt);p.happy=Math.max(0,(p.happy||0)-dt);p.sad=Math.max(0,(p.sad||0)-dt);p.coinFlash=Math.max(0,(p.coinFlash||0)-dt);p.alpha=p.alpha===undefined?1:p.alpha}
  if(cam.follow){cam.tx=cam.follow.wx;cam.ty=cam.follow.wy-30}{const hw=W/2/cam.tz,hh=H/2/cam.tz;cam.tx=hw*2<WW?clamp(cam.tx,hw,WW-hw):WW/2;cam.ty=hh*2<WH?clamp(cam.ty,hh,WH-hh):WH/2}
  const k=Math.min(1,dt*4.5);cam.x+=(cam.tx-cam.x)*k;cam.y+=(cam.ty-cam.y)*k;cam.z+=(cam.tz-cam.z)*k;
- if(G.dice)for(const b of G.dice.blocks){if(!b.done){b.cyc-=dt;if(b.cyc<=0){b.cyc=.055;let v;const mx=G.dice.p.curse?5:10;do v=randi(1,mx);while(v===b.v&&mx>1);b.v=v}}b.pop=Math.max(0,b.pop-dt*3)}}
+ if(G.dice)for(const b of G.dice.blocks){if(!b.done){b.cyc-=dt;if(b.cyc<=0){b.cyc=.055;let v;const mx=G.dice.mx||(G.dice.p.curse?5:10);do v=randi(1,mx);while(v===b.v&&mx>1);b.v=v}}b.pop=Math.max(0,b.pop-dt*3)}}
 function drawSpace(c,n){const x=n.x,y=n.y;
- if(n.id===G.starNode){const pu=1+Math.sin(NOW*4)*.07;const rg=c.createRadialGradient(x,y,4,x,y,64);rg.addColorStop(0,'rgba(255,244,160,.95)');rg.addColorStop(1,'rgba(255,200,40,0)');c.fillStyle=rg;circ(c,x,y,64);c.fill();
+ if(n.id===G.starNode&&!G.starFly){const pu=1+Math.sin(NOW*4)*.07;const rg=c.createRadialGradient(x,y,4,x,y,64);rg.addColorStop(0,'rgba(255,244,160,.95)');rg.addColorStop(1,'rgba(255,200,40,0)');c.fillStyle=rg;circ(c,x,y,64);c.fill();
   c.fillStyle=C.ink;ell(c,x,y+6,26,19);c.fill();c.fillStyle=C.goldD;ell(c,x,y+4,24,17);c.fill();c.fillStyle=C.gold;ell(c,x,y,24,17);c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();
   drawStar(c,x,y-26-Math.sin(NOW*3)*5,25*pu,Math.sin(NOW*1.5)*.2,C.gold,3.5);return}
  if(n.type==='shop'){c.fillStyle=C.ink;ell(c,x,y+6,27,19);c.fill();c.fillStyle='#e2cfa6';ell(c,x,y,25,17);c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();
@@ -686,6 +693,7 @@ function drawSpace(c,n){const x=n.x,y=n.y;
  else if(t==='red'){c.fillStyle='#fff';rr(c,x-9,y-2.5,18,5,2.5);c.fill()}
  else if(t==='happening')txt(c,'?',x,y+1,{s:22,f:FD,w:400,col:'#fff'});
  else if(t==='chance')txt(c,'!',x,y+1,{s:22,f:FD,w:400,col:'#fff'});
+ else if(t==='lucky'){c.fillStyle='#fff';for(let k=0;k<4;k++){const a=k*Math.PI/2+Math.PI/4;c.save();c.translate(x+Math.cos(a)*4.5,y+Math.sin(a)*3.2);c.rotate(a);ell(c,0,0,5.5,4);c.fill();c.restore()}c.strokeStyle='#fff';c.lineWidth=2;c.beginPath();c.moveTo(x,y+2);c.quadraticCurveTo(x+3,y+7,x+7,y+8);c.stroke()}
  else if(t==='item'){c.fillStyle='#fff';c.fillRect(x-8,y-5,16,11);c.fillStyle=f;c.fillRect(x-1.5,y-5,3,11);c.fillStyle='#fff';c.beginPath();c.arc(x-4,y-7,3.5,0,7);c.arc(x+4,y-7,3.5,0,7);c.fill()}
  else if(t==='pinch'){c.fillStyle='#fff';circ(c,x,y,7);c.fill();c.fillStyle=f;circ(c,x-2.5,y-1,1.8);c.fill();circ(c,x+2.5,y-1,1.8);c.fill();c.fillStyle='#fff';c.beginPath();c.moveTo(x-7,y-4);c.lineTo(x-10,y-11);c.lineTo(x-3,y-6);c.fill();c.beginPath();c.moveTo(x+7,y-4);c.lineTo(x+10,y-11);c.lineTo(x+3,y-6);c.fill()}
  else if(t==='volcano'){c.fillStyle='#fff';c.beginPath();c.moveTo(x,y-11);c.quadraticCurveTo(x+10,y-2,x+6,y+6);c.quadraticCurveTo(x,y+10,x-6,y+6);c.quadraticCurveTo(x-10,y-2,x,y-11);c.fill();c.fillStyle=f;ell(c,x,y+3,3,4);c.fill()}
@@ -724,7 +732,9 @@ function drawBoardScene(c){c.fillStyle=BD.bg;c.fillRect(0,0,W,H);
  {const gp=BOARD.gatePos;drawGate(c,gp[0],gp[1])}
  if(G.junc){const n=NODE(G.junc.node);G.junc.opts.forEach((o,i)=>{const m=NODE(o);const a=Math.atan2(m.y-n.y,m.x-n.x);const sel=i===G.junc.sel;const d=48+(sel?Math.sin(NOW*8)*5:0);
   c.save();c.translate(n.x+Math.cos(a)*d,n.y-30+Math.sin(a)*d);c.rotate(a);c.fillStyle=sel?C.gold:'rgba(255,255,255,.85)';c.lineWidth=4;c.strokeStyle=C.ink;c.beginPath();c.moveTo(18,0);c.lineTo(-8,-16);c.lineTo(-8,-6);c.lineTo(-20,-6);c.lineTo(-20,6);c.lineTo(-8,6);c.lineTo(-8,16);c.closePath();c.fill();c.stroke();c.restore();
+  if(G.junc.info&&G.junc.info[i]){const inf=G.junc.info[i],ix=n.x+Math.cos(a)*(d+92),iy=n.y-30+Math.sin(a)*(d+92);const lines=[inf.star<99?`★まで ${inf.star}`:'',...inf.seen].filter(Boolean);if(lines.length){const bw=112,bh=lines.length*22+12;rr(c,ix-bw/2,iy-bh/2,bw,bh,10);c.fillStyle=sel?'#fff8dc':'rgba(255,255,255,.88)';c.fill();c.lineWidth=2.5;c.strokeStyle=sel?C.goldD:C.ink;c.stroke();lines.forEach((l,k)=>txt(c,l,ix,iy-bh/2+17+k*22,{s:16,col:l==='わな'||l==='ピンチ'?C.redD:l.startsWith('★')?'#b26a00':C.ink}))}}
   if(isToll(G.junc.node,o)){const tx=n.x+Math.cos(a)*(d+38),ty=n.y-30+Math.sin(a)*(d+38);drawCoin(c,tx-14,ty,10);txt(c,''+TOLL,tx+8,ty+1,{s:18,f:FD,w:400,col:'#fff',st:C.ink,sw:5})}})}
+ if(G.starFly){const f=G.starFly;const rg=c.createRadialGradient(f.x,f.y,4,f.x,f.y,70);rg.addColorStop(0,'rgba(255,244,160,.9)');rg.addColorStop(1,'rgba(255,200,40,0)');c.fillStyle=rg;c.fillRect(f.x-70,f.y-70,140,140);drawStar(c,f.x,f.y,30,NOW*6,C.gold,4)}
  const ps=G.players.slice().sort((a,b)=>a.wy-b.wy);
  for(const p of ps){const j=p.jumpT>0?Math.sin(p.jumpT/.3*Math.PI)*26:0;c.save();c.globalAlpha=p.alpha;
   if(G.cur===p.i){c.strokeStyle=CHARS[p.ci].col;c.lineWidth=4;ell(c,p.wx,p.wy+2,30,12);c.stroke()}
@@ -835,17 +845,20 @@ async function starEvent(p){sfx('star');const sp=SP();
  if(c!==0){await say('また きてね！',{owner:p.i});return}
  changeCoins(p,-sp);p.stars++;p.happy=2.5;sfx('fanfare');burst(p.wx,p.wy-60,30,[C.gold,'#fff7b0','#fff'],{world:true,sh:'s',max:320,up:120});
  await banner('スター ゲット！',{col:C.goldD,dur:1.5});await moveStar(p);followPlayer(p);await wait(.5)}
-const SHOPLIST=['double','triple','custom','warp','steal_coin','steal_star','curse','trap'];
-async function shopEvent(p){if(G.fastHop||p.items.length>=3)return;if(!SHOPLIST.some(id=>iprice(id)<=p.coins))return;
+const SHOPLIST=['double','triple','custom','mini','warp','pipe','steal_coin','steal_star','curse','trap'];
+async function shopEvent(p){if(G.fastHop)return;if(p.items.length>=3){if(p.human&&!p.shopFullSaid){p.shopFullSaid=true;await say('ころころ屋だよ！ …でも もちものが いっぱい（3こ）だね。アイテムを 使ってから また きてね。',{owner:p.i,spk:'shop'})}return}p.shopFullSaid=false;if(!SHOPLIST.some(id=>iprice(id)<=p.coins))return;
  const c0=await choose(`ころころ屋だよ！${G.night?' 今夜は はんがく！':''} アイテム 買っていく？`,['よる','よらない'],{owner:p.i,spk:'shop',cpu:()=>(p.coins>=iprice('double')+SP()||(p.coins<SP()&&p.coins>=8&&Math.random()<.5)||G.night&&p.coins>=10)?0:1});
  if(c0!==0)return;
- const dis=SHOPLIST.map(id=>iprice(id)>p.coins);
- const cpuPick=()=>{const has=id=>iprice(id)<=p.coins;const rich=p.coins>=SP()+8;
-  if(has('steal_star')&&G.players.some(q=>q!==p&&q.stars>0)&&p.coins>=iprice('steal_star')+4)return SHOPLIST.indexOf('steal_star');
-  if(rich&&has('custom'))return SHOPLIST.indexOf('custom');if(has('steal_coin')&&Math.random()<.4)return SHOPLIST.indexOf('steal_coin');
-  if(has('triple')&&!rich)return SHOPLIST.indexOf('triple');if(has('curse')&&Math.random()<.3)return SHOPLIST.indexOf('curse');if(has('double'))return 0;return SHOPLIST.length};
- const k=await choose('どれにする？',SHOPLIST.map(id=>`${ITEMS[id].name} ${iprice(id)}枚`).concat(['やめる']),{owner:p.i,spk:'shop',cancel:true,dis:dis.concat([false]),cpu:cpuPick});
- if(k<0||k>=SHOPLIST.length)return;const id=SHOPLIST[k];changeCoins(p,-iprice(id));p.items.push(id);await say(`${ITEMS[id].name}を 買った！ ${ITEMS[id].desc}。`,{owner:p.i,spk:'shop'})}
+ // その日の 品ぞろえ：ダブルダイス＋ほかから 4つ（来るたびに かわる）
+ const st2=['double',...shuffle(SHOPLIST.filter(y=>y!=='double')).slice(0,4)];const ST=SHOPLIST.filter(x=>st2.includes(x));
+ const dis=ST.map(id=>iprice(id)>p.coins);
+ const cpuPick=()=>{const has=id=>ST.includes(id)&&iprice(id)<=p.coins;const rich=p.coins>=SP()+8;const at=id=>ST.indexOf(id);
+  if(has('pipe')&&p.coins>=iprice('pipe')+SP())return at('pipe');
+  if(has('steal_star')&&G.players.some(q=>q!==p&&q.stars>0)&&p.coins>=iprice('steal_star')+4)return at('steal_star');
+  if(rich&&has('custom'))return at('custom');if(has('steal_coin')&&Math.random()<.4)return at('steal_coin');
+  if(has('triple')&&!rich)return at('triple');if(has('curse')&&Math.random()<.3)return at('curse');if(has('double'))return at('double');return ST.length};
+ const k=await choose('きょうの しなもの。どれにする？',ST.map(id=>`${ITEMS[id].name} ${iprice(id)}枚`).concat(['やめる']),{owner:p.i,spk:'shop',cancel:true,dis:dis.concat([false]),cpu:cpuPick});
+ if(k<0||k>=ST.length)return;const id=ST[k];changeCoins(p,-iprice(id));p.items.push(id);await say(`${ITEMS[id].name}を 買った！ ${ITEMS[id].desc}。`,{owner:p.i,spk:'shop'})}
 function effType(n){let t=n.type==='start'?'blue':n.type;if(t==='happening'&&(G.hapToChance||G.night))t='chance';if(G.flip&&n.west){if(t==='blue')t='red';else if(t==='red')t='blue'}return t}
 async function landEvent(p){const n=NODE(p.node);
  const tr=G.traps[p.node];if(tr!=null&&tr!==p.i){const o=P(tr);delete G.traps[p.node];STATS.trap++;sfx('lose');burst(p.wx,p.wy-20,14,['#7a5230',C.gold],{world:true});await say(`わなだ！ ${pname(o)}の しかけた わなに かかった！`,{owner:p.i});const v=Math.min(10,p.coins);if(v>0){changeCoins(p,-v);changeCoins(o,v)}p.sad=1.2;await wait(.4)}
@@ -853,12 +866,15 @@ async function landEvent(p){const n=NODE(p.node);
  if((t==='blue'||t==='red')&&Math.random()<.04)await hiddenBlock(p);
  if(t==='blue'){p.color='blue';changeCoins(p,3*G.coinMul);p.happy=1;await wait(.7)}
  else if(t==='red'){p.color='red';changeCoins(p,-3*G.coinMul);p.sad=1;await wait(.7)}
- else{p.color='green';if(t==='happening'){p.haps++;await happeningEvent(p)}else if(t==='item')await itemSpace(p);else if(t==='chance')await chanceTime(p);else if(t==='pinch')await pinchEvent(p);
+ else{p.color='green';if(t==='happening'){p.haps++;await happeningEvent(p)}else if(t==='item')await itemSpace(p);else if(t==='lucky')await luckySpace(p);else if(t==='chance')await chanceTime(p);else if(t==='pinch')await pinchEvent(p);
   else if(t==='volcano')await eruption(p);else if(t==='coaster')await coasterEvent(p);else if(t==='avalanche')await avalancheEvent(p);else if(t==='battle')await battleEvent(p);else if(t==='duel')await duelEvent(p)}}
-const ITEMPOOL=['double','double','double','triple','custom','warp','steal_coin','steal_coin','curse','trap','trap','steal_star'];
-async function itemSpace(p){const id=pick(ITEMPOOL);sfx('ok');if(p.items.length>=3){await say('アイテムマス！ …だけど もう もちきれないよ。',{owner:p.i});return}
+const ITEMPOOL=['double','double','double','triple','custom','mini','mini','warp','steal_coin','steal_coin','curse','trap','trap','steal_star','pipe'];
+async function itemSpace(p){const id=pick(ITEMPOOL);sfx('ok');if(p.items.length>=3){
+  const k=await choose(`アイテムマス！ ${ITEMS[id].name}（${ITEMS[id].desc}）を もらえる！ でも もちものが いっぱい。どれと こうかんする？`,p.items.map(x=>ITEMS[x].name+'を すてる').concat(['こうかんしない']),{owner:p.i,cancel:true,cpu:()=>{const val=x=>({steal_star:5,custom:4,triple:3,steal_coin:2,double:1}[x]||0);let w=0;p.items.forEach((x,j)=>{if(val(x)<val(p.items[w]))w=j});return val(id)>val(p.items[w])?w:3}});
+  if(k<0||k>=3){await say('こうかんしなかった。',{owner:p.i});return}const old=p.items[k];p.items[k]=id;p.happy=1;await say(`${ITEMS[old].name}を すてて ${ITEMS[id].name}を もらった！`,{owner:p.i});return}
  p.items.push(id);p.happy=1;await say(`アイテムマス！ ${ITEMS[id].name}を もらった！ ${ITEMS[id].desc}。`,{owner:p.i})}
 function cpuItemPlan(p){if(!p.items.length)return null;const d=stepsToStar(p.node);const rich=p.coins>=SP();const has=id=>p.items.includes(id);const others=G.players.filter(q=>q!==p);
+ if(has('pipe')&&rich&&d>4)return'pipe';if(has('mini')&&rich&&d<=3)return'mini';
  if(has('steal_star')&&others.some(q=>q.stars>0))return'steal_star';
  if(has('custom')&&rich&&d<=10)return'custom';
  if(has('steal_coin')&&others.some(q=>q.coins>=10))return'steal_coin';
@@ -875,7 +891,8 @@ async function useItem(p,id){const k=p.items.indexOf(id);if(k<0)return{count:1};
  if(id==='trap'&&(isPass(NODE(p.node))||G.traps[p.node]!=null)){await say('ここには わなを しかけられないよ。',{owner:p.i});return{count:1}}
  p.items.splice(k,1);sfx('ok');STATS.item=(STATS.item||0)+1;
  await say(`${ITEMS[id].name}を 使った！`,{owner:p.i});
- if(id==='double')return{count:2};if(id==='triple')return{count:3};if(id==='custom')return{custom:true};
+ if(id==='double')return{count:2};if(id==='mini')return{count:1,max:3};
+ if(id==='pipe'){const pre=BOARD.nodes.find(nd=>nd.next.includes(G.starNode)&&!nd.branch&&!isPass(nd))||BOARD.nodes.find(nd=>nd.next.includes(G.starNode));if(pre){sfx('hop');burst(p.wx,p.wy,16,['#2f9e44','#fff'],{world:true});p.alpha=0;await wait(.3);p.node=pre.id;p.wx=pre.x;p.wy=pre.y;followPlayer(p);await wait(.5);p.alpha=1;sfx('star');await say('スターの 目の前に 出た！',{owner:p.i})}return{count:1}}if(id==='triple')return{count:3};if(id==='custom')return{custom:true};
  if(id==='warp'){await warpEvent(p);return{count:1}}
  if(id==='steal_coin'){const q=await pickTarget(p,'だれから うばう？',others,q=>q.coins);const v=Math.min(randi(5,15),q.coins);sfx('evil');if(v>0){changeCoins(q,-v);changeCoins(p,v);q.sad=1.2}await say(v>0?`${pname(q)}から ${v}コイン うばった！`:`${pname(q)}は 一文なしだった…`,{owner:p.i});return{count:1}}
  if(id==='steal_star'){const q=await pickTarget(p,'だれの スターを うばう？',others.filter(o=>o.stars>0),q=>q.stars*100+q.coins);q.stars--;p.stars++;q.sad=2;p.happy=2;sfx('star');floatText(q.wx,q.wy-70,'★-1','#ff8a7a',{world:true});floatText(p.wx,p.wy-70,'★+1',C.gold,{world:true});await say(`${pname(q)}の スターを うばった！`,{owner:p.i});return{count:1}}
@@ -906,7 +923,7 @@ async function turnPick(p,used){const u={p,sel:0,sub:-1,isel:0,t:0,used};G.tmenu
 async function rollPhase(p){let mode={count:1},used=false,skip=false;
  if(!p.human){const it=cpuItemPlan(p);if(it){mode=await useItem(p,it);used=true}}
  for(;;){if(p.human&&!skip){const r=await turnPick(p,used);if(r!=='dice'){if(r&&r.used){mode=r.mode;used=true;skip=true}continue}}skip=false;
-  if(mode.custom)return await customDie(p);const r=await rollDice(p,mode.count,p.human);if(r==='menu')continue;return r}}
+  if(mode.custom)return await customDie(p);const r=await rollDice(p,mode.count,p.human,mode.max);if(r==='menu')continue;return r}}
 function drawTurnMenu(c){const u=G.tmenu;if(!u)return;const p=u.p,col=CHARS[p.ci].col;const x=30,w=230,bh=54,y0=H-130-3*(bh+8)-44;
  rr(c,x-8,y0-8,w+16,3*(bh+8)+52,18);c.fillStyle='rgba(43,33,64,.82)';c.fill();txt(c,`${pname(p)} の ばん`,x+w/2,y0+12,{s:18,f:FD,w:400,col:'#fff'});
  const L=[['dice','サイコロ'],['item',`アイテム（${p.items.length}）`],['map','マップ']];
@@ -920,11 +937,11 @@ function drawTurnMenu(c){const u=G.tmenu;if(!u)return;const p=u.p,col=CHARS[p.ci
   p.items.forEach((id,j)=>{const yy=iy0+12+j*64,sel=j===u.isel;if(sel){rr(c,ix+8,yy,iw-16,58,12);c.fillStyle='#fff0c6';c.fill();c.lineWidth=3;c.strokeStyle=col;c.stroke()}
    drawItemIcon(c,id,ix+40,yy+29,40);txt(c,ITEMS[id].name,ix+72,yy+18,{s:19,a:'left',f:FD,w:400});txt(c,ITEMS[id].desc,ix+72,yy+42,{s:13,a:'left',col:'#5d5270'})});
   txt(c,`${aLabel(p.dev)} つかう　${bLabel(p.dev)} もどる`,ix+iw/2,iy0+ih-20,{s:15,col:'#6d6280'})}}
-async function rollDice(p,count,allowMenu){G.dice={p,blocks:[],k:0,allowMenu,total:0};for(let k=0;k<count;k++)G.dice.blocks.push({v:randi(1,p.curse?5:10),done:false,pop:0,cyc:0});let total=0;
+async function rollDice(p,count,allowMenu,max){const MX=max||(p.curse?5:10);G.dice={p,blocks:[],k:0,allowMenu,total:0,mx:MX};for(let k=0;k<count;k++)G.dice.blocks.push({v:randi(1,MX),done:false,pop:0,cyc:0});let total=0;
  for(let k=0;k<count;k++){G.dice.k=k;const b=G.dice.blocks[k];let t=rand(.45,.95)*G.tempo,res=null,el=0;
   await until(()=>{el+=DT;if(allowMenu&&k===0&&p.human&&Input.pressed(p.dev,'b')){res='menu';return true}if(p.human?(el>.35&&Input.pressed(p.dev,'a')):(t-=DT)<=0){res='hit';return true}return false});
   if(res==='menu'){G.dice=null;return'menu'}
-  b.v=randi(1,p.curse?5:10);b.done=true;b.pop=1;p.jumpT=.3;sfx('hit');burst(p.wx+(k-(count-1)/2)*72,p.wy-118,14,['#fff',C.gold,'#9cc6ff'],{world:true,max:220});total+=b.v;await wait(.4)}
+  b.v=randi(1,MX);b.done=true;b.pop=1;p.jumpT=.3;sfx('hit');burst(p.wx+(k-(count-1)/2)*72,p.wy-118,14,['#fff',C.gold,'#9cc6ff'],{world:true,max:220});total+=b.v;await wait(.4)}
  if(count>1){G.dice.total=total;sfx('ok');await wait(.8)}await wait(.25);G.dice=null;if(p.curse)p.curse=false;return total}
 async function customDie(p){const u={p,v:5};G.customUI=u;let target=clamp(stepsToStar(p.node),1,10);if(p.coins<SP())target=10;let t=0,mv=0;
  await until(()=>{if(p.human){if(Input.rep(p.dev,'left')||Input.rep(p.dev,'down')){u.v=u.v<=1?10:u.v-1;sfx('blip')}if(Input.rep(p.dev,'right')||Input.rep(p.dev,'up')){u.v=u.v>=10?1:u.v+1;sfx('blip')}return Input.pressed(p.dev,'a')}
@@ -938,6 +955,9 @@ async function movePlayer(p,steps){G.stepsLeft=steps;
 const TOLL=10;
 const isToll=(from,to)=>from===BOARD.J&&to===BOARD.bids[0];
 async function chooseDirection(p,node){const opts=node.next.slice();G.junc={node:node.id,opts,sel:0};
+ // 分かれ道の 先に 何があるか（★までの マス数と、8マス先までの お店など）
+ G.junc.info=opts.map(o=>{const star=G.starNode>=0?(isPass(NODE(o))?0:1)+stepsBetween(o,G.starNode):99;const seen=[];let cur=o;for(let k=0;k<8;k++){const nd=NODE(cur);const ty=nd.id===G.starNode?'star':nd.type;
+   const lab={shop:'ショップ',lucky:'ラッキー',pinch:'ピンチ',item:'アイテム',chance:'チャンス',star:''}[ty];if(lab&&!seen.includes(lab))seen.push(lab);if(G.traps[cur]!=null&&G.traps[cur]!==p.i&&!seen.includes('わな'))seen.push('わな');cur=nd.next[0];if(cur==null)break}return{star,seen:seen.slice(0,3)}});
  const tollOk=o=>!isToll(node.id,o)||p.coins>=TOLL;let pi;
  if(!p.human){const sc=opts.map(o=>{let s=(isPass(NODE(o))?0:1)+stepsBetween(o,G.starNode);if(isToll(node.id,o)){if(p.coins<TOLL)s+=999;else if(p.coins>=SP()&&p.coins-TOLL<SP())s+=999;else if(p.coins<SP()&&Math.random()<.6)s+=999}return s});
   let best=sc.indexOf(Math.min(...sc));if(p.coins<SP()&&Math.random()<.4)best=pick(opts.map((o,i)=>i).filter(i=>tollOk(opts[i])));
@@ -953,7 +973,12 @@ async function chooseDirection(p,node){const opts=node.next.slice();G.junc={node
  return r}
 async function passEvent(p,n){if(n.id===G.starNode)await starEvent(p);else if(n.type==='shop')await shopEvent(p)}
 async function moveStar(p){const old=G.starNode;const cands=BOARD.starCands.filter(i=>i!==old&&!G.players.some(q=>q.node===i));G.starNode=pick(cands.length?cands:BOARD.starCands.filter(i=>i!==old));
- const n=NODE(G.starNode);await panTo(n.x,n.y,1,1.0);sfx('star');burst(n.x,n.y-26,18,[C.gold,'#fff'],{world:true,sh:'s'});await say('スターは ここに おひっこし！',{owner:p?p.i:-1});if(p)followPlayer(p)}
+ const n=NODE(G.starNode),o=old>=0?NODE(old):null;
+ if(o){// 古い場所から 新しい場所へ スターが 飛んでいく（カメラも ついていく）
+  const f={x:o.x,y:o.y-26,t:0};G.starFly=f;await panTo(o.x,o.y,.85,.5);sfx('star');const D=1.5,dist=Math.hypot(n.x-o.x,n.y-o.y);
+  await until(()=>{f.t=Math.min(1,f.t+DT/D);const e=f.t<.5?2*f.t*f.t:1-Math.pow(-2*f.t+2,2)/2;f.x=lerp(o.x,n.x,e);f.y=lerp(o.y,n.y,e)-26-Math.sin(Math.PI*f.t)*Math.min(260,dist*.35);cam.tx=f.x;cam.ty=f.y;cam.tz=lerp(.85,.7,Math.sin(Math.PI*f.t));if(Math.random()<.5)burst(f.x,f.y,1,[C.gold,'#fff'],{world:true,max:60,g:0});return f.t>=1});
+  G.starFly=null}
+ await panTo(n.x,n.y,1,o?.35:1.0);sfx('star');burst(n.x,n.y-26,18,[C.gold,'#fff'],{world:true,sh:'s'});await say('スターは ここに おひっこし！',{owner:p?p.i:-1});if(p)followPlayer(p)}
 async function eruption(p){const vx=585,vy=470;await panTo(vx,vy+60,.8,.8);G.shake=1.4;sfx('boom');await wait(.25);sfx('boom');
  for(let k=0;k<4;k++)burst(vx,vy-10,18,['#ff6b3d','#ffb347','#fff2a8','#5d566a'],{world:true,up:420,max:300,g:700,life:1.4});
  await wait(.9);G.flip=!G.flip;STATS.erupt++;sfx('evil');
@@ -961,6 +986,12 @@ async function eruption(p){const vx=585,vy=470;await panTo(vx,vy+60,.8,.8);G.sha
  const hit=G.players.filter(q=>NODE(q.node).west);
  if(hit.length){for(const q of hit){changeCoins(q,-5);q.sad=1.2}await say(`西がわに いた ${hit.map(pname).join('、')}は 火山灰で コインを 5枚 おとした！`,{owner:p.i})}
  followPlayer(p);await wait(.4)}
+// ラッキーマス：ルーレットで いいことが 1つ（わるいことは なし）
+async function luckySpace(p){sfx('star');p.happy=1;await say('ラッキーマス！ ルーレットを 回そう！',{owner:p.i});
+ const opts=['5コイン','10コイン','アイテム','みんなから 3コインずつ','ダブルダイス'];const k=await roulette({title:'ラッキー ルーレット',items:opts,owner:p.i});
+ if(k===0){changeCoins(p,5);await say('5コイン もらった！',{owner:p.i})}else if(k===1){changeCoins(p,10);sfx('coin');await say('10コイン もらった！',{owner:p.i})}
+ else if(k===2||k===4){const id=k===4?'double':pick(ITEMPOOL);if(p.items.length>=3){changeCoins(p,5);await say(`${ITEMS[id].name}… でも もちものが いっぱいなので かわりに 5コイン！`,{owner:p.i})}else{p.items.push(id);await say(`${ITEMS[id].name}を もらった！ ${ITEMS[id].desc}。`,{owner:p.i})}}
+ else{let s=0;for(const q of G.players)if(q!==p){const v=Math.min(3,q.coins);if(v>0){changeCoins(q,-v);s+=v}}changeCoins(p,s);await say(`みんなから あわせて ${s}コイン もらった！`,{owner:p.i})}}
 async function hiddenBlock(p){sfx('hit');burst(p.wx,p.wy-110,20,[C.gold,'#fff'],{world:true});await say('あっ！ かくしブロックが 出てきた！',{owner:p.i});
  if(Math.random()<.3){p.stars++;p.happy=2;sfx('fanfare');await say('なんと スターが 入ってた！',{owner:p.i})}else{const v=randi(10,20);changeCoins(p,v);await say(`コインが ${v}枚 入ってた！`,{owner:p.i})}}
 async function warpEvent(p){const others=G.players.filter(q=>q!==p);const k=await roulette({title:'だれと 入れかわる？',items:others.map(pname),owner:p.i});const q=others[k];
@@ -2788,7 +2819,7 @@ const SETUP={slots:[null,null,null,null],row:0,opt:loadOpt(),t:0,mode:'party',fo
  taken(ex){return this.slots.filter((s,i)=>s&&i!==ex).map(s=>s.ci)},
  rows(){const o=this.opt;if(this.mode==='free'){const key=MG_ORDER[this.fo.g%MG_ORDER.length],ms=MGS[key].modes,m=ms[this.fo.m%ms.length],to=teamOpts(m);
    return[['ミニゲーム',MGS[key].name,()=>MG_ORDER.length,'g'],['かたち',MODE_NAME[m],()=>ms.length,'m'],['チーム',to[this.fo.t%to.length],()=>to.length,'t'],['COMのつよさ',['よわい','ふつう','つよい'][o.lv],()=>3,'lv'],['決定ボタン（コントローラー）',['じどう','下のボタン（Xbox式）','右のボタン（Switch式）'][o.swap],()=>3,'swap'],['あそぶ！','',null,null]]}
-  return[['ボード',BOARDS[o.board%BOARDS.length].name,()=>BOARDS.length,'board'],['ターン数',['10','15','20'][o.turns],()=>3,'turns'],['COMのつよさ',['よわい','ふつう','つよい'][o.lv],()=>3,'lv'],['COMのテンポ',['ふつう','はやい'][o.tempo],()=>2,'tempo'],['ボーナススター',['あり','なし'][o.bonus],()=>2,'bonus'],
+  return[['ボード',BOARDS[o.board%BOARDS.length].name,()=>BOARDS.length,'board'],['ターン数',TURN_OPTS[o.tn]+(TURN_OPTS[o.tn]===5?'（おためし）':''),()=>TURN_OPTS.length,'tn'],['COMのつよさ',['よわい','ふつう','つよい'][o.lv],()=>3,'lv'],['COMのテンポ',['ふつう','はやい'][o.tempo],()=>2,'tempo'],['ボーナススター',['あり','なし'][o.bonus],()=>2,'bonus'],
    ['ミニゲームの きめかた',['原作どおり（マスの色）','バトルロイヤル多め','ランダム'][o.mgrule],()=>3,'mgrule'],['決定ボタン（コントローラー）',['じどう','下のボタン（Xbox式）','右のボタン（Switch式）'][o.swap],()=>3,'swap'],['ゲームスタート！','',null,null]]},
  change(d){const r=this.rows()[this.row];if(!r||!r[2])return;const lim=r[2](),key=r[3];if(['g','m','t'].includes(key)){this.fo[key]=(this.fo[key]+d+lim*10)%lim;if(key==='g'){this.fo.m=0;this.fo.t=0}if(key==='m')this.fo.t=0}else{this.opt[key]=(this.opt[key]+d+lim*10)%lim;SWAP=this.opt.swap;saveOpt(this.opt)}sfx('blip')},
  update(dt){this.t+=dt;const sl=this.slots;const host=sl.findIndex(s=>s);const allReady=host>=0&&sl.every(s=>!s||s.ready);const rows=this.rows();if(!allReady)MGPICK.open=false;
@@ -2833,7 +2864,7 @@ const SETUP={slots:[null,null,null,null],row:0,opt:loadOpt(),t:0,mode:'party',fo
 function slotPlayers(){const sl=SETUP.slots;const used=sl.filter(s=>s).map(s=>s.ci);const free=shuffle(CHARS.map((_,i)=>i).filter(c=>!used.includes(c)));
  return[0,1,2,3].map(i=>{const s=sl[i];return{i,ci:s?s.ci:free.shift(),human:!!s,dev:s?s.dev:null,coins:10,dc:10,stars:0,items:[],node:0,color:'blue',mgCoins:0,maxCoins:10,haps:0,alpha:1,face:1,curse:false}})}
 function startGame(){const o=SETUP.opt;setBoard(o.board);G.players=slotPlayers();const fr=shuffle(G.players.filter(p=>!p.human).map(p=>p.ci));G.players.filter(p=>!p.human).forEach((p,k)=>p.ci=fr[k]);
- G.maxTurns=[10,15,20][o.turns];G.cpuLv=o.lv;G.tempo=[1,.5][o.tempo];G.bonus=o.bonus===0;G.mgRule=o.mgrule;beginBoard()}
+ G.maxTurns=TURN_OPTS[o.tn]||15;G.cpuLv=o.lv;G.tempo=[1,.5][o.tempo];G.bonus=o.bonus===0;G.mgRule=o.mgrule;beginBoard()}
 async function startFree(){G.players=slotPlayers();G.cpuLv=SETUP.opt.lv;G.tempo=1;G.cur=-1;G.talk=-1;
  const key=MG_ORDER[SETUP.fo.g%MG_ORDER.length],ms=MGS[key].modes,mode=ms[SETUP.fo.m%ms.length];const teams=teamsFor(mode,SETUP.fo.t);teams.noCoin=true;
  resetAsync();const gid=GAMEID;DLG=null;G.overlay=null;G.banners=[];FX.parts=[];FX.floats=[];
@@ -2856,7 +2887,7 @@ function resumeGame(d){const bi=BOARDS.findIndex(b=>b.id===d.board);setBoard(bi<
  for(const p of G.players)if(BOARD.nodes[p.node].type==='shop')p.node=0;
  G.maxTurns=d.maxTurns;G.cpuLv=clamp(d.cpuLv|0,0,2);G.tempo=d.tempo||1;G.bonus=d.bonus!==false;beginBoard(d)}
 let SAVE_INFO=null;
-function goTitle(){resetAsync();SAVE_INFO=loadSave();TITLE.sel=SAVE_INFO?2:0;DLG=null;G.overlay=null;G.dice=null;G.tmenu=null;G.banners=[];G.orderUI=null;G.customUI=null;G.junc=null;G.villain=false;FX.parts=[];FX.floats=[];paused=false;scene=TITLE;BGM.play('board');FADET=0;FADE=0}
+function goTitle(){resetAsync();SAVE_INFO=loadSave();TITLE.sel=SAVE_INFO?2:0;DLG=null;G.overlay=null;G.dice=null;G.tmenu=null;G.starFly=null;G.banners=[];G.orderUI=null;G.customUI=null;G.junc=null;G.villain=false;FX.parts=[];FX.floats=[];paused=false;scene=TITLE;BGM.play('board');FADET=0;FADE=0}
 BOARDSCENE={update(dt){updatePlayersBoard(dt)},draw(c){drawBoardScene(c)}};
 
 /* ================= COMの番の はやおくり ================= */
