@@ -651,7 +651,7 @@ function drawHUD(c){const pos=[[16,16],[W-246,16],[16,H-108],[W-246,H-108]];rank
  let ny=64+notes.length*30;
  if(scene===BOARDSCENE&&G.cur>=0&&G.starNode>=0&&!G.villain){const p=P(G.cur);const k=(STK&&STK.n===p.node&&STK.s===G.starNode)?STK.v:(STK={n:p.node,s:G.starNode,v:stepsToStar(p.node)}).v;
   if(k<99){rr(c,W/2-110,ny,220,28,14);c.fillStyle=C.paper;c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();drawStar(c,W/2-84,ny+14,10,0,C.gold,2);txt(c,`まで あと ${k} マス`,W/2+8,ny+14,{s:16,col:C.ink});ny+=32}
-  const sn=NODE(G.starNode);const sx=W/2+(sn.x-cam.x)*cam.z,sy=H/2+(sn.y-30-cam.y)*cam.z;const L=60,R=W-60,T=120,B=H-130;
+  const sn=NODE(G.starNode);const sx=W/2+(sn.x-cam.x)*cam.z,sy=H/2+(sn.y-30-cam.y)*cam.z;const L=G.tmenu?300:60,R=W-60,T=120,B=H-130;
   if(cam.z>.8&&(sx<L||sx>R||sy<T||sy>B)){const cx=W/2,cy=H/2,dx=sx-cx,dy=sy-cy;const f=Math.min(dx?((dx>0?R:L)-cx)/dx:1e9,dy?((dy>0?B:T)-cy)/dy:1e9);const ex=cx+dx*f,ey=cy+dy*f,a=Math.atan2(dy,dx),bob=Math.sin(NOW*5)*4;
    c.save();c.translate(ex-Math.cos(a)*bob,ey-Math.sin(a)*bob);c.save();c.rotate(a);c.fillStyle=C.gold;c.strokeStyle=C.ink;c.lineWidth=3;c.beginPath();c.moveTo(44,0);c.lineTo(26,-13);c.lineTo(26,13);c.closePath();c.fill();c.stroke();c.restore();
    circ(c,0,0,26);c.fillStyle='rgba(43,33,64,.85)';c.fill();c.lineWidth=3;c.strokeStyle=C.gold;c.stroke();drawStar(c,0,-2,14,0,C.gold,2);c.restore()}}
@@ -709,7 +709,7 @@ function diceAnchor(p){const z=cam.z;let ax=W/2+(p.wx-cam.x)*z,ay=H/2+(p.wy-cam.
 function drawDiceUI(c){let AX=0,AY=0;const anc=p=>{[AX,AY]=diceAnchor(p)};
 if(G.dice){const p=G.dice.p;anc(p);const n=G.dice.blocks.length;G.dice.blocks.forEach((b,k)=>{const bx=AX+(k-(n-1)/2)*72,by=AY-118+(b.done?0:Math.sin(NOW*4+k)*4);if(b.done&&k!==G.dice.k&&!G.dice.total){drawDiceBlock(c,bx,by,b.v,{done:true,s:42})}else drawDiceBlock(c,bx,by,b.v,{done:b.done,pop:b.pop,col:p.curse?'#8a2f6b':undefined})});
   if(G.dice.total)txt(c,'合計 '+G.dice.total,AX,AY-178,{s:30,f:FD,w:400,col:C.gold,st:C.ink,sw:8});
-  if(p.human&&!G.dice.blocks[G.dice.k].done)txt(c,`${aLabel(p.dev)}：たたく${G.dice.allowMenu?'　'+bLabel(p.dev)+'：メニュー':''}`,AX,AY-70-60-58,{s:17,col:'#fff',st:C.ink,sw:5})}
+  if(p.human&&!G.dice.blocks[G.dice.k].done)txt(c,`${aLabel(p.dev)}：たたく${G.dice.allowMenu&&G.dice.k===0?'　'+bLabel(p.dev)+'：もどる':''}`,AX,AY-70-60-58,{s:17,col:'#fff',st:C.ink,sw:5})}
 if(G.customUI){const u=G.customUI,p=u.p;anc(p);drawDiceBlock(c,AX,AY-118,u.v,{col:C.purple});c.fillStyle=C.gold;c.strokeStyle=C.ink;c.lineWidth=3;for(const k of[-1,1]){c.beginPath();c.moveTo(AX+k*62,AY-118);c.lineTo(AX+k*46,AY-132);c.lineTo(AX+k*46,AY-104);c.closePath();c.fill();c.stroke()}
   if(p.human)txt(c,'◀▶でえらぶ　'+aLabel(p.dev)+'：けってい',AX,AY-176,{s:17,col:'#fff',st:C.ink,sw:5})}
 if(G.stepsLeft>0&&G.cur>=0&&!G.dice){const p=P(G.cur);anc(p);const bx=AX,by=AY-92;circ(c,bx,by,22);c.fillStyle='#fff';c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();txt(c,''+G.stepsLeft,bx,by+1,{s:26,f:FD,w:400,col:C.blueD})}
@@ -734,7 +734,7 @@ function drawBoardScene(c){c.fillStyle=BD.bg;c.fillRect(0,0,W,H);
  drawFx(c,true);
  c.restore();
  if(G.villain){c.fillStyle='rgba(30,10,50,.35)';c.fillRect(0,0,W,H)}
- if(!G.mapView){drawHUD(c);drawDiceUI(c)}else{rr(c,W/2-200,H-70,400,46,23);c.fillStyle=C.ink;c.fill();const p=G.cur>=0?P(G.cur):null;txt(c,`マップ　${p?aLabel(p.dev):'A'}：もどる`,W/2,H-47,{s:20,col:'#fff'})}
+ if(!G.mapView){drawHUD(c);drawDiceUI(c);drawTurnMenu(c)}else{rr(c,W/2-200,H-70,400,46,23);c.fillStyle=C.ink;c.fill();const p=G.cur>=0?P(G.cur):null;txt(c,`マップ　${p?aLabel(p.dev):'A'}：もどる`,W/2,H-47,{s:20,col:'#fff'})}
  if(G.orderUI)drawOrderUI(c);
  drawFx(c,false);drawOverlay(c);drawBanners(c);drawDialog(c)}
 const SEACACHE={};function minDistCache(i,x,y){if(SEACACHE[i]===undefined)SEACACHE[i]=minDistLoop(x,y);return SEACACHE[i]}
@@ -892,18 +892,37 @@ async function playerTurn(p){G.cur=p.i;G.talk=p.i;followPlayer(p);await wait(.35
  if(p.curse)await say('のろいの せいで、こんかいの サイコロは 1〜5しか 出ない…',{owner:p.i});
  const total=await rollPhase(p);
  await wait(.25);await movePlayer(p,total);await wait(.2);await landEvent(p);await wait(.35);G.talk=-1}
-async function turnMenu(p){const opts=[];if(p.items.length)opts.push('アイテムを使う');opts.push('マップを見る','もどる');
- const k=await choose('どうする？',opts,{owner:p.i,cancel:true});const o=opts[k];
- if(o==='マップを見る'){await mapView(p);return null}
- if(o==='アイテムを使う'){const names=p.items.map(id=>`${ITEMS[id].name}`).concat(['やめる']);const j=await choose('どれを使う？ '+p.items.map(id=>ITEMS[id].name+'：'+ITEMS[id].desc).join(' / '),names,{owner:p.i,cancel:true});
-  if(j<0||j>=p.items.length)return null;return await useItem(p,p.items[j])}return null}
 async function mapView(p){G.mapView=true;overview();await wait(.3);await until(()=>Input.pressed(p.dev,'a')||Input.pressed(p.dev,'b'));G.mapView=false;followPlayer(p);await wait(.4)}
-async function rollPhase(p){let mode={count:1},used=false;
+// 自分の番のメニュー（左下）：サイコロ／アイテム／マップ。サイコロ中も B でここに戻れる
+async function turnPick(p,used){const u={p,sel:0,sub:-1,isel:0,t:0,used};G.tmenu=u;let res=null;
+ await until(()=>{u.t+=DT;const d=p.dev;if(u.t<.2)return false;
+  if(u.sub<0){if(Input.rep(d,'up')){u.sel=(u.sel+2)%3;sfx('blip')}if(Input.rep(d,'down')){u.sel=(u.sel+1)%3;sfx('blip')}
+   if(Input.pressed(d,'a')){const o=['dice','item','map'][u.sel];if(o==='item'){if(used||!p.items.length){sfx('beep');u.ng=.5;return false}u.sub=0;u.isel=0;u.t=.2;sfx('ok');return false}res=o;sfx('ok');return true}}
+  else{const n=p.items.length;if(Input.rep(d,'up')){u.isel=(u.isel+n-1)%n;sfx('blip')}if(Input.rep(d,'down')){u.isel=(u.isel+1)%n;sfx('blip')}
+   if(Input.pressed(d,'b')){u.sub=-1;sfx('back');return false}if(Input.pressed(d,'a')){res={item:p.items[u.isel]};sfx('ok');return true}}
+  u.ng=Math.max(0,(u.ng||0)-DT);return false});
+ G.tmenu=null;if(res==='map'){await mapView(p);return null}if(res==='dice')return'dice';
+ if(res&&res.item){const n0=p.items.length;const m=await useItem(p,res.item);return{mode:m,used:p.items.length<n0}}return null}
+async function rollPhase(p){let mode={count:1},used=false,skip=false;
  if(!p.human){const it=cpuItemPlan(p);if(it){mode=await useItem(p,it);used=true}}
- for(;;){if(mode.custom)return await customDie(p);const r=await rollDice(p,mode.count,p.human&&!used);if(r==='menu'){const m=await turnMenu(p);if(m){mode=m;used=true}continue}return r}}
+ for(;;){if(p.human&&!skip){const r=await turnPick(p,used);if(r!=='dice'){if(r&&r.used){mode=r.mode;used=true;skip=true}continue}}skip=false;
+  if(mode.custom)return await customDie(p);const r=await rollDice(p,mode.count,p.human);if(r==='menu')continue;return r}}
+function drawTurnMenu(c){const u=G.tmenu;if(!u)return;const p=u.p,col=CHARS[p.ci].col;const x=30,w=230,bh=54,y0=H-130-3*(bh+8)-44;
+ rr(c,x-8,y0-8,w+16,3*(bh+8)+52,18);c.fillStyle='rgba(43,33,64,.82)';c.fill();txt(c,`${pname(p)} の ばん`,x+w/2,y0+12,{s:18,f:FD,w:400,col:'#fff'});
+ const L=[['dice','サイコロ'],['item',`アイテム（${p.items.length}）`],['map','マップ']];
+ L.forEach(([k,lab],j)=>{const y=y0+30+j*(bh+8),sel=u.sub<0&&j===u.sel,off=k==='item'&&(u.used||!p.items.length);const sh=sel&&k==='item'&&u.ng>0?Math.sin(u.ng*40)*5:0;
+  rr(c,x+sh+(sel?8:0),y,w-(sel?8:0),bh,14);c.fillStyle=sel?'#fff':off?'#bdb5c9':C.paper;c.fill();c.lineWidth=sel?4:3;c.strokeStyle=sel?col:C.ink;c.stroke();
+  const ix=x+sh+(sel?8:0)+30,iy=y+bh/2;if(k==='dice')miniDie(c,ix,iy,30,5);else if(k==='item'){p.items.length?drawItemIcon(c,p.items[0],ix,iy,32):(rr(c,ix-16,iy-16,32,32,8),c.fillStyle='#ddd',c.fill(),c.lineWidth=2,c.strokeStyle=C.ink,c.stroke())}
+  else{c.fillStyle='#e9f3d6';c.beginPath();c.moveTo(ix-16,iy-12);c.lineTo(ix-5,iy-16);c.lineTo(ix+5,iy-12);c.lineTo(ix+16,iy-16);c.lineTo(ix+16,iy+12);c.lineTo(ix+5,iy+16);c.lineTo(ix-5,iy+12);c.lineTo(ix-16,iy+16);c.closePath();c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();c.beginPath();c.moveTo(ix-5,iy-16);c.lineTo(ix-5,iy+12);c.moveTo(ix+5,iy-12);c.lineTo(ix+5,iy+16);c.stroke();c.fillStyle=C.red;circ(c,ix+9,iy-3,3.5);c.fill()}
+  txt(c,lab,ix+28,iy+1,{s:20,a:'left',f:FD,w:400,col:off?'#7a7088':C.ink});if(sel){c.fillStyle=col;c.beginPath();c.moveTo(x-6+sh,iy-10);c.lineTo(x+6+sh,iy);c.lineTo(x-6+sh,iy+10);c.fill()}});
+ const hy=y0+30+3*(bh+8)+2;txt(c,u.used&&u.sub<0?'アイテムは 1ターンに 1回まで':`▲▼ えらぶ　${aLabel(p.dev)} けってい`,x+w/2,hy,{s:14,col:'#fff'});
+ if(u.sub>=0){const ix=x+w+20,iw=380,ih=p.items.length*64+56,iy0=y0+30;rr(c,ix,iy0,iw,ih,16);c.fillStyle=C.paper;c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();
+  p.items.forEach((id,j)=>{const yy=iy0+12+j*64,sel=j===u.isel;if(sel){rr(c,ix+8,yy,iw-16,58,12);c.fillStyle='#fff0c6';c.fill();c.lineWidth=3;c.strokeStyle=col;c.stroke()}
+   drawItemIcon(c,id,ix+40,yy+29,40);txt(c,ITEMS[id].name,ix+72,yy+18,{s:19,a:'left',f:FD,w:400});txt(c,ITEMS[id].desc,ix+72,yy+42,{s:13,a:'left',col:'#5d5270'})});
+  txt(c,`${aLabel(p.dev)} つかう　${bLabel(p.dev)} もどる`,ix+iw/2,iy0+ih-20,{s:15,col:'#6d6280'})}}
 async function rollDice(p,count,allowMenu){G.dice={p,blocks:[],k:0,allowMenu,total:0};for(let k=0;k<count;k++)G.dice.blocks.push({v:randi(1,p.curse?5:10),done:false,pop:0,cyc:0});let total=0;
- for(let k=0;k<count;k++){G.dice.k=k;const b=G.dice.blocks[k];let t=rand(.45,.95)*G.tempo,res=null;
-  await until(()=>{if(allowMenu&&k===0&&p.human&&Input.pressed(p.dev,'b')){res='menu';return true}if(p.human?Input.pressed(p.dev,'a'):(t-=DT)<=0){res='hit';return true}return false});
+ for(let k=0;k<count;k++){G.dice.k=k;const b=G.dice.blocks[k];let t=rand(.45,.95)*G.tempo,res=null,el=0;
+  await until(()=>{el+=DT;if(allowMenu&&k===0&&p.human&&Input.pressed(p.dev,'b')){res='menu';return true}if(p.human?(el>.35&&Input.pressed(p.dev,'a')):(t-=DT)<=0){res='hit';return true}return false});
   if(res==='menu'){G.dice=null;return'menu'}
   b.v=randi(1,p.curse?5:10);b.done=true;b.pop=1;p.jumpT=.3;sfx('hit');burst(p.wx+(k-(count-1)/2)*72,p.wy-118,14,['#fff',C.gold,'#9cc6ff'],{world:true,max:220});total+=b.v;await wait(.4)}
  if(count>1){G.dice.total=total;sfx('ok');await wait(.8)}await wait(.25);G.dice=null;if(p.curse)p.curse=false;return total}
@@ -1005,7 +1024,8 @@ function scoreWinners(sc,mode,teams){if(mode==='ffa'){const m=Math.max(...sc);if
  const ts=teams.groups.map(gr=>gr.reduce((a,i)=>a+sc[i],0));if(ts[0]===ts[1])return[];return teams.groups[ts[0]>ts[1]?0:1].slice()}
 function teamOf(teams,i){return teams.groups.findIndex(g=>g.includes(i))}
 function teamCol(teams,i){if(teams.mode==='ffa')return CHARS[P(i).ci].col;return teams.colors[teamOf(teams,i)]}
-function drawMGTop(c,title,time,vals,teams){rr(c,16,12,W-32,64,18);c.fillStyle='rgba(43,33,64,.82)';c.fill();txt(c,title,36,44,{s:22,a:'left',f:FD,w:400,col:'#fff'});
+let MG_LASTVALS=null;
+function drawMGTop(c,title,time,vals,teams){MG_LASTVALS=vals?vals.slice():null;rr(c,16,12,W-32,64,18);c.fillStyle='rgba(43,33,64,.82)';c.fill();txt(c,title,36,44,{s:22,a:'left',f:FD,w:400,col:'#fff'});
  if(time!==null){txt(c,time>=10?Math.ceil(time)+'':time.toFixed(1),W/2,44,{s:34,f:FD,w:400,col:time<5?'#ff9a8a':C.gold})}
  if(vals){vals.forEach((v,i)=>{if(v===null||v===undefined)return;const x=W-16-4*150+i*150+10;rr(c,x,22,138,44,14);c.fillStyle=teamCol(teams,i);c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();drawChar(c,P(i).ci,x+24,44,15,{noShadow:true});txt(c,''+v,x+92,45,{s:24,f:FD,w:400,col:'#fff',st:C.ink,sw:5})})}}
 // 遊び場ごとに見た目を変える（同じ緑のマス目ばかりにならないように）
@@ -2610,9 +2630,9 @@ function makeMGScene(key,mode,teams,res,back){const def=MGS[key];const PL=PLs(te
    if((S.ready.every(r=>r)&&S.t>.8)||(!humansIn().length&&S.t>2.2)){S.game=def.create(mode,teams);S.phase='count';S.t=0;BGM.play('mg')}}
   else if(S.phase==='practice'){S.game.update(dt);if(S.game.done||S.t>20||(S.t>.6&&humansIn().some(p=>Input.pressed(p.dev,'b')))){S.phase='intro';S.t=.45;S.game=null;FX.parts=[];FX.floats=[];BGM.play('board');sfx('back')}}
   else if(S.phase==='count'){const n=3-Math.floor(S.t/.8);if(n!==S.beeped){S.beeped=n;if(n>0)sfx('beep');else sfx('go')}if(S.t>=3*.8+.35){S.phase='play';S.t=0}}
-  else if(S.phase==='play'){S.game.update(dt);const tm=S.game.time;if(typeof tm==='number'&&S.prevT!=null&&tm<S.prevT&&tm>0){if(S.prevT>10&&tm<=10&&!S.game.practice)S.spurt=1.4;if(tm<=5){const sec=Math.ceil(tm);if(sec!==S.lastSec){S.lastSec=sec;sfx('tick')}S.last5=true}}else if(typeof tm==='number'&&tm>5)S.last5=false;S.prevT=tm;if(S.spurt>0)S.spurt-=dt;if(S.game.done){S.last5=false;S.phase='finish';S.t=0;sfx('whistle');S.winners=S.game.winners();S.winners.scores=S.game.scores?S.game.scores():null;BGM.play(null)}}
+  else if(S.phase==='play'){S.game.update(dt);const tm=S.game.time;if(typeof tm==='number'&&S.prevT!=null&&tm<S.prevT&&tm>0){if(S.prevT>10&&tm<=10&&!S.game.practice)S.spurt=1.4;if(tm<=5){const sec=Math.ceil(tm);if(sec!==S.lastSec){S.lastSec=sec;sfx('tick')}S.last5=true}}else if(typeof tm==='number'&&tm>5)S.last5=false;S.prevT=tm;if(S.spurt>0)S.spurt-=dt;if(S.game.done){S.last5=false;S.phase='finish';S.t=0;sfx('whistle');S.winners=S.game.winners();S.winners.scores=S.game.scores?S.game.scores():null;S.winners.vals=S.game.resultVals?S.game.resultVals():(MG_LASTVALS&&MG_LASTVALS.some(v=>v!=null)?MG_LASTVALS:scoreFallback(S.winners));BGM.play(null)}}
   else if(S.phase==='finish'){if(S.t>1.4){S.phase='result';S.t=0;if(S.winners.length)sfx('fanfare');else sfx('lose')}}
-  else if(S.phase==='result'){if(S.t>1.0&&(ownerPressed(-1,'a')||(isAuto(-1)&&S.t>2.6)||S.t>8)){S.phase='out';fadeTo(1,.35).then(()=>{scene=back||BOARDSCENE;res(S.winners)})}}};
+  else if(S.phase==='result'){if(S.t>2.2&&(ownerPressed(-1,'a')||(isAuto(-1)&&S.t>5)||S.t>20)){S.phase='out';fadeTo(1,.35).then(()=>{scene=back||BOARDSCENE;res(S.winners)})}}};
  S.draw=c=>{if(S.phase==='intro'){drawMGIntro(c,def,mode,teams,S);return}
   S.game.draw(c);drawFx(c,false);
   if(S.phase==='play'&&S.last5){const k=(S.game.time%1);c.save();c.globalAlpha=.25*k;const vg=c.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,H*.85);vg.addColorStop(0,'rgba(255,40,40,0)');vg.addColorStop(1,'rgba(255,40,40,1)');c.fillStyle=vg;c.fillRect(0,0,W,H);c.restore()}
@@ -2641,15 +2661,26 @@ function mgRanks(winners,teams){const sc=winners.scores;if(teams.mode!=='ffa'||!
  const wmin=Math.min(...winners.map(i=>sc[i])),wmax=Math.max(...winners.map(i=>sc[i])),lmax=Math.max(...L.map(i=>sc[i])),lmin=Math.min(...L.map(i=>sc[i]));
  let dir=0;if(wmin>=lmax)dir=1;else if(wmax<=lmin)dir=-1;if(!dir||L.some(i=>!Number.isFinite(sc[i])))return null;
  const r={};for(const i of L)r[i]=winners.length+L.filter(j=>dir*sc[j]>dir*sc[i]).length+1;return r}
-function drawMGResult(c,winners,teams,t){c.fillStyle='rgba(20,10,40,.6)';c.fillRect(0,0,W,H);const k=easeBack(Math.min(1,t*2.5));
- txt(c,winners.length?'勝ち！':'ひきわけ',W/2,150,{s:100*k,f:FD,w:400,col:winners.length?C.gold:'#fff',st:C.ink,sw:14});
- const n=winners.length;winners.forEach((i,j)=>{const x=W/2+(j-(n-1)/2)*230;drawChar(c,P(i).ci,x,380,62,{mood:'happy',jump:Math.abs(Math.sin(NOW*6+j))*30});txt(c,pname(P(i)),x,480,{s:28,col:'#fff',st:C.ink,sw:6});
-  if(!teams.noCoin){drawCoin(c,x-30,530,16);txt(c,'+10',x+18,532,{s:30,f:FD,w:400,col:C.gold,st:C.ink,sw:6})}});
- const losers=PLs(teams).filter(i=>!winners.includes(i));const rk=mgRanks(winners,teams);if(rk)losers.sort((a,b)=>rk[a]-rk[b]);
- if(losers.length){const bw=losers.length*(rk?150:120)+40;rr(c,W/2-bw/2,572,bw,108,22);c.fillStyle='rgba(20,10,40,.55)';c.fill()}
- losers.forEach((i,j)=>{const x=W/2+(j-(losers.length-1)/2)*(rk?150:120);drawChar(c,P(i).ci,x,640,26,{mood:'sad',alpha:.8});
-  if(rk&&rk[i]){rr(c,x-30,584,60,26,13);c.fillStyle='#fff';c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();txt(c,rk[i]+'位',x,597,{s:17,f:FD,w:400,col:C.ink})}});
- if(t>1&&!isAuto(-1))txt(c,'A / Space / Enter で つぎへ',W/2,H-24,{s:18,col:'#fff'})}
+// 点数を 自分で 表示している ミニゲーム用：scores が 0〜999 の 整数で、勝った人ほど 高いときだけ 点数として 出す
+function scoreFallback(w){const s=w.scores;if(!s||!w.length)return null;const ids=[0,1,2,3].filter(i=>s[i]!=null);if(!ids.length||ids.some(i=>!Number.isInteger(s[i])||s[i]<0||s[i]>999))return null;
+ const L=ids.filter(i=>!w.includes(i));if(L.length&&Math.min(...w.map(i=>s[i]))<Math.max(...L.map(i=>s[i])))return null;return s.slice()}
+function fmtVal(v){if(v==null)return null;if(typeof v==='number'){if(!Number.isFinite(v))return null;return Number.isInteger(v)?String(v):v.toFixed(2)}return String(v)}
+function drawMGResult(c,winners,teams,t){c.fillStyle='rgba(20,10,40,.66)';c.fillRect(0,0,W,H);const k=easeBack(Math.min(1,t*2.5));
+ txt(c,winners.length?'勝ち！':'ひきわけ',W/2,118,{s:90*k,f:FD,w:400,col:winners.length?C.gold:'#fff',st:C.ink,sw:14});
+ const rk=mgRanks(winners,teams),vals=winners.vals,all=PLs(teams);
+ const order=all.slice().sort((a,b)=>{const wa=winners.includes(a)?0:1,wb=winners.includes(b)?0:1;if(wa!==wb)return wa-wb;if(rk&&!wa)return 0;if(rk)return(rk[a]||0)-(rk[b]||0);return 0});
+ const n=order.length,cw=Math.min(270,(W-80)/n),gap=14;
+ order.forEach((i,j)=>{const win=winners.includes(i),x=W/2+(j-(n-1)/2)*cw,cy=200,ch=380,app=Math.min(1,Math.max(0,(t-.15-j*.12)*4)),yo=(1-app)*40;
+  c.save();c.globalAlpha=app;const bx=x-cw/2+gap/2,bw=cw-gap,tc=teams.mode==='ffa'?CHARS[P(i).ci].col:teamCol(teams,i);
+  rr(c,bx,cy+yo,bw,ch,22);c.fillStyle=win?'#fff8e6':'rgba(255,255,255,.82)';c.fill();c.lineWidth=win?6:3;c.strokeStyle=win?C.gold:C.ink;c.stroke();
+  c.save();rr(c,bx,cy+yo,bw,ch,22);c.clip();c.fillStyle=tc;c.fillRect(bx,cy+yo,bw,36);c.restore();rr(c,bx,cy+yo,bw,ch,22);c.lineWidth=win?6:3;c.strokeStyle=win?C.gold:C.ink;c.stroke();
+  const lab=win?(rk?'1位':'勝ち'):(rk&&rk[i]?rk[i]+'位':'');if(lab)txt(c,lab,x,cy+yo+18,{s:22,f:FD,w:400,col:'#fff',st:C.ink,sw:5});
+  drawChar(c,P(i).ci,x,cy+yo+150,win?54:46,{mood:win?'happy':'sad',jump:win?Math.abs(Math.sin(NOW*6+j))*24:0});
+  txt(c,pname(P(i)),x,cy+yo+232,{s:24,f:FD,w:400,col:C.ink});
+  const v=vals?fmtVal(vals[i]):null;if(v!=null){txt(c,'スコア',x,cy+yo+268,{s:15,col:'#6d6280'});txt(c,v,x,cy+yo+302,{s:v.length>5?28:38,f:FD,w:400,col:win?'#c4570a':C.ink})}
+  if(win&&!teams.noCoin){drawCoin(c,x-30,cy+yo+346,15);txt(c,'+10',x+16,cy+yo+348,{s:28,f:FD,w:400,col:C.gold,st:C.ink,sw:6})}
+  c.restore()});
+ if(t>2.2)txt(c,isAuto(-1)?'つぎへ すすみます…':`${(()=>{const h=G.players.find(p=>p.human);return h?aLabel(h.dev):'A'})()} で つぎへ`,W/2,H-30,{s:20,col:'#fff',st:C.ink,sw:5})}
 
 /* ================= 結果発表 ================= */
 const RS={mode:'line',hi:[],ranks:null,showStats:false,drum:false};
@@ -2823,7 +2854,7 @@ function resumeGame(d){const bi=BOARDS.findIndex(b=>b.id===d.board);setBoard(bi<
  for(const p of G.players)if(BOARD.nodes[p.node].type==='shop')p.node=0;
  G.maxTurns=d.maxTurns;G.cpuLv=clamp(d.cpuLv|0,0,2);G.tempo=d.tempo||1;G.bonus=d.bonus!==false;beginBoard(d)}
 let SAVE_INFO=null;
-function goTitle(){resetAsync();SAVE_INFO=loadSave();TITLE.sel=SAVE_INFO?2:0;DLG=null;G.overlay=null;G.dice=null;G.banners=[];G.orderUI=null;G.customUI=null;G.junc=null;G.villain=false;FX.parts=[];FX.floats=[];paused=false;scene=TITLE;BGM.play('board');FADET=0;FADE=0}
+function goTitle(){resetAsync();SAVE_INFO=loadSave();TITLE.sel=SAVE_INFO?2:0;DLG=null;G.overlay=null;G.dice=null;G.tmenu=null;G.banners=[];G.orderUI=null;G.customUI=null;G.junc=null;G.villain=false;FX.parts=[];FX.floats=[];paused=false;scene=TITLE;BGM.play('board');FADET=0;FADE=0}
 BOARDSCENE={update(dt){updatePlayersBoard(dt)},draw(c){drawBoardScene(c)}};
 
 /* ================= COMの番の はやおくり ================= */
