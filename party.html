@@ -2695,10 +2695,11 @@ const SETUP={slots:[null,null,null,null],row:0,opt:loadOpt(),t:0,mode:'party',fo
    if(this.mode==='free'&&this.wins[i])txt(c,`${this.wins[i]}勝`,x+w-18,y+56,{s:18,a:'right',f:FD,w:400,col:C.red});
    if(!s){txt(c,'COM',x+w/2,y+124,{s:40,f:FD,w:400,col:'rgba(43,33,64,.45)'});txt(c,'さんか するには',x+w/2,y+196,{s:18});txt(c,'A / Space / Enter',x+w/2,y+224,{s:20,col:C.redD});continue}
    txt(c,DEVNAME[s.dev],x+w-18,y+31,{s:15,a:'right',col:'#6d6280'});
-   drawChar(c,s.ci,x+w/2,y+124,50,{mood:s.ready?'happy':null,jump:s.ready?Math.abs(Math.sin(NOW*6))*10:0});
-   txt(c,CHARS[s.ci].name,x+w/2,y+202,{s:28,f:FD,w:400});
-   if(!s.ready){c.fillStyle=C.gold;c.strokeStyle=C.ink;c.lineWidth=3;for(const k of[-1,1]){const ax=x+w/2+k*104;c.beginPath();c.moveTo(ax+k*14,y+124);c.lineTo(ax-k*6,y+108);c.lineTo(ax-k*6,y+140);c.closePath();c.fill();c.stroke()}
-    txt(c,`◀▶ えらぶ　${aLabel(s.dev)} けってい　${bLabel(s.dev)} ぬける`,x+w/2,y+240,{s:14})}
+   const cy0=s.ready?124:112;drawChar(c,s.ci,x+w/2,y+cy0,s.ready?50:44,{mood:s.ready?'happy':null,jump:s.ready?Math.abs(Math.sin(NOW*6))*10:0});
+   txt(c,CHARS[s.ci].name,x+w/2,y+(s.ready?202:186),{s:s.ready?28:24,f:FD,w:400});
+   if(!s.ready){const N=CHARS.length,sp=Math.min(26,(w-24)/N),tk=this.taken(i);for(let k=0;k<N;k++){const ix=x+w/2+(k-(N-1)/2)*sp,iy=y+214;if(k===s.ci){circ(c,ix,iy,12);c.fillStyle=C.gold;c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke()}drawChar(c,k,ix,iy-1,8.5,{noShadow:true,alpha:tk.includes(k)?.25:1})}
+    c.fillStyle=C.gold;c.strokeStyle=C.ink;c.lineWidth=3;for(const k of[-1,1]){const ax=x+w/2+k*104;c.beginPath();c.moveTo(ax+k*14,y+cy0);c.lineTo(ax-k*6,y+cy0-16);c.lineTo(ax-k*6,y+cy0+16);c.closePath();c.fill();c.stroke()}
+    {const hs=`◀▶ えらぶ　${aLabel(s.dev)} けってい　${bLabel(s.dev)} ぬける`;c.font=`800 14px ${FB}`;const mw=c.measureText(hs).width;txt(c,hs,x+w/2,y+242,{s:mw>w-20?Math.floor(14*(w-20)/mw):14})}}
    else{rr(c,x+w/2-60,y+222,120,34,17);c.fillStyle=C.green;c.fill();c.lineWidth=3;c.stroke();txt(c,'OK！',x+w/2,y+239,{s:20,col:'#fff'})}
    txt(c,DEVHINT[s.dev],x+w/2,y+h+16,{s:13,col:'#fff',st:C.ink,sw:4})}
   const rows=this.rows(),n=rows.length,rh=Math.min(36,272/n);const FREE=this.mode==='free';const px=FREE?48:180,py=376,pw=FREE?820:920,ph=rh*n+18;
