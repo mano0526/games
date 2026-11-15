@@ -410,7 +410,7 @@ function buildBoard(){const def=BD,wp=def.wp;
  for(const t of['battle','duel'])if(!nodes.some(nd=>nd.type===t)){const c0=nodes.find(nd=>!nd.branch&&nd.type==='blue'&&!ex.has(nd.id)&&nd.id>5);if(c0)c0.type=t}
  {const a=nodes[J],b=nodes[bids[0]],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;let best=[mx+40,my],bs=-1;for(let k=0;k<16;k++){const an=k/16*Math.PI*2;for(const r of[56,72]){const x=mx+Math.cos(an)*r,y=my+Math.sin(an)*r;let md=1e9;for(const nd of nodes){md=Math.min(md,Math.hypot(nd.x-x,nd.y-(y-45)),Math.hypot(nd.x-x,nd.y-y))}if(md>bs){bs=md;best=[x,y]}}}BOARD.gatePos=best}
  {const cand=nodes.filter(nd=>!nd.branch&&nd.type==='blue'&&!ex.has(nd.id)&&nd.id>3);const want=3;for(let k=0;k<want&&cand.length;k++){const idx=Math.floor((k+.5)/want*cand.length);const nd=cand[Math.min(idx,cand.length-1)];if(nd)nd.type='lucky'}}
- BOARD.spec=spec;BOARD.base=base;BOARD.starCands=[...sc,bm];BOARD.nodes=nodes;BOARD.J=J;BOARD.M=M;BOARD.bids=bids;BOARD.branchPts=bd;BOARD.lamps=[];
+ BOARD.shops=shops;BOARD.spec=spec;BOARD.base=base;BOARD.starCands=[...sc,bm];BOARD.nodes=nodes;BOARD.J=J;BOARD.M=M;BOARD.bids=bids;BOARD.branchPts=bd;BOARD.lamps=[];
 }
 const NODE=i=>BOARD.nodes[i];
 // にじの はし（sky）が かかっていない ターンは 分かれ道の 近道を 通れない
@@ -922,14 +922,16 @@ async function shopEvent(p){if(G.fastHop)return;if(p.items.length>=3){if(p.human
  const c0=await choose(`ころころ屋だよ！${G.night?' 今夜は はんがく！':''} アイテム 買っていく？`,['よる','よらない'],{owner:p.i,spk:'shop',cpu:()=>(p.coins>=iprice('double')+SP()||(p.coins<SP()&&p.coins>=8&&Math.random()<.5)||G.night&&p.coins>=10)?0:1});
  if(c0!==0)return;
  // その日の 品ぞろえ：ダブルダイス＋ほかから 4つ（来るたびに かわる）
- const st2=['double',...shuffle(SHOPLIST.filter(y=>y!=='double')).slice(0,4)];const ST=SHOPLIST.filter(x=>st2.includes(x));
+ // 店ごとに 得意な しなもの：1けんめ＝サイコロの店、2けんめ＝いたずらの店（3品は とくい、1品は それ以外）
+ const si=(BOARD.shops||[]).indexOf(p.node),fav=si===1?['warp','steal_coin','steal_star','curse','trap']:['triple','custom','mini','pipe'];
+ const pk=shuffle(fav).slice(0,3);const rest=shuffle(SHOPLIST.filter(y=>y!=='double'&&!pk.includes(y)));const st2=['double',...pk,rest[0]];const ST=SHOPLIST.filter(x=>st2.includes(x));
  const dis=ST.map(id=>iprice(id)>p.coins);
  const cpuPick=()=>{const has=id=>ST.includes(id)&&iprice(id)<=p.coins;const rich=p.coins>=SP()+8;const at=id=>ST.indexOf(id);
   if(has('pipe')&&p.coins>=iprice('pipe')+SP())return at('pipe');
   if(has('steal_star')&&G.players.some(q=>q!==p&&q.stars>0)&&p.coins>=iprice('steal_star')+4)return at('steal_star');
   if(rich&&has('custom'))return at('custom');if(has('steal_coin')&&Math.random()<.4)return at('steal_coin');
   if(has('triple')&&!rich)return at('triple');if(has('curse')&&Math.random()<.3)return at('curse');if(has('double'))return at('double');return ST.length};
- const k=await choose('きょうの しなもの。どれにする？',ST.map(id=>`${ITEMS[id].name} ${iprice(id)}枚`).concat(['やめる']),{owner:p.i,spk:'shop',cancel:true,dis:dis.concat([false]),cpu:cpuPick});
+ const k=await choose(si===1?'いたずら屋の きょうの しなもの。どれにする？':'サイコロ屋の きょうの しなもの。どれにする？',ST.map(id=>`${ITEMS[id].name} ${iprice(id)}枚`).concat(['やめる']),{owner:p.i,spk:'shop',cancel:true,dis:dis.concat([false]),cpu:cpuPick});
  if(k<0||k>=ST.length)return;const id=ST[k];changeCoins(p,-iprice(id));p.items.push(id);await say(`${ITEMS[id].name}を 買った！ ${ITEMS[id].desc}。`,{owner:p.i,spk:'shop'})}
 function effType(n){let t=n.type==='start'?'blue':n.type;if(t==='happening'&&(G.hapToChance||G.night))t='chance';if(G.flip&&n.west){if(t==='blue')t='red';else if(t==='red')t='blue'}return t}
 async function landEvent(p){const n=NODE(p.node);
