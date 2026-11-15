@@ -13,6 +13,7 @@
 | trap.html | ワナワナ・ラン（アルチキ風パーティ足場ゲーム、2D canvas、最大4人＋CPU）。オンラインは自前（各自の端末で動かす方式） |
 | asobi.html | あそび大全（テーブルゲーム集、2〜4人＋COM、1枚の canvas 1280×720＋オンライン用の HTML `#ui`）。オンラインは自前（各自の端末で動かす方式）。netplay.js は使わない |
 | bomber.html | ドッカン・ひろば（ボンバーマン風、2〜4人＋COM）。オンラインは自前（各自の端末で動かす方式） |
+| fall.html | ドロップ・バトル（ぷよテト風、2〜4人＋COM）。オンラインは自前（各自の端末で動かす方式） |
 | netplay.js | パーティ・キッチン用のオンライン部品（リモートプレイ方式）。カートとワナワナは使っていない |
 | netdb.js | 共通部品：各自の端末で動かす方式のDB（`NetDB.open(game)`／`NetDB.mem()`）、全ゲーム共通の部屋一覧 `NetDB.lobby`（np/lobby/）、共通の名前 `NetDB.name` と音量 `NetDB.vol`。カート・ワナワナ・一覧ページ・netplay.js が使う |
 
@@ -156,12 +157,19 @@
 - やられた後（`m.ghost`）：外わくを歩いて 中へボムをなげる（`stepGhost`、4秒に1回、火力2）。
 - テスト：/tmp/claude-0/sp/bb1.py（1台・COM）、bbnet.py（2ページ。スナップショットのハッシュを比べる＝一致を確認済み）、bbmv.py（キー操作）、bbph.py（スマホ）、bbgh.py（なげボム）。`window.__bAuto=1` でその端末の人もCOMの考えで動く。
 
+## ドロップ・バトル（fall.html、2026-11-16 新規）
+- ぷよぷよテトリス風（名前・絵はオリジナル）。1人ずつ「まる」（ぷよ風 6×13、4色、`newPuyo`/`pStep`）か「ブロック」（テトリス風 10×22、SRS・7バッグ・ホールド・Tスピン・B2B・コンボ、`newTet`/`tStep`）をえらぶ（p/{pid}.md、localStorage `fb_md`）。2〜4人＋COM、勝ちぬけ 1/2/3/5回。
+- じゃまは まるのおじゃま数でやりとり（`OJ_LINE=4`＝ブロック1列）。こうげきは まず自分のじゃまと相殺（`attack`）→ のこりを 生きている相手へ じゅんばんに。90秒をすぎると30秒ごとに こうげき×1.25（`margin`）。ブロックは 消さずに置いた時に 最大8列せり上がり、まるは れんさが終わったあと 最大30こ。
+- 同じラウンドは全員 同じ種（同じ順番のブロック／まる）。オンラインは各自の端末で動かし、盤面を `b/{pid}`（8回/秒、`boardSnap`）、こうげき・まけを `e/{n}/{id}`（k:'a' from,to,n／k:'d'）。ホストが のこり1人で結果（`hostStep`）。COM はホストの端末（`tPlan` 置き場所の点数、`pPlan` れんさ・つながり・のびしろ `pPotential`）。
+- テスト：/tmp/claude-0/sp/fb1.py（1台・COM）、fbnet.py（2ページ）、fbph.py（スマホ）。`window.__fAuto=1` でその端末の人もCOMで動く。
+
 ## テスト方法（この作業環境から外部には通信できない）
 - `python3 -m http.server` で配信し、Playwright の同じブラウザコンテキストで2ページ開く。
 - URL に `?np=local` を付けると Firebase の代わりに同じブラウザ内の仕組み（netplay は BroadcastChannel、fakeroom は localStorage）でつながる。
 - Chromium 起動オプション: `--autoplay-policy=no-user-gesture-required --disable-features=WebRtcHideLocalIpsWithMdns`
 
 ## 決定事項・ユーザーの好み
+- 結果が出る場面（サイコロ・カードをめくる・れんさ など）には 動き・音・大きな文字の演出を必ず入れる（「あっさりしすぎ」はNG、2026-11-16 ユーザー指摘）。
 - 作業時間の目安を伝える。嘘・曖昧な情報はNG。案を出したら自分で反論して良い案にする。完成品を出す。
 - 調整は Claude が直接 main に push して反映（ユーザーの手動アップロードは不要になった）。
 - 1つのゲームを複数チャットで同時に編集しない。
