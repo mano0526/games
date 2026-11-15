@@ -2706,7 +2706,93 @@ MGS.hockey={name:'エアホッケー',modes:['1v1','2v2'],roles:m=>['左の ゴ�
    rr(c,W/2-150,82,300,48,24);c.fillStyle=C.ink;c.fill();txt(c,''+g.sc[0],W/2-70,106,{s:34,f:FD,w:400,col:teams.colors[0]==='#3a7fdc'?'#7fb5ff':teams.colors[0]});txt(c,'−',W/2,106,{s:24,col:'#fff'});txt(c,''+g.sc[1],W/2+70,106,{s:34,f:FD,w:400,col:'#ff8a7a'});
    if(g.flash>0)txt(c,'ゴール！',W/2,H/2,{s:90*(1+g.flash*.2),f:FD,w:400,col:C.gold,st:C.ink,sw:12})};
   return g}};
-const MG_ORDER=['coin','mash','quick','stop10','rock','sumo','dodge','paint','jump','memory','flags','count','boat','pilot','bomb','tug','tag','hammer','keeper','tunnel','hotbomb','tiles','cups','rope','tower','fish','mole','balloon','treasure','math','silhouette','cannon','raft','volley','fruit','snow','fall','rhythm','sushi','firefly','race','crush','hockey'];
+/* --- コインどろぼう合戦（2vs2／バトルロイヤル）：まん中の コインを 自分の 基地へ。あいての 基地からも ぬすめる --- */
+MGS.raid={name:'コインどろぼう合戦',modes:['2v2','ffa'],desc:m=>'まん中に わいてくる コインを ひろって 自分の 基地に もちかえろう！ もてるのは 3まいまで。あいての 基地からも ぬすめるよ。Aの タックルで あいての コインを ばらまかせろ！ 30秒で 基地の コインが 多い '+(m==='ffa'?'人':'チーム')+'の 勝ち。',
+ ctl:'いどう：スティック / 十字　A：タックル（コインを おとさせる）',
+ create(mode,teams){const ar={x:120,y:140,w:1040,h:540};const cx=ar.x+ar.w/2,cy=ar.y+ar.h/2;
+  const own=i=>mode==='ffa'?i:teamOf(teams,i),nOwn=mode==='ffa'?4:2;
+  const basePos=mode==='ffa'?[[ar.x+90,ar.y+90],[ar.x+ar.w-90,ar.y+90],[ar.x+90,ar.y+ar.h-90],[ar.x+ar.w-90,ar.y+ar.h-90]]:[[ar.x+90,cy],[ar.x+ar.w-90,cy]];
+  const g={ar,time:30,done:false,ai:[],coins:[],bank:new Array(nOwn).fill(0),ct:0,rt:[0,0,0,0],tg:[null,null,null,null]};
+  g.actors=[0,1,2,3].map(i=>{const b=basePos[own(i)];const a=mkActor(i,b[0]+(mode==='ffa'?0:(teams.groups[own(i)].indexOf(i)?40:-40)*0)+(mode==='ffa'?0:0),b[1]+(mode==='ffa'?0:(teams.groups[own(i)].indexOf(i)?60:-60)));a.carry=0;a.cd=0;a.dash=0;a.stun=0;a.fx=1;a.fy=0;return a});
+  const spawn=(x,y,vx,vy)=>g.coins.push({x,y,vx:vx||0,vy:vy||0,t:0});for(let k=0;k<8;k++)spawn(cx+rand(-90,90),cy+rand(-90,90));
+  const atBase=a=>{const b=basePos[own(a.pi)];return Math.hypot(a.x-b[0],a.y-b[1])<70};
+  g.update=dt=>{g.time-=dt;if(g.time<=0){g.time=0;g.done=true;return}g.ct-=dt;if(g.ct<=0&&g.coins.length<14){g.ct=.55;spawn(cx+rand(-70,70),cy+rand(-70,70))}g.think(dt);
+   for(const c of g.coins){c.t+=dt;c.x=clamp(c.x+c.vx*dt,ar.x+14,ar.x+ar.w-14);c.y=clamp(c.y+c.vy*dt,ar.y+14,ar.y+ar.h-14);c.vx*=Math.pow(.05,dt);c.vy*=Math.pow(.05,dt)}
+   for(const a of g.actors){a.cd=Math.max(0,a.cd-dt);a.dash=Math.max(0,a.dash-dt);a.stun=Math.max(0,a.stun-dt);const inp=a.stun>0?{x:0,y:0}:mgIn(g,a.pi);const m=Math.hypot(inp.x||0,inp.y||0);if(m>.3){a.fx=inp.x/m;a.fy=inp.y/m}
+    if(inp.a&&a.cd<=0&&a.stun<=0){a.dash=.22;a.cd=.9;a.vx=a.fx*620;a.vy=a.fy*620;sfx('hop')}
+    moveActor(a,inp,a.dash>0?620:(a.carry>=3?220:270),dt,ar);
+    if(a.carry<3&&a.stun<=0)for(let k=g.coins.length-1;k>=0;k--){const c=g.coins[k];if(c.t>.35&&Math.hypot(c.x-a.x,c.y-a.y)<34){g.coins.splice(k,1);a.carry++;sfx('coin');if(a.carry>=3)break}}
+    if(a.carry>0&&atBase(a)){g.bank[own(a.pi)]+=a.carry;floatText(a.x,a.y-70,'+'+a.carry,C.gold,{size:26});a.carry=0;sfx('ok')}
+    // あいての 基地から ぬすむ（1まいずつ）
+    for(let o=0;o<nOwn;o++){if(o===own(a.pi)||a.carry>=3||g.bank[o]<=0)continue;const b=basePos[o];if(Math.hypot(a.x-b[0],a.y-b[1])<60){a.steal=(a.steal||0)+dt;if(a.steal>.45){a.steal=0;g.bank[o]--;a.carry++;sfx('evil');floatText(b[0],b[1]-50,'-1','#ff8a7a',{size:22})}}}}
+   for(const a of g.actors){if(a.dash<=0)continue;for(const b of g.actors){if(a===b||own(a.pi)===own(b.pi)||b.stun>0)continue;if(Math.hypot(a.x-b.x,a.y-b.y)<a.r+b.r+4){b.stun=.7;b.vx=a.vx*.6;b.vy=a.vy*.6;a.dash=0;sfx('thud');
+     for(let k=0;k<b.carry;k++){const an=rand(0,Math.PI*2);spawn(b.x,b.y,Math.cos(an)*rand(200,380),Math.sin(an)*rand(200,380))}if(b.carry)burst(b.x,b.y-30,10,[C.gold,'#fff'],{max:200});b.carry=0}}}
+   separate(g.actors)};
+  g.think=dt=>{const lv=LV();for(const a of g.actors){const i=a.pi;if(P(i).human)continue;g.rt[i]-=dt;
+    const myB=basePos[own(a.pi)];let tx,ty,act=false;
+    if(a.carry>=3||(a.carry>0&&(g.time<4||Math.hypot(a.x-myB[0],a.y-myB[1])<200))){tx=myB[0];ty=myB[1]}
+    else{if(g.rt[i]<=0||!g.coins.includes(g.tg[i])){g.rt[i]=[.6,.35,.2][lv];let best=null,bs=1e9;for(const c of g.coins){const s=Math.hypot(c.x-a.x,c.y-a.y)+rand(0,[200,80,20][lv]);if(s<bs){bs=s;best=c}}g.tg[i]=best;
+       // 強い COM は ゆたかな 基地を ねらう
+       if(lv>0){let rich=-1,rv=0;for(let o=0;o<nOwn;o++)if(o!==own(a.pi)&&g.bank[o]>rv){rv=g.bank[o];rich=o}if(rich>=0&&rv>=[99,6,4][lv]&&(!best||bs>220))g.tg[i]={x:basePos[rich][0],y:basePos[rich][1],base:true}}}
+     const c=g.tg[i];if(c){tx=c.x;ty=c.y}else{tx=cx;ty=cy}}
+    // 近くの コインを もっている あいてに タックル
+    for(const b of g.actors){if(own(b.pi)===own(a.pi)||b.carry<1||b.stun>0)continue;const d=Math.hypot(b.x-a.x,b.y-a.y);if(d<[90,130,160][lv]&&a.carry<2){tx=b.x;ty=b.y;if(d<[70,100,120][lv]&&a.cd<=0&&Math.random()<[.03,.08,.15][lv]){act=true;const l=d||1;a.fx=(b.x-a.x)/l;a.fy=(b.y-a.y)/l}}}
+    const s=seek(a,tx,ty,10);g.ai[i]={x:s.x,y:s.y,a:act}}};
+  g.vals=()=>g.actors.map(a=>mode==='ffa'?g.bank[a.pi]:g.bank[own(a.pi)]);
+  g.scores=()=>g.vals();g.winners=()=>{if(mode==='ffa'){const m=Math.max(...g.bank);return m>0?g.bank.map((v,i)=>v===m?i:-1).filter(i=>i>=0):[]}return g.bank[0]===g.bank[1]?[]:teams.groups[g.bank[0]>g.bank[1]?0:1].slice()};
+  g.draw=c=>{drawFloor(c,ar,'ruins');
+   basePos.forEach((b,o)=>{const col=mode==='ffa'?CHARS[P(o).ci].col:teams.colors[o];c.fillStyle=col+'55';circ(c,b[0],b[1],70);c.fill();c.lineWidth=5;c.strokeStyle=col;c.setLineDash([12,8]);c.stroke();c.setLineDash([]);
+    c.fillStyle='#8a5a2e';rr(c,b[0]-34,b[1]-16,68,40,8);c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();c.fillStyle='#a8743c';rr(c,b[0]-38,b[1]-30,76,18,6);c.fill();c.stroke();
+    const n=Math.min(12,g.bank[o]);for(let k=0;k<n;k++)drawCoin(c,b[0]-24+(k%6)*10,b[1]-36-Math.floor(k/6)*10,8);txt(c,''+g.bank[o],b[0],b[1]+50,{s:28,f:FD,w:400,col:'#fff',st:col,sw:7})});
+   c.fillStyle='rgba(255,220,90,.25)';circ(c,cx,cy,110);c.fill();
+   for(const co of g.coins)drawCoin(c,co.x,co.y,12);
+   for(const a of g.actors.slice().sort((p,q)=>p.y-q.y)){drawActor(c,a,{mood:a.stun>0?'dizzy':a.carry>=3?'happy':null});for(let k=0;k<a.carry;k++)drawCoin(c,a.x-12+k*12,a.y-a.r*2.7,9);if(a.dash>0){c.strokeStyle=C.gold;c.lineWidth=4;circ(c,a.x,a.y-20,34);c.stroke()}}
+   drawMGTop(c,'コインどろぼう合戦',g.time,g.vals(),teams)};
+  return g}};
+/* --- おしだまサッカー（2vs2）：大きな ボールを おして あいての ゴールへ --- */
+MGS.pushball={name:'おしだまサッカー',modes:['2v2','1v1'],desc:()=>'大きな ボールに 体当たりして、あいての ゴールに おしこもう！ Aの ダッシュで 強く おせる。先に 3点 か、40秒で 多い ほうの 勝ち。同点なら そのとき ボールが あいての 陣地に ある チームの 勝ち！',
+ ctl:'いどう：スティック / 十字　A：ダッシュ（強く おす）',
+ create(mode,teams){const ar={x:110,y:150,w:1060,h:520};const cy=ar.y+ar.h/2,GH=240,R=56;
+  const side=i=>teamOf(teams,i);const PL=PLs(teams);
+  const g={ar,time:40,done:false,ai:[],sc:[0,0],ball:{x:ar.x+ar.w/2,y:cy,vx:0,vy:0,rot:0},serve:1.2,flash:0,endT:-1};
+  g.actors=PL.map(i=>{const s=side(i),k=teams.groups[s].indexOf(i),n=teams.groups[s].length;const a=mkActor(i,s?ar.x+ar.w-170:ar.x+170,ar.y+ar.h*(n===1?.5:(k?.7:.3)));a.cd=0;a.dash=0;a.fx=s?-1:1;a.fy=0;return a});
+  const reset=()=>{g.ball={x:ar.x+ar.w/2,y:cy,vx:0,vy:0,rot:0};g.serve=1.2;g.actors.forEach(a=>{const s=side(a.pi),k=teams.groups[s].indexOf(a.pi),n=teams.groups[s].length;a.x=s?ar.x+ar.w-170:ar.x+170;a.y=ar.y+ar.h*(n===1?.5:(k?.7:.3));a.vx=a.vy=0})};
+  g.update=dt=>{if(g.done)return;g.time-=dt;g.flash=Math.max(0,g.flash-dt);if(g.endT>=0){g.endT-=dt;if(g.endT<=0)g.done=true;return}if(g.time<=0){g.time=0;g.done=true;return}g.think(dt);
+   const b=g.ball;if(g.serve>0){g.serve-=dt}
+   for(const a of g.actors){a.cd=Math.max(0,a.cd-dt);a.dash=Math.max(0,a.dash-dt);const inp=mgIn(g,a.pi);const m=Math.hypot(inp.x||0,inp.y||0);if(m>.3){a.fx=inp.x/m;a.fy=inp.y/m}
+    if(inp.a&&a.cd<=0){a.dash=.25;a.cd=.85;sfx('hop')}moveActor(a,a.dash>0?{x:a.fx,y:a.fy}:inp,a.dash>0?560:280,dt,ar);
+    if(g.serve>0)continue;const dx=b.x-a.x,dy=b.y-(a.y-20),d=Math.hypot(dx,dy);if(d<R+a.r&&d>0){const nx=dx/d,ny=dy/d;const want=a.dash>0?640:260,vn=b.vx*nx+b.vy*ny;if(vn<want){b.vx+=nx*(want-vn);b.vy+=ny*(want-vn)}a.x-=nx*(R+a.r-d)*.5;a.y-=ny*(R+a.r-d)*.5;if(a.dash>0){a.dash=0;sfx('thud')}}}
+   separate(g.actors);
+   b.x+=b.vx*dt;b.y+=b.vy*dt;b.vx*=Math.pow(.45,dt);b.vy*=Math.pow(.45,dt);const sp=Math.hypot(b.vx,b.vy);if(sp>700){b.vx*=700/sp;b.vy*=700/sp}b.rot+=b.vx*dt/R;
+   if(b.y<ar.y+R){b.y=ar.y+R;b.vy=Math.abs(b.vy)*.7}if(b.y>ar.y+ar.h-R){b.y=ar.y+ar.h-R;b.vy=-Math.abs(b.vy)*.7}
+   // 2.5秒 ほとんど 動かなければ（すみっこで おしあい など）まん中から やりなおし
+   if(g.serve<=0){g.stall=(g.stall||0)+dt;if(!g.sp0)g.sp0={x:b.x,y:b.y};if(Math.hypot(b.x-g.sp0.x,b.y-g.sp0.y)>60){g.stall=0;g.sp0={x:b.x,y:b.y}}if(g.stall>2.5){g.stall=0;g.sp0=null;sfx('whistle');reset()}}
+   const inG=Math.abs(b.y-cy)<GH/2-10;
+   if(b.x<ar.x+R){if(inG){g.sc[1]++;g.flash=1.2;sfx('fanfare');burst(ar.x+20,b.y,24,[teams.colors[1],'#fff',C.gold],{max:360});if(g.sc[1]>=3)g.endT=1.4;else reset()}else{b.x=ar.x+R;b.vx=Math.abs(b.vx)*.7}}
+   if(b.x>ar.x+ar.w-R){if(inG){g.sc[0]++;g.flash=1.2;sfx('fanfare');burst(ar.x+ar.w-20,b.y,24,[teams.colors[0],'#fff',C.gold],{max:360});if(g.sc[0]>=3)g.endT=1.4;else reset()}else{b.x=ar.x+ar.w-R;b.vx=-Math.abs(b.vx)*.7}}};
+  g.think=dt=>{const lv=LV(),b=g.ball;for(const a of g.actors){const i=a.pi;if(P(i).human)continue;const s=side(i),dir=s?-1:1,og=s?ar.x:ar.x+ar.w,mg=s?ar.x+ar.w:ar.x;
+    const mates=g.actors.filter(q=>side(q.pi)===s);const role=mates.length>1?mates.indexOf(a):0;
+    const danger=(b.x-mg)*dir<ar.w*.3;let tx,ty,dash=false;
+    if(role===1&&!danger){tx=mg+dir*ar.w*.3;ty=clamp(b.y,ar.y+80,ar.y+ar.h-80)}
+    else{// ボールの うしろ（ゴールと 反対がわ）に まわりこんで おす
+     const gx=og-b.x,gy=cy-b.y,gl=Math.hypot(gx,gy)||1;const ux=gx/gl,uy=gy/gl;const bx=b.x-ux*(R+40),by=b.y-uy*(R+40)+20;const rx=a.x-b.x,ry=a.y-20-b.y,along=rx*ux+ry*uy,lat=rx*(-uy)+ry*ux;const behind=along<-R*.6&&Math.abs(lat)<26;
+     if(behind){tx=b.x+ux*40;ty=b.y+20+uy*40;dash=Math.hypot(b.x-a.x,b.y-a.y+20)<R+80&&Math.random()<[.03,.08,.15][lv]}else{const side2=(a.y<b.y?-1:1);tx=bx+(-uy)*side2*70;ty=by+ux*side2*70;if(Math.hypot(tx-a.x,ty-a.y)<40){tx=bx;ty=by}}}
+    const sv=seek(a,tx,ty,8),k=[.7,.85,1][lv];g.ai[i]={x:sv.x*k,y:sv.y*k,a:dash};if(dash){const l=Math.hypot(b.x-a.x,b.y-a.y+20)||1;a.fx=(b.x-a.x)/l;a.fy=(b.y+20-a.y)/l}}};
+  g.scores=()=>PLs(teams).map(i=>g.sc[side(i)]);g.resultVals=()=>[0,1,2,3].map(i=>PL.includes(i)?g.sc[side(i)]:null);
+  // 同点なら ボールが あいての 陣地に ある チームの 勝ち（まん中 ±30 は ひきわけ）
+  g.winners=()=>{if(g.sc[0]!==g.sc[1])return teams.groups[g.sc[0]>g.sc[1]?0:1].slice();const dx=g.ball.x-(ar.x+ar.w/2);return Math.abs(dx)<30?[]:teams.groups[dx>0?0:1].slice()};
+  g.draw=c=>{mgBG(c,'#2f7a3a','#225c2b');rr(c,ar.x-16,ar.y-16,ar.w+32,ar.h+32,20);c.fillStyle='#e9e1cf';c.fill();c.lineWidth=5;c.strokeStyle=C.ink;c.stroke();for(let k=0;k<10;k++){c.fillStyle=k%2?'#5fb85a':'#6cc466';c.fillRect(ar.x+k*ar.w/10,ar.y,ar.w/10,ar.h)}
+   for(const s of[0,1]){const gx=s?ar.x+ar.w:ar.x-40;c.fillStyle='rgba(255,255,255,.9)';c.fillRect(gx,cy-GH/2,40,GH);c.strokeStyle='rgba(43,33,64,.25)';c.lineWidth=2;for(let k=1;k<8;k++){c.beginPath();c.moveTo(gx,cy-GH/2+k*GH/8);c.lineTo(gx+40,cy-GH/2+k*GH/8);c.stroke()}for(let k=1;k<4;k++){c.beginPath();c.moveTo(gx+k*10,cy-GH/2);c.lineTo(gx+k*10,cy+GH/2);c.stroke()}c.lineWidth=5;c.strokeStyle=teams.colors[s];c.strokeRect(gx,cy-GH/2,40,GH)}
+   c.strokeStyle='rgba(255,255,255,.8)';c.lineWidth=5;c.beginPath();c.moveTo(ar.x+ar.w/2,ar.y);c.lineTo(ar.x+ar.w/2,ar.y+ar.h);c.stroke();circ(c,ar.x+ar.w/2,cy,80);c.stroke();
+   for(const s of[0,1]){const gx=s?ar.x+ar.w:ar.x;c.fillStyle='rgba(255,255,255,.75)';c.fillRect(s?gx-8:gx,cy-GH/2,8,GH);c.strokeStyle=teams.colors[s];c.lineWidth=8;c.beginPath();c.moveTo(gx,cy-GH/2);c.lineTo(gx+(s?-24:24),cy-GH/2);c.moveTo(gx,cy+GH/2);c.lineTo(gx+(s?-24:24),cy+GH/2);c.stroke();
+    c.strokeStyle='rgba(255,255,255,.5)';c.lineWidth=2;for(let k=0;k<6;k++){c.beginPath();c.moveTo(gx,cy-GH/2+k*GH/5);c.lineTo(gx+(s?24:-24),cy-GH/2+k*GH/5);c.stroke()}}
+   const b=g.ball;const items=[...g.actors.map(a=>({y:a.y,f:()=>{c.fillStyle=teams.colors[side(a.pi)];ell(c,a.x,a.y+2,30,11);c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();drawActor(c,a);if(a.dash>0){c.strokeStyle=C.gold;c.lineWidth=4;circ(c,a.x,a.y-20,32);c.stroke()}}})),{y:b.y+20,f:()=>{c.fillStyle='rgba(0,0,0,.2)';ell(c,b.x,b.y+R*.85,R*.9,R*.25);c.fill();c.save();c.translate(b.x,b.y);c.rotate(b.rot);circ(c,0,0,R);c.fillStyle='#fff';c.fill();c.lineWidth=5;c.strokeStyle=C.ink;c.stroke();c.fillStyle=C.ink;for(let k=0;k<5;k++){const an=k/5*Math.PI*2;c.beginPath();for(let j=0;j<5;j++){const aa=an+j/5*Math.PI*2;const px=Math.cos(an)*R*.55+Math.cos(aa)*R*.2,py=Math.sin(an)*R*.55+Math.sin(aa)*R*.2;j?c.lineTo(px,py):c.moveTo(px,py)}c.closePath();c.fill()}c.beginPath();for(let j=0;j<5;j++){const aa=j/5*Math.PI*2-Math.PI/2;j?c.lineTo(Math.cos(aa)*R*.22,Math.sin(aa)*R*.22):c.moveTo(Math.cos(aa)*R*.22,Math.sin(aa)*R*.22)}c.closePath();c.fill();c.restore()}}];
+   items.sort((p,q)=>p.y-q.y).forEach(o=>o.f());
+   if(g.time<10&&g.sc[0]===g.sc[1]){const dx=b.x-(ar.x+ar.w/2);if(Math.abs(dx)>=30){const s=dx>0?0:1;c.fillStyle=teams.colors[s]+'33';c.fillRect(dx>0?ar.x+ar.w/2:ar.x,ar.y,ar.w/2,ar.h);txt(c,'いま リード！',dx>0?ar.x+ar.w*.75:ar.x+ar.w*.25,ar.y+30,{s:22,f:FD,w:400,col:'#fff',st:teams.colors[s],sw:6})}}
+   drawMGTop(c,'おしだまサッカー',g.time,null,teams);rr(c,W/2-130,84,260,46,23);c.fillStyle=C.ink;c.fill();txt(c,''+g.sc[0],W/2-60,107,{s:32,f:FD,w:400,col:teams.colors[0]});txt(c,'−',W/2,107,{s:24,col:'#fff'});txt(c,''+g.sc[1],W/2+60,107,{s:32,f:FD,w:400,col:teams.colors[1]});
+   if(g.flash>0)txt(c,'ゴール！',W/2,H/2,{s:90,f:FD,w:400,col:C.gold,st:C.ink,sw:12})};
+  return g}};
+const MG_ORDER=['coin','mash','quick','stop10','rock','sumo','dodge','paint','jump','memory','flags','count','boat','pilot','bomb','tug','tag','hammer','keeper','tunnel','hotbomb','tiles','cups','rope','tower','fish','mole','balloon','treasure','math','silhouette','cannon','raft','volley','fruit','snow','fall','rhythm','sushi','firefly','race','crush','hockey','raid','pushball'];
 const PLs=t=>t.players||[0,1,2,3];
 
 
