@@ -207,7 +207,7 @@ GAMES.push({key:'four',name:'コネクトフォー',min:2,max:2,desc:'上から 
   return g}});
 
 /* ================= ドット＆ボックス（2〜4人） ================= */
-GAMES.push({key:'dots',name:'ドット＆ボックス',min:2,max:4,desc:'点と点を 線で むすぶ。四角を かこんだら 自分の ものに なって もう1回！',
+GAMES.push({key:'dots',name:'ドット&ボックス',min:2,max:4,desc:'点と点を 線で むすぶ。四角を かこんだら 自分の ものに なって もう1回！',
  rules:['自分の 番に 線を 1本 引く。','4つめの 辺を 引いて 四角が できたら、その 四角は 自分の もの。もう1回 引ける。','ぜんぶ 引いたら おわり。四角が いちばん 多い 人の 勝ち。','3本目を 引くと、あいてに 四角を あげて しまうので 注意！'],
  thumb(c,x,y,w,h){c.fillStyle=C.paper;c.fillRect(x,y,w,h);const s=w/6;for(let i=0;i<5;i++)for(let j=0;j<4;j++){if((i+j)%3===0){c.fillStyle=SEATC[(i+j)%4].c+'88';c.fillRect(x+s*(i+.5),y+s*(j+.5)-10,s,s)}}c.fillStyle=C.ink;for(let i=0;i<6;i++)for(let j=0;j<5;j++){circ(c,x+s*(i+.5),y+s*(j+.5)-10,4);c.fill()}},
  create(n){const CW=n<=2?5:6,CH=n<=2?4:5;// 四角の 数
@@ -245,7 +245,7 @@ GAMES.push({key:'dots',name:'ドット＆ボックス',min:2,max:4,desc:'点と�
   g.update=dt=>{g.anim=Math.max(0,g.anim-dt)};g.busy=()=>g.anim>0;
   g.ranking=()=>rankBy(g.pts.slice(0,n));g.score=s=>g.pts[s]+'こ';
   g.draw=c=>{bgFelt(c);panel(c,BX-40,BY-40,S*CW+80,S*CH+80,{fill:C.paper});
-   c.strokeStyle='rgba(58,127,220,.12)';c.lineWidth=1;for(let x=BX-40;x<BX+S*CW+40;x+=20){c.beginPath();c.moveTo(x,BY-36);c.lineTo(x,BY+S*CH+36);c.stroke()}
+   
    BOX.forEach((o,i)=>{if(o<0)return;const x=BX+(i%CW)*S,y=BY+Math.floor(i/CW)*S;c.fillStyle=SEATC[o].c+'66';c.fillRect(x+4,y+4,S-8,S-8);txt(c,SEATC[o].n[0],x+S/2,y+S/2,{s:S*.36,f:FD,w:400,col:SEATC[o].d})});
    const human=!isCom(g.turn)&&!g.done;
    E.forEach((e,i)=>{const p=ePos(e);const x1=e.h?p.x-S/2:p.x,y1=e.h?p.y:p.y-S/2,x2=e.h?p.x+S/2:p.x,y2=e.h?p.y:p.y+S/2;
@@ -455,7 +455,7 @@ GAMES.push({key:'ludo',name:'ルドー',min:2,max:4,desc:'サイコロで 1周�
    // サイコロ
    const s=g.turn,rolling=g.roll&&g.roll.t<.6;panel(c,DIE.x-90,DIE.y-62,180,160,{fill:'rgba(255,248,236,.92)',stroke:SEATC[s].c,lw:5});
    drawDie(c,DIE.x,DIE.y,74,g.phase==='roll'&&!g.roll?0:rolling?randi(1,6):g.dice,{rot:rolling?Math.sin(g.roll.t*30)*.3:0});
-   txt(c,g.phase==='roll'?(isCom(s)?'COM が ふります':seatDev(s)==='net'?'ふるのを まっています':'タップ／Aで ふる'):g.phase==='move'?(isCom(s)?'考え中…':seatDev(s)==='net'?'えらんでいます':'うごかす コマを えらぶ'):'',DIE.x,DIE.y+70,{s:13,col:C.sub});
+   txt(c,g.phase==='roll'?(isCom(s)?'COM が ふります':seatDev(s)==='net'?'ふるのを まっています':'タップで ふる！'):g.phase==='move'?(isCom(s)?'考え中…':seatDev(s)==='net'?'えらんでいます':'うごかす コマを えらぶ'):'',DIE.x,DIE.y+66,{s:19,f:FD,w:400,col:SEATC[s].d});
    if(g.phase==='roll'&&g.roll===null){}
    sidePanels(c,[...Array(n).keys()],s=>`${g.pos[s].filter(p=>p===56).length}/${PC} ゴール`);if(g.msgT>0)toast(c,g.msg)};
   g.update0=g.update;g.update=dt=>{g.update0(dt);if(g.phase==='roll'&&g.anim<=0&&g.roll&&g.roll.t>1.5)g.roll=null};
@@ -532,7 +532,7 @@ const DIA=(()=>{const cells=[],key={};for(let x=-8;x<=8;x++)for(let z=-8;z<=8;z+
  const dist=(a,b)=>{const A=cells[a],B=cells[b];return(Math.abs(A.x-B.x)+Math.abs(A.y-B.y)+Math.abs(A.z-B.z))/2};
  const apex=T.map(t=>{let best=t[0],bd=-1;for(const i of t){const c=cells[i],d=Math.max(Math.abs(c.x),Math.abs(c.y),Math.abs(c.z));if(d>bd){bd=d;best=i}}return best});
  return{cells,T,nb,dist,apex,px}})();
-GAMES.push({key:'diamond',name:'ダイヤモンドゲーム',min:2,max:4,desc:'星形の 盤で コマを 進めたり とびこえたり。向かいの 陣地を 先に うめた 人の 勝ち！',
+GAMES.push({key:'diamond',name:'チャイニーズチェッカー',min:2,max:4,desc:'星形の 盤で コマを 進めたり とびこえたり。向かいの 陣地を 先に うめた 人の 勝ち！',
  rules:['自分の 番に コマを 1つ うごかす。となりの あいている 穴へ 1マス、または となりの コマを 1つ とびこえる。','とびこえた 先から さらに とびこえられれば、何回でも つづけて とべる（どの 色の コマでも とびこえられる）。','向かいの 陣地（三角）に 自分の コマ 10こを 先に ぜんぶ 入れた 人の 勝ち。','向かいの 陣地が ぜんぶ うまっていて、自分の コマが 1つでも 入っていれば それでも 勝ち（いじわるで 居すわる コマ対策）。'],
  thumb(c,x,y,w,h){const S=Math.min(w,h)/17.5,cx=x+w/2,cy=y+h/2;c.fillStyle='#d9a565';c.fillRect(x,y,w,h);DIA.cells.forEach((q,i)=>{const p=DIA.px(q);const t=DIA.T.findIndex(T=>T.includes(i));circ(c,cx+p[0]*S,cy+p[1]*S,S*.36);c.fillStyle=t===0?SEATC[0].c:t===3?SEATC[1].c:t===1?SEATC[2].c:'#8a5a2b';c.fill()})},
  create(n){const starts=n===2?[0,3]:n===3?[0,2,4]:[0,1,3,4];const goal=starts.map(k=>(k+3)%6);
@@ -588,7 +588,7 @@ GAMES.push({key:'diamond',name:'ダイヤモンドゲーム',min:2,max:4,desc:'�
 /* ================= 七並べ（2〜4人・手札は 自分にだけ 見える） ================= */
 // カードの 番号は 大富豪と 同じ（マーク×13＋並び 0＝3 … 10＝K, 11＝A, 12＝2）。七並べでは A＝1 … K＝13 として あつかう
 const sv=id=>{const i=id%13;return i===11?1:i===12?2:i+3},sid=(su,v)=>su*13+(v===1?11:v===2?12:v-3);
-GAMES.push({key:'seven',name:'七並べ',min:2,max:4,hidden:true,desc:'7から となりの 数字を じゅんに ならべていく。手札を 先に なくした 人の 勝ち！',
+GAMES.push({key:'seven',name:'7ならべ',min:2,max:4,hidden:true,desc:'7から となりの 数字を じゅんに ならべていく。手札を 先に なくした 人の 勝ち！',
  opts:[{k:'pm',name:'パスできる 回数',vals:[3,5],labels:['3回','5回'],def:0}],
  rules:['はじめに 7は ぜんぶ 場に ならぶ。♦7を 持っていた 人から スタート。','自分の 番に、場の カードの となりの 数字（同じ マーク）を 1まい 出す。A〜6は 下へ、8〜Kは 上へ のびていく。','出せない・出したくない ときは パス（3回まで）。パスを 使いきって さらに パスすると 失格で、手札は ぜんぶ 場に 置かれる。','先に 手札を なくした じゅんに 順位。失格の 人は 最後。'],
  thumb(c,x,y,w,h){c.fillStyle='#2b6a4b';c.fillRect(x,y,w,h);const cw=w/9.5;for(let su=0;su<4;su++)for(let v=4;v<=10;v++){if(Math.abs(v-7)>(su===1?3:su===0?2:1))continue;drawCard(c,x+w/2+(v-7)*cw*1.05-cw/2,y+12+su*(h-20)/4,cw,(h-30)/4,sid(su,v))}},
@@ -637,11 +637,11 @@ GAMES.push({key:'seven',name:'七並べ',min:2,max:4,hidden:true,desc:'7から �
    const others=[];for(let k=1;k<n;k++)others.push((v+k)%n);
    others.forEach((s,k)=>{const x=16,y=78+k*124,on=s===g.turn&&!g.done;panel(c,x,y,BX-46,112,{fill:on?'#fff':'rgba(255,248,236,.88)',stroke:on?SEATC[s].c:C.ink,lw:on?6:3});avatar(c,x+26,y+26,14,s);c.font=`800 14px ${FB}`;const nm=seatName(s);txt(c,nm.length>8?nm.slice(0,8)+'…':nm,x+46,y+26,{s:14,a:'left',f:FD,w:400,col:SEATC[s].d});
     const cnt=g.hands[s].length;for(let i=0;i<Math.min(cnt,13);i++)drawCard(c,x+14+i*8,y+46,24,34,0,{back:true});txt(c,g.dead.includes(s)?'失格':g.out.includes(s)?'あがり！':`${cnt}まい`,x+BX-60,y+64,{s:14,a:'right',col:g.out.includes(s)?'#c4570a':C.ink});
-    for(let i=0;i<PM;i++){circ(c,x+20+i*16,y+94,5);c.fillStyle=i<g.passes[s]?C.red:'#d8cfbd';c.fill()}txt(c,'パス',x+28+PM*16,y+94,{s:11,a:'left',col:C.sub})});
+    txt(c,`パス ${g.passes[s]}/${PM}`,x+16,y+94,{s:17,a:'left',col:g.passes[s]?C.red:C.sub})});
    // 自分
    const me=v,mh=g.hands[me],len=mh.length,P=handPos(len),myTurn=me===g.turn&&!g.done&&!isCom(me)&&seatDev(me)!=='net'&&!hidden;
-   panel(c,BX-16,BY+4*(BH+8)+16,260,56,{fill:me===g.turn?'#fff':'rgba(255,248,236,.9)',stroke:me===g.turn?SEATC[me].c:C.ink,lw:me===g.turn?5:3,r:14});avatar(c,BX+10,BY+4*(BH+8)+44,14,me);txt(c,seatName(me),BX+32,BY+4*(BH+8)+34,{s:14,a:'left',f:FD,w:400,col:SEATC[me].d});
-   txt(c,g.dead.includes(me)?'失格':g.out.includes(me)?'あがり！':`${len}まい`,BX+32,BY+4*(BH+8)+56,{s:12,a:'left',col:C.sub});for(let i=0;i<PM;i++){circ(c,BX+150+i*16,BY+4*(BH+8)+56,5);c.fillStyle=i<g.passes[me]?C.red:'#d8cfbd';c.fill()}
+   panel(c,BX-16,BY+4*(BH+8)+12,300,64,{fill:me===g.turn?'#fff':'rgba(255,248,236,.9)',stroke:me===g.turn?SEATC[me].c:C.ink,lw:me===g.turn?5:3,r:14});avatar(c,BX+10,BY+4*(BH+8)+44,14,me);txt(c,shortName(me),BX+32,BY+4*(BH+8)+32,{s:19,a:'left',f:FD,w:400,col:SEATC[me].d});
+   txt(c,(g.dead.includes(me)?'失格':g.out.includes(me)?'あがり！':`${len}まい`)+`　パス ${g.passes[me]}/${PM}`,BX+32,BY+4*(BH+8)+56,{s:17,a:'left',col:C.sub});
    for(let i=0;i<len;i++){const q=P(i),id=mh[i],ok=myTurn&&can(id),up=ok?14:0;drawCard(c,q.x,q.y-up,CW,CH,id,{back:hidden,dim:myTurn&&!ok});if(myTurn&&i===g.cur){c.fillStyle=C.gold;c.beginPath();const mx=q.x+Math.min(q.w,CW)/2;c.moveTo(mx-10,q.y-up-16);c.lineTo(mx+10,q.y-up-16);c.lineTo(mx,q.y-up-4);c.fill()}}
    if(myTurn){const sel=g.cur===len,L=legal(me);panel(c,PB.x,PB.y,PB.w,PB.h,{fill:L.length?C.paper:C.gold,stroke:sel?C.red:C.ink,lw:sel?6:3,r:16});txt(c,g.passes[me]>=PM?'パス（失格）':`パス（のこり${PM-g.passes[me]}）`,PB.x+PB.w/2,PB.y+PB.h/2,{s:17,f:FD,w:400});txt(c,'光った カードを タップで 出す',PB.x+PB.w/2,PB.y-14,{s:12,col:'#fff',st:C.ink,sw:3})}
    else if(!g.done&&!hidden)txt(c,isCom(g.turn)?`${seatName(g.turn)} が 考え中…`:`${seatName(g.turn)} の 番`,PB.x+PB.w/2,PB.y+20,{s:15,col:'#fff',st:C.ink,sw:4});
@@ -818,7 +818,7 @@ GAMES.push({key:'mancala',name:'マンカラ',min:2,max:2,desc:'穴の 石を 1�
   return g}});
 
 /* ================= 五目並べ（2人） ================= */
-GAMES.push({key:'gomoku',name:'五目並べ',min:2,max:2,desc:'交互に 石を 置いて、たて・よこ・ななめに 5つ ならべたら 勝ち！',
+GAMES.push({key:'gomoku',name:'五目ならべ',min:2,max:2,desc:'交互に 石を 置いて、たて・よこ・ななめに 5つ ならべたら 勝ち！',
  rules:['黒（1P）と 白（2P）が 交互に 石を 1つずつ 置く。','たて・よこ・ななめの どれかに 自分の 石を 5つ 以上 ならべたら 勝ち。','禁じ手は なし（だれでも 自由に 置ける）。'],
  thumb(c,x,y,w,h){c.fillStyle='#e2b46a';c.fillRect(x,y,w,h);const s=Math.min(w,h)/9;c.strokeStyle='rgba(0,0,0,.5)';for(let i=0;i<9;i++){c.beginPath();c.moveTo(x+w/2-4*s,y+h/2+(i-4)*s);c.lineTo(x+w/2+4*s,y+h/2+(i-4)*s);c.stroke();c.beginPath();c.moveTo(x+w/2+(i-4)*s,y+h/2-4*s);c.lineTo(x+w/2+(i-4)*s,y+h/2+4*s);c.stroke()}
   [[0,0,0],[1,1,0],[2,2,0],[3,3,0],[1,0,1],[2,1,1],[0,2,1],[3,1,1]].forEach(([a,b,v])=>{circ(c,x+w/2+(a-2)*s,y+h/2+(b-2)*s,s*.42);c.fillStyle=v?'#fff':'#222';c.fill();c.strokeStyle='#000';c.stroke()})},
@@ -853,7 +853,7 @@ GAMES.push({key:'gomoku',name:'五目並べ',min:2,max:2,desc:'交互に 石を 
 const PINC=['#e5473c','#f2b705','#2fb36b','#3a7fdc','#9b59d0','#f07fb0'],PINN=['あか','きいろ','みどり','あお','むらさき','ピンク'];
 function drawPin(c,x,y,r,k,o={}){c.save();if(k>=0){c.fillStyle='rgba(0,0,0,.25)';ell(c,x+r*.1,y+r*.35,r*.9,r*.6);c.fill()}circ(c,x,y,r);if(k<0){c.fillStyle='rgba(0,0,0,.18)';c.fill();c.strokeStyle='rgba(255,255,255,.25)';c.lineWidth=2;c.setLineDash([4,4]);c.stroke();c.setLineDash([]);c.restore();return}
  const gr=c.createRadialGradient(x-r*.35,y-r*.4,r*.1,x,y,r);gr.addColorStop(0,'#fff');gr.addColorStop(.25,PINC[k]);gr.addColorStop(1,PINC[k]);c.fillStyle=gr;c.fill();c.lineWidth=o.sel?4:2.5;c.strokeStyle=o.sel?C.gold:C.ink;c.stroke();c.restore()}
-GAMES.push({key:'hitblow',name:'ヒット＆ブロー',min:1,max:2,desc:'かくされた 4本の 色ピンの 色と ならび順を 当てよう。1人でも 2人でも あそべる。',
+GAMES.push({key:'hitblow',name:'ヒット&ブロー',min:1,max:2,desc:'かくされた 4本の 色ピンの 色と ならび順を 当てよう。1人でも 2人でも あそべる。',
  opts:[{k:'dup',name:'同じ色',vals:[0,1],labels:['入らない','入ることがある'],def:0}],
  rules:['かくされた 答えは、6色の ピンから 4本を えらんで ならべた もの。','色を 4つ えらんで 予想すると、「ヒット（色も 場所も 合っている）」と「ブロー（色は 合っているが 場所が ちがう）」の 数が わかる。','ヒントを 手がかりに、8回までに 答えを 当てよう。','2人のときは 同じ 答えを 交互に 予想する（予想と ヒントは 2人とも 見える）。先に 当てた 人の 勝ち。'],
  thumb(c,x,y,w,h){c.fillStyle='#24384f';c.fillRect(x,y,w,h);const r=Math.min(w,h)*.07;[[0,3,1,5],[2,3,4,1],[3,2,1,0]].forEach((row,j)=>{row.forEach((k,i)=>drawPin(c,x+w*.24+i*r*2.6,y+h*.25+j*h*.25,r,k));for(let q=0;q<4;q++){circ(c,x+w*.74+(q%2)*r*1.1,y+h*.25+j*h*.25+(q<2?-r*.5:r*.5),r*.4);c.fillStyle=q<j?'#7a3d1c':q<j+1?'#fff':'rgba(255,255,255,.15)';c.fill()}})},
@@ -909,7 +909,7 @@ GAMES.push({key:'hitblow',name:'ヒット＆ブロー',min:1,max:2,desc:'かく�
    if(g.msgT>0)toast(c,g.msg)};
   return g}});
 
-const MEMO={"reversi": "19世紀の イギリスで 生まれた ゲームが もと。日本では「オセロ」の 名前でも 有名。", "four": "英語では「コネクトフォー」。1974年に アメリカで 発売されて 広まった。", "dots": "19世紀の フランスの 数学者 リュカが 紹介した ことで 知られる、紙と えんぴつの 遊び。", "daifugo": "日本で 人気の トランプゲーム。地方ごとに ローカルルールが たくさん ある。", "ludo": "インドの 古い すごろく「パチーシ」が もとに なった ゲーム。", "yacht": "サイコロ5こで 役を そろえる 遊び。同じ しくみの「ヤッツィー」も 有名。", "diamond": "ドイツの「ハルマ」が もと。英語では「チャイニーズチェッカー」と よばれる。", "seven": "英語では「セブンス」などと よばれる、世界中で 遊ばれている トランプゲーム。", "wolf": "「人狼ゲーム」の しくみを もとにした、話し合いで あそぶ ゲーム。", "oldmaid": "英語の「オールドメイド」が もと。もとは クイーンを 1まい ぬいて 遊んでいた。", "memory": "英語では「コンセントレーション（集中）」などと よばれる。", "mancala": "アフリカや アジアで 古くから 遊ばれてきた「種まき」の 遊びの なかま。", "gomoku": "日本で 古くから 遊ばれてきた。きまりを ふやした 競技は「連珠」と よばれる。", "hitblow": "色ピンで 遊ぶ この形は「マスターマインド」の 名前でも 知られる。"};
+const MEMO={"reversi": "19世紀の イギリスで 生まれた ゲームが もと。日本では「オセロ」の 名前でも 有名。", "four": "英語では「コネクトフォー」。1974年に アメリカで 発売されて 広まった。", "dots": "19世紀の フランスの 数学者 リュカが 紹介した ことで 知られる、紙と えんぴつの 遊び。", "daifugo": "日本で 人気の トランプゲーム。地方ごとに ローカルルールが たくさん ある。", "ludo": "インドの 古い すごろく「パチーシ」が もとに なった ゲーム。", "yacht": "サイコロ5こで 役を そろえる 遊び。同じ しくみの「ヤッツィー」も 有名。", "diamond": "ドイツ生まれの ゲーム。日本では「ダイヤモンドゲーム」の 名前でも 知られる。", "seven": "英語では「セブンス」などと よばれる、世界中で 遊ばれている トランプゲーム。", "wolf": "「人狼ゲーム」の しくみを もとにした、話し合いで あそぶ ゲーム。", "oldmaid": "英語の「オールドメイド」が もと。もとは クイーンを 1まい ぬいて 遊んでいた。", "memory": "英語では「コンセントレーション（集中）」などと よばれる。", "mancala": "アフリカや アジアで 古くから 遊ばれてきた「種まき」の 遊びの なかま。", "gomoku": "日本で 古くから 遊ばれてきた。きまりを ふやした 競技は「連珠」と よばれる。", "hitblow": "色ピンで 遊ぶ この形は「マスターマインド」の 名前でも 知られる。"};
 /* ================= 共通の 描画：プレイヤー欄・お知らせ ================= */
 const shortName=s=>{const q=SEATS[s];if(!q)return'';if(q.name)return q.name.length>5?q.name.slice(0,5)+'…':q.name;return q.com?'COM':`${s+1}P`};
 const seatName=s=>SEATS[s]?(SEATS[s].name?SEATS[s].name+(SEATS[s].com?'（COM）':''):SEATS[s].com?`COM（${SEATC[s].n}）`:`${s+1}P（${SEATC[s].n}）`):'';
