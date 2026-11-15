@@ -125,7 +125,7 @@ touchEl.querySelectorAll('button').forEach(b=>{const k=b.dataset.k;const on=e=>{
 const KB={kb1:{l:['KeyA'],r:['KeyD'],u:['KeyW','Space'],d:['KeyS'],cw:['KeyE'],ccw:['KeyQ'],hold:['ShiftLeft','KeyC'],st:['Escape','KeyP'],a:['Space','KeyE']},
   kb2:{l:['ArrowLeft'],r:['ArrowRight'],u:['ArrowUp'],d:['ArrowDown'],cw:['Slash','Enter'],ccw:['Period'],hold:['ShiftRight'],st:['Backspace'],a:['Enter','Slash']}};
 const KBM={l:['KeyA','ArrowLeft'],r:['KeyD','ArrowRight'],u:['Space','KeyW'],d:['KeyS','ArrowDown'],cw:['ArrowUp','KeyX','KeyE','Enter'],ccw:['KeyZ','KeyQ','ControlLeft'],hold:['KeyC','ShiftLeft','ShiftRight'],st:['Escape','KeyP'],a:['Space','Enter','KeyX']};
-const DEVNAME={kb1:'キーボード左（AD 移動・Q/E 回転・W ストン）',kb2:'キーボード右（矢印・. / 回転・↑ ストン）',touch:'タッチ',any:'この端末'};
+const DEVNAME={kb1:'キーボード左（AD 移動・Q/E 回転・W ストン／まるは はやく）',kb2:'キーボード右（矢印・. / 回転・↑ ストン）',touch:'タッチ',any:'この端末'};
 const BTN=['l','r','u','d','cw','ccw','hold','st','a'];
 let devs={},devPrev={};
 function kbMerged(){return G.active&&!Object.values(S.local).some(l=>l.dev==='kb2');}
@@ -182,15 +182,19 @@ function startRound(v){const rd=v.rd;G.n=rd.n;G.t0=rd.t0;G.seed=rd.seed;G.res=nu
 function elapsed(){return(S.db.now()-G.t0)/1000;}
 function margin(){const t=elapsed();return 1+.25*Math.floor(Math.max(0,t-90)/30);}
 function sendEv(e){const id=(e.pid||'x').replace(/[^A-Za-z0-9-]/g,'')+'_'+(G.seq++)+Math.random().toString(36).slice(2,5);G.EVID.add(id);S.db.set(rp('e/'+G.n+'/'+id),e);onEv(e);}
-function onEv(e){if(e.k==='a'){const P=G.me[e.to];if(P&&P.al){P.pend+=e.n;P.inc=(P.inc||0)+1;P.flash=.5;}const f=G.order.indexOf(e.from),t=G.order.indexOf(e.to);if(f>=0&&t>=0)G.shots.push({f,t,n:e.n,t0:performance.now()});}
+function onEv(e){if(e.k==='a'){const P=G.me[e.to];if(P&&P.al){if(e.dl){(P.wait=P.wait||[]).push({n:e.n,t:e.dl});}else{P.pend+=e.n;P.flash=.5;}}const f=G.order.indexOf(e.from),t=G.order.indexOf(e.to);if(f>=0&&t>=0)G.shots.push({f,t,n:e.n,t0:performance.now()});}
   else if(e.k==='d'){if(!G.dead[e.pid]){G.dead[e.pid]=1;sfx('ko');const P=G.me[e.pid];if(P)P.al=false;}}}
 G.shots=[];
 // こうげき：まず自分の じゃまを 消し（そうさい）、のこりを 相手へ
-function attack(P,oj){oj=Math.floor(oj*margin());if(oj<=0)return;const c=Math.min(P.pend,oj);P.pend-=c;oj-=c;if(c>0)P.msg2={t:'そうさい！',a:1};if(oj<=0)return;
+// 1分30秒すぎの こうげきアップは まる だけ（原作の新しい版と同じ）
+function offset(P,oj){const c=Math.min(P.pend,oj);P.pend-=c;oj-=c;if(c>0)P.msg2={t:'そうさい！',a:1};return oj;}
+function attack(P,oj){if(P.md==='p')oj=Math.floor(oj*margin());if(oj<=0)return;oj=offset(P,oj);if(oj<=0)return;send(P,oj);}
+function send(P,oj){
   const alive=G.order.filter(q=>q!==P.pid&&!G.dead[q]);if(!alive.length)return;
   // ねらいは じゅんばんに かわる
   let to=null;for(let k=1;k<=G.order.length;k++){const q=G.order[(P.tg+k)%G.order.length];if(alive.includes(q)){to=q;P.tg=(P.tg+k)%G.order.length;break;}}
-  sendEv({k:'a',from:P.pid,to,n:oj});}
+  // ブロック → まる への こうげきは 少しおくれて とどく
+  sendEv({k:'a',from:P.pid,to,n:oj,dl:P.md==='t'&&G.mds[to]==='p'?1:0});}
 function die(P){if(!P.al)return;P.al=false;P.dt=performance.now();sendEv({k:'d',pid:P.pid});}
 // ============ ブロック ============
 function newTet(seed){const P={md:'t',g:new Int8Array(TW*TH),q:[],bag:[],R:rng(seed),gr:rng(seed^0x9e37),hold:null,held:false,cur:null,pend:0,combo:-1,b2b:false,al:true,ph:'play',clr:null,acc:0,lockT:0,resets:0,das:0,dasDir:0,lastRot:false,lines:0,msg:null,atk:0,lowest:0};
@@ -221,8 +225,9 @@ function tLock(P){const c=P.cur;let above=true;for(const[a,b]of ROT[c.k][c.r]){c
     P.lines+=n;P.clr={rows,t:.28};P.ph='clear';P.fx=P.fx||[];for(const y of rows)for(let x=0;x<TW;x++)for(let k=0;k<2;k++){const a=Math.random()*7,sp=2+Math.random()*5;P.fx.push({md:'t',x:x+.5,y:y-TV+.5,vx:Math.cos(a)*sp+(x-4.5)*.6,vy:Math.sin(a)*sp-2,col:TCOL[P.g[y*TW+x]]||'#fff',l:.5+Math.random()*.4});}if(n===4||ts||a>=4)P.big=.6;
     const pc=P.g.every((v,i)=>v===0||rows.includes(Math.floor(i/TW)));if(pc){a+=10;name='オールクリア！';}
     P.msg={t:name+(P.combo>0?`  ${P.combo}コンボ`:'')+(diff&&a>0&&P.b2b&&name?'':''),a:1.4};if(n===4||ts)sfx('tetra');else sfx('line');
-    if(a>0)attack(P,a*OJ_LINE);}
-  else{P.combo=-1;if(ts)P.msg={t:'Tスピン',a:1};tGarbage(P);if(P.al)tSpawn(P);}
+    // じゃま予告があれば そうさい、のこりは アタックゲージへ（コンボが切れたら まとめて送る）
+    if(a>0){const r=offset(P,a*OJ_LINE);if(r>0){P.gauge=(P.gauge||0)+r;P.gaugeT=.4;}}}
+  else{const brk=P.combo>=0;P.combo=-1;if(ts)P.msg={t:'Tスピン',a:1};if(brk&&P.gauge>0){send(P,P.gauge);P.gauge=0;}tGarbage(P);if(P.al)tSpawn(P);}
   P.held=false;}
 function tGarbage(P){let lines=Math.min(8,Math.floor(P.pend/OJ_LINE));if(lines<=0)return;P.pend-=lines*OJ_LINE;const hole=Math.floor(P.gr()*TW);
   for(let y=0;y<lines;y++)for(let x=0;x<TW;x++)if(P.g[y*TW+x]){die(P);}
@@ -240,7 +245,8 @@ function tStep(P,inp,dt){if(!P.al)return;if(P.ph==='clear'){P.clr.t-=dt;if(P.clr
 // ============ まるドロップ ============
 function newPuyo(seed){const R=rng(seed^0x51ed);const all=[1,2,3,4,5];for(let i=4;i>0;i--){const j=Math.floor(R()*(i+1));[all[i],all[j]]=[all[j],all[i]];}
   const P={md:'p',g:new Int8Array(PW*PHH),off:new Float32Array(PW*PHH),R:rng(seed^0x77),gr:rng(seed^0x1234),cols:all.slice(0,4),q:[],cur:null,pend:0,al:true,ph:'play',acc:0,lockT:0,resets:0,das:0,dasDir:0,chain:0,score:0,carry:0,pop:null,msg:null,garbNext:false};
-  for(let i=0;i<3;i++)P.q.push(newPair(P));return P;}
+  // さいしょの2手は 3色まで
+  for(let i=0;i<2;i++)P.q.push([P.cols[Math.floor(P.R()*3)],P.cols[Math.floor(P.R()*3)]]);P.q.push(newPair(P));return P;}
 function newPair(P){return[P.cols[Math.floor(P.R()*4)],P.cols[Math.floor(P.R()*4)]];}
 function pFree(P,x,y,g){g=g||P.g;return x>=0&&x<PW&&y<PHH&&(y<0||!g[y*PW+x]);}
 function pFits(P,x,y,r){const o=POFF[r];return pFree(P,x,y)&&pFree(P,x+o[0],y+o[1])&&y>=0;}
@@ -249,7 +255,8 @@ function pMove(P,dx){const c=P.cur;if(pFits(P,c.x+dx,c.y,c.r)){c.x+=dx;if(P.lock
 function pRot(P,dir){const c=P.cur;const r2=(c.r+dir+4)%4;const o=POFF[r2];
   const tries=[[0,0]];if(o[0]===1)tries.push([-1,0]);if(o[0]===-1)tries.push([1,0]);if(o[1]===1)tries.push([0,-1]);
   for(const[dx,dy]of tries){if(pFits(P,c.x+dx,c.y+dy,r2)){c.x+=dx;c.y+=dy;c.r=r2;if(!P.cpu)sfx('rot');if(P.lockT>0&&P.resets<10){P.lockT=0;P.resets++;}return true;}}
-  // せまい所では 上下を ひっくり返す
+  // せまい所では すばやく2回 押すと 上下が ひっくり返る（クイックターン）
+  if(!P.qtT){P.qtT=.35;return false;}P.qtT=0;
   const r3=(c.r+2)%4;for(const dy of[0,-1]){if(pFits(P,c.x,c.y+dy,r3)){c.y+=dy;c.r=r3;if(!P.cpu)sfx('rot');return true;}}return false;}
 function pSpeed(){const t=Math.max(0,elapsed());return Math.min(4,1.1+t/60);}
 function pLock(P){const c=P.cur;const o=POFF[c.r];P.g[c.y*PW+c.x]=c.a;const by=c.y+o[1];if(by>=0)P.g[by*PW+c.x+o[0]]=c.b;P.cur=null;if(!P.cpu)sfx('lock');P.chain=0;P.score=0;pGravity(P);P.ph='fall';}
@@ -262,7 +269,9 @@ function pStepChain(P){const gs=pGroups(P.g);if(!gs.length)return false;P.chain+
   const oj=new Set();for(const c of set){const x=c%PW,y=(c/PW)|0;for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||nx>=PW||ny<1||ny>=PHH)continue;const k=ny*PW+nx;if(P.g[k]===OJ)oj.add(k);}}
   const mult=Math.max(1,Math.min(999,CHAIN_P[Math.min(CHAIN_P.length-1,P.chain-1)]+COLOR_B[colors.size]+gb));P.score+=10*n*mult;
   P.pop={cells:[...set,...oj],t:.42};P.ph='pop';if(P.chain>=3)P.big=.5;P.msg={t:P.chain>=2?`${P.chain}れんさ！`:'',a:1.2};if(!P.cpu||P.chain>1)sfx('chain',P.chain);return true;}
-function pEndChain(P){if(P.chain>0){const tot=P.score+P.carry;let oj=Math.floor(tot/70);P.carry=tot%70;if(P.g.every(v=>!v)){oj+=30;P.msg={t:'ぜんけし！',a:1.6};}attack(P,oj);}
+function pEndChain(P){if(P.chain>0){const tot=P.score+P.carry;let oj=Math.floor(tot/70);P.carry=tot%70;
+    // ぜんけしボーナスは 次の れんさに 上のせ
+    if(P.acb){oj+=30;P.acb=false;}if(P.g.every(v=>!v)){P.acb=true;P.msg={t:'ぜんけし！',a:1.8};sfx('tetra');P.big=.7;}attack(P,oj);}
   if(P.pend>0&&!P.garbNext){P.garbNext=true;const n=Math.min(30,P.pend);P.pend-=n;pDropOj(P,n);P.ph='fall';return;}
   P.garbNext=false;P.ph='play';pSpawn(P);}
 function pDropOj(P,n){const full=Math.floor(n/PW),rest=n%PW;const add=new Array(PW).fill(full);const cols=[0,1,2,3,4,5];for(let i=5;i>0;i--){const j=Math.floor(P.gr()*(i+1));[cols[i],cols[j]]=[cols[j],cols[i]];}for(let i=0;i<rest;i++)add[cols[i]]++;
@@ -273,8 +282,7 @@ function pStep(P,inp,dt){if(!P.al)return;
   if(!P.cur){pSpawn(P);if(!P.al)return;}const c=P.cur;
   if(inp.cw)pRot(P,1);if(inp.ccw)pRot(P,-1);
   if(inp.x){if(inp.x!==P.dasDir){P.dasDir=inp.x;P.das=0;pMove(P,inp.x);}else{P.das+=dt;if(P.das>.15){let k=0;while(P.das>.15+.05&&k<6){P.das-=.05;pMove(P,inp.x);k++;}}}}else P.dasDir=0;
-  if(inp.hard){while(pFits(P,c.x,c.y+1,c.r))c.y++;if(!P.cpu)sfx('drop');pLock(P);return;}
-  const sp=inp.soft?16:pSpeed();P.acc+=sp*dt;while(P.acc>=1){if(pFits(P,c.x,c.y+1,c.r)){c.y++;P.acc-=1;}else{P.acc=Math.min(P.acc,.999);break;}}
+  const sp=inp.soft?18:pSpeed();P.acc+=sp*dt;while(P.acc>=1){if(pFits(P,c.x,c.y+1,c.r)){c.y++;P.acc-=1;}else{P.acc=Math.min(P.acc,.999);break;}}
   if(!pFits(P,c.x,c.y+1,c.r)){P.lockT+=dt*(inp.soft?3:1);if(P.lockT>=.5)pLock(P);}else P.lockT=0;}
 // ============ COM ============
 function tEval(g,lines,lv){let agg=0,holes=0,bump=0,maxH=0;const hs=[];for(let x=0;x<TW;x++){let h=0;for(let y=0;y<TH;y++)if(g[y*TW+x]){h=TH-y;break;}hs.push(h);agg+=h;maxH=Math.max(maxH,h);let seen=false;for(let y=0;y<TH;y++){if(g[y*TW+x])seen=true;else if(seen)holes++;}}
@@ -312,7 +320,7 @@ function cpuInput(P,dt){const ai=P.cpu,lv=ai.lv;const inp={x:0,cw:false,ccw:fals
   if(P.md==='t'){if(pl.useH&&!ai.held){ai.held=true;inp.hold=true;ai.cur=null;return inp;}
     if(c.r!==pl.r){inp.cw=true;return inp;}if(c.x<pl.x){inp.x=1;P.dasDir=0;return inp;}if(c.x>pl.x){inp.x=-1;P.dasDir=0;return inp;}inp.hard=true;return inp;}
   if(c.r!==pl.r){inp.cw=true;return inp;}if(c.x<pl.x){inp.x=1;P.dasDir=0;return inp;}if(c.x>pl.x){inp.x=-1;P.dasDir=0;return inp;}
-  if(lv===0){inp.soft=true;ai.t=0;return inp;}inp.hard=true;return inp;}
+  inp.soft=true;ai.t=0;return inp;}
 // ============ 1フレーム ============
 let acc=0;
 function gameTick(dt){const m=S.meta;if(!m||!m.rd)return;const db=S.db;const t=elapsed();
@@ -321,13 +329,13 @@ function gameTick(dt){const m=S.meta;if(!m||!m.rd)return;const db=S.db;const t=e
   acc+=dt;let k=0;while(acc>=1/120&&k<14){acc-=1/120;k++;
     for(const pid in G.me){const P=G.me[pid];if(!playing||!P.al)continue;let inp;
       if(P.cpu)inp=cpuInput(P,1/120);
-      else{const d=devOf(pid);inp=d&&!G.menu?{x:d.x,soft:!!d.d,hard:d.pu,cw:d.pcw,ccw:d.pccw,hold:d.phold}:{x:0};if(d){d.pu=d.pcw=d.pccw=d.phold=false;}}
+      else{const d=devOf(pid);inp=d&&!G.menu?{x:d.x,soft:!!d.d||(P.md==='p'&&!!d.u),hard:P.md==='t'&&d.pu,cw:d.pcw,ccw:d.pccw,hold:d.phold}:{x:0};if(d){d.pu=d.pcw=d.pccw=d.phold=false;}}
       if(P.md==='t')tStep(P,inp,1/120);else pStep(P,inp,1/120);}}
-  for(const pid in G.me){const P=G.me[pid];if(P.msg){P.msg.a-=dt;if(P.msg.a<=0)P.msg=null;}if(P.msg2){P.msg2.a-=dt;if(P.msg2.a<=0)P.msg2=null;}if(P.flash)P.flash=Math.max(0,P.flash-dt);if(P.big)P.big=Math.max(0,P.big-dt);if(P.fx){for(const f of P.fx){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=14*dt;f.l-=dt;}P.fx=P.fx.filter(f=>f.l>0);}if(P.shake)P.shake=Math.max(0,P.shake-dt);}
+  for(const pid in G.me){const P=G.me[pid];if(P.msg){P.msg.a-=dt;if(P.msg.a<=0)P.msg=null;}if(P.msg2){P.msg2.a-=dt;if(P.msg2.a<=0)P.msg2=null;}if(P.flash)P.flash=Math.max(0,P.flash-dt);if(P.qtT)P.qtT=Math.max(0,P.qtT-dt);if(P.wait&&P.wait.length){for(const w of P.wait)w.t-=dt;const ok=P.wait.filter(w=>w.t<=0);if(ok.length){P.wait=P.wait.filter(w=>w.t>0);for(const w of ok)P.pend+=w.n;P.flash=.5;}}if(P.big)P.big=Math.max(0,P.big-dt);if(P.fx){for(const f of P.fx){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=14*dt;f.l-=dt;}P.fx=P.fx.filter(f=>f.l>0);}if(P.shake)P.shake=Math.max(0,P.shake-dt);}
   G.sendT=(G.sendT||0)-dt;if(G.sendT<=0){G.sendT=1/8;for(const pid in G.me){const P=G.me[pid];const snap=boardSnap(P);const key=JSON.stringify(snap);if(key===P.sent)continue;P.sent=key;snap.t=db.now();snap.n=G.n;db.set(rp('b/'+pid),snap);}}
   if(S.host)hostStep();}
-function boardSnap(P){const s={md:P.md,al:P.al?1:0,pd:P.pend};s.f=Array.from(P.g,v=>v.toString(36)).join('');
-  if(P.md==='t'){if(P.cur)s.c=[P.cur.k,P.cur.r,P.cur.x,P.cur.y];s.q=P.q.slice(0,5).join('');s.h=P.hold||'';s.ln=P.lines;}
+function boardSnap(P){const s={md:P.md,al:P.al?1:0,pd:P.pend+(P.wait?P.wait.reduce((a,w)=>a+w.n,0):0)};if(P.acb)s.ac=1;s.f=Array.from(P.g,v=>v.toString(36)).join('');
+  if(P.md==='t'){if(P.cur)s.c=[P.cur.k,P.cur.r,P.cur.x,P.cur.y];s.q=P.q.slice(0,5).join('');s.h=P.hold||'';s.ln=P.lines;if(P.gauge)s.ga=P.gauge;}
   else{if(P.cur)s.c=[P.cur.a,P.cur.b,P.cur.x,P.cur.y,P.cur.r];s.q=P.q.slice(0,2).map(p=>p.join('')).join('');if(P.pop)s.pp=P.pop.cells;}
   if(P.msg&&P.msg.t)s.m=P.msg.t;if(P.clr)s.cl=P.clr.rows;return s;}
 function devOf(pid){const l=S.local[pid];if(!l)return null;return devs[l.dev]||null;}
@@ -357,8 +365,8 @@ addEventListener('resize',resize);
 // 1人ぶんの わく：横 16 × 縦 24.5（ブロックの1マス＝u）
 function layout(){if(!G.order)return;const n=G.order.length;const coarse=matchMedia('(pointer:coarse)').matches;const land=innerWidth>innerHeight;
   const W0=cv.width,H0=cv.height-((coarse&&!land&&!touchEl.hidden)?220*DPR:0);const side=(coarse&&land&&!touchEl.hidden)?230*DPR:0;
-  let best=null;for(const cols of[n,Math.ceil(n/2)]){const rows=Math.ceil(n/cols);const u=Math.min((W0-side*2)/(cols*16.6),H0/(rows*24.6));if(!best||u>best.u)best={u,cols,rows};}
-  const{u,cols,rows}=best;const pw=16*u,ph=24*u;const AW=W0-side*2;const gx=(AW-cols*pw)/(cols+1),gy=(H0-rows*ph)/(rows+1);
+  let best=null;for(const cols of[n,Math.ceil(n/2)]){const rows=Math.ceil(n/cols);const u=Math.min((W0-side*2)/(cols*16.6),H0/(rows*25.6));if(!best||u>best.u)best={u,cols,rows};}
+  const{u,cols,rows}=best;const pw=16*u,ph=25*u;const AW=W0-side*2;const gx=(AW-cols*pw)/(cols+1),gy=(H0-rows*ph)/(rows+1);
   // 自分のわくを 先に（左上）
   const ord=G.order.slice().sort((a,b)=>(S.local[b]?1:0)-(S.local[a]?1:0));
   PANELS=ord.map((pid,i)=>({pid,x:side+gx+(i%cols)*(pw+gx),y:gy+Math.floor(i/cols)*(ph+gy),u,w:pw,h:ph}));}
@@ -417,15 +425,15 @@ function drawPanel(c,pn,t){const v=viewOf(pn.pid);const u=pn.u;const lw=Math.max
   const m=S.meta;const wins=(m&&m.wins&&m.wins[pn.pid])||0;for(let k=0;k<(m?m.target:1);k++)star(c,pn.x+u*3.1+k*u*.9,pn.y+u*1.85,u*.36,k<wins?'#ffd23a':'rgba(255,255,255,.2)');
   txt(c,MD[md].short,pn.x+pn.w-u*.4,pn.y+u*1.3,u*.7,MD[md].col,'right',false);
   // フィールド
-  const fx=pn.x+u*.9,fy=pn.y+u*3.1,fw=u*10,fh=u*20;
+  const fx=pn.x+u*.9,fy=pn.y+u*4.1,fw=u*10,fh=u*20;
   rr(c,fx-lw,fy-lw,fw+lw*2,fh+lw*2,u*.4);c.fillStyle=md==='t'?'#141026':'#1b1430';c.fill();c.lineWidth=lw;c.strokeStyle='#8a7fb8';c.stroke();
   // じゃま メーター（左）
-  const pend=v?v.pd||0:0;if(pend>0){const lines=pend/OJ_LINE;const hh=Math.min(fh,lines/20*fh*(md==='p'?20/12/1.2:1));c.fillStyle=pend>=30?'#ff3b3b':pend>=12?'#ff9a3c':'#ffd23a';c.fillRect(pn.x+u*.15,fy+fh-hh,u*.5,hh);
+  const pend=v?v.pd||0:0;if(pend>0&&md==='p')drawYokoku(c,pend,fx,fy-u*.08,fw,u,t);else if(pend>0){const lines=pend/OJ_LINE;const hh=Math.min(fh,lines/20*fh*(md==='p'?20/12/1.2:1));c.fillStyle=pend>=30?'#ff3b3b':pend>=12?'#ff9a3c':'#ffd23a';c.fillRect(pn.x+u*.15,fy+fh-hh,u*.5,hh);
     txt(c,String(pend),pn.x+u*.4,fy+fh-hh-u*.6,u*.6,'#fff');}
   if(live&&live.flash){c.fillStyle=`rgba(255,80,80,${live.flash*.5})`;c.fillRect(fx,fy,fw,fh);}
   if(v){if(md==='t')drawTField(c,v,fx,fy,u,pn,t);else drawPField(c,v,fx,fy,u*10/6,pn,t);}
   if(live&&live.big){c.fillStyle=`rgba(255,240,160,${live.big*.45})`;c.fillRect(fx,fy,fw,fh);}
-  if(live&&live.fx){const cs=md==='t'?u:u*10/6;for(const f of live.fx){c.globalAlpha=clamp(f.l*2,0,1);c.fillStyle=f.col;c.beginPath();c.arc(fx+f.x*cs,fy+f.y*cs,cs*.14,0,7);c.fill();}c.globalAlpha=1;}
+  if(live&&live.fx){c.save();c.beginPath();c.rect(fx,fy,fw,fh);c.clip();const cs=md==='t'?u:u*10/6;for(const f of live.fx){c.globalAlpha=clamp(f.l*2,0,1);c.fillStyle=f.col;c.beginPath();c.arc(fx+f.x*cs,fy+f.y*cs,cs*.14,0,7);c.fill();}c.globalAlpha=1;c.restore();}
   if(v&&v.m){const a0=live&&live.msg?live.msg.a:1;const pop=live&&live.msg?1+.6*clamp((a0-(live.msg.a0||a0))/-.2+1,0,1):1;if(live&&live.msg&&live.msg.a0==null)live.msg.a0=live.msg.a;const age=live&&live.msg?(live.msg.a0-live.msg.a):1;const sc=1+.7*Math.max(0,1-age/.18);
     c.save();c.translate(fx+fw/2,fy+fh*.32);c.scale(sc,sc);txt(c,v.m,0,0,u*(v.m.length>8?.95:1.5),'#ffe27a');c.restore();}
   if(live&&live.msg2)txt(c,live.msg2.t,fx+fw/2,fy+fh*.42,u*.9,'#9fe0ff');
@@ -441,7 +449,23 @@ function drawTField(c,v,fx,fy,u,pn,t){c.strokeStyle='rgba(255,255,255,.05)';c.li
   const sx=fx+10*u+u*.5,s=u*.62;txt(c,'つぎ',sx+u*1.35,fy+u*.4,u*.55,'#cfc8e0','center',false);const q=v.q||'';
   for(let i=0;i<Math.min(5,q.length);i++){const k=q[i];const sc=i===0?1:.78;mini(c,k,sx+u*.1,fy+u*1+i*u*2.25,s*sc);}
   txt(c,'ホールド',sx+u*1.35,fy+u*12.6,u*.5,'#cfc8e0','center',false);rr(c,sx,fy+u*13.1,u*2.7,u*2.2,u*.3);c.fillStyle='rgba(255,255,255,.06)';c.fill();if(v.h)mini(c,v.h,sx+u*.15,fy+u*13.4,s*.82,live&&live.held);
-  txt(c,`${v.ln||0}列`,sx+u*1.35,fy+u*16.4,u*.55,'#cfc8e0','center',false);}
+  txt(c,`${v.ln||0}列`,sx+u*1.35,fy+u*16.4,u*.55,'#cfc8e0','center',false);
+  // アタックゲージ（コンボ中に ためた こうげき）
+  const ga=v.ga||0;rr(c,sx+u*.2,fy+u*17.2,u*2.3,u*.5,u*.25);c.fillStyle='rgba(255,255,255,.08)';c.fill();if(ga>0){const k=Math.min(1,ga/40);rr(c,sx+u*.2,fy+u*17.2,u*2.3*k,u*.5,u*.25);c.fillStyle=Math.sin(t*10)>0?'#ffd23a':'#ff9a3c';c.fill();txt(c,`ため ${Math.round(ga/OJ_LINE)}列`,sx+u*1.35,fy+u*18.3,u*.5,'#ffd23a','center',false);}
+  else txt(c,'アタックゲージ',sx+u*1.35,fy+u*18.3,u*.42,'#8a83a3','center',false);}
+// じゃま予告：小さいまる1・大きいまる6・岩30・星180・月360・王冠720
+const YK=[[720,'crown'],[360,'moon'],[180,'star'],[30,'rock'],[6,'big'],[1,'small']];
+function drawYokoku(c,n,fx,fy,fw,u,t){const icons=[];let r=n;for(const[v,k]of YK){while(r>=v&&icons.length<6){icons.push(k);r-=v;}}
+  c.fillStyle='rgba(10,8,20,.7)';rr(c,fx,fy-u*1.25,fw,u*1.2,u*.3);c.fill();const sz=u*1.05;let x=fx+u*.2;const bob=Math.sin(t*8)*u*.06;
+  for(const k of icons){const cx0=x+sz/2,cy0=fy-u*.65+bob;c.lineWidth=Math.max(1,u*.07);c.strokeStyle=INK;
+    if(k==='small'){c.beginPath();c.arc(cx0,cy0,sz*.22,0,7);c.fillStyle='#c9c4d6';c.fill();c.stroke();x+=sz*.55;continue;}
+    if(k==='big'){c.beginPath();c.arc(cx0,cy0,sz*.4,0,7);c.fillStyle='#c9c4d6';c.fill();c.stroke();}
+    else if(k==='rock'){c.beginPath();c.moveTo(cx0-sz*.42,cy0+sz*.32);c.lineTo(cx0-sz*.3,cy0-sz*.25);c.lineTo(cx0+sz*.05,cy0-sz*.4);c.lineTo(cx0+sz*.4,cy0-sz*.12);c.lineTo(cx0+sz*.42,cy0+sz*.32);c.closePath();c.fillStyle='#8d8577';c.fill();c.stroke();}
+    else if(k==='star'){star(c,cx0,cy0,sz*.45,'#ffd23a');c.stroke();}
+    else if(k==='moon'){c.beginPath();c.arc(cx0,cy0,sz*.4,0,7);c.fillStyle='#ffe98a';c.fill();c.stroke();c.beginPath();c.arc(cx0+sz*.16,cy0-sz*.08,sz*.32,0,7);c.fillStyle='#2a2347';c.fill();}
+    else{c.beginPath();c.moveTo(cx0-sz*.42,cy0+sz*.3);c.lineTo(cx0-sz*.42,cy0-sz*.25);c.lineTo(cx0-sz*.2,cy0);c.lineTo(cx0,cy0-sz*.35);c.lineTo(cx0+sz*.2,cy0);c.lineTo(cx0+sz*.42,cy0-sz*.25);c.lineTo(cx0+sz*.42,cy0+sz*.3);c.closePath();c.fillStyle='#ffc93c';c.fill();c.stroke();}
+    x+=sz*.95;}
+  txt(c,String(n),fx+fw-u*.3,fy-u*.65,u*.6,n>=30?'#ff6a6a':'#fff','right');}
 function mini(c,k,x,y,s,dim){const cs=ROT[k][0];const minX=Math.min(...cs.map(a=>a[0])),maxX=Math.max(...cs.map(a=>a[0])),minY=Math.min(...cs.map(a=>a[1])),maxY=Math.max(...cs.map(a=>a[1]));const w=(maxX-minX+1)*s,h=(maxY-minY+1)*s;
   const ox=x+(4*s-w)/2,oy=y+(2*s-h)/2;for(const[a,b]of cs)block(c,ox+(a-minX)*s,oy+(b-minY)*s,s,dim?'#6d6878':TCOL[PK.indexOf(k)+1]);}
 function drawPField(c,v,fx,fy,s,pn,t){const f=v.f||'';const live=v.live;const pp=new Set(v.pp||[]);const flash=Math.sin(t*30)>0;
@@ -486,9 +510,9 @@ function helpScreen(){scr='help';
   h(`<div class="wrap" style="max-width:720px"><h2>あそびかた</h2><div class="panel">
   <p><b>まるドロップ</b>：2こ組で 落ちてくる まるを、同じ色 4つ以上 つなげると 消えます。消えたあとに 上のまるが 落ちて また消えると「れんさ」。れんさが 多いほど 相手に たくさん じゃま（灰色のまる）が とどきます。<b>左から3列目の いちばん上（×じるし）が うまると まけ</b>。灰色のまるは となりで 色が消えると いっしょに 消えます。</p>
   <p><b>ブロック</b>：7しゅるいの ブロックを 回して ならべ、横1列が そろうと 消えます。2列で1、3列で2、<b>4列いっきに（テトラ）で4</b>のこうげき。Tブロックを 回して すきまに入れる「Tスピン」、つづけて消す「コンボ」も こうげきアップ。じゃまは 下から せり上がる列（穴が1つ）で とどきます。上まで つまると まけ。</p>
-  <p><b>じゃまの そうさい</b>：じゃまが とどく前（わくの左の メーター）に こちらが消すと、まず自分の じゃまが へります。のこりが 相手へ。まるのおじゃま4こ ＝ ブロックの1列 です。1分30秒をすぎると 30秒ごとに こうげき力が アップします。</p>
+  <p><b>じゃまの そうさい</b>：とどく予定の じゃま（まるは わくの上の アイコン：小さいまる1・大きいまる6・岩30・星180、ブロックは 左の メーター）があるときに こちらが消すと、まず自分の じゃまが へり、のこりが 相手へ。まるのおじゃま4こ ＝ ブロックの1列 です。ブロックは コンボ中の こうげきを「アタックゲージ」に ため、コンボが切れたときに まとめて 送ります。ブロックから まるへの こうげきは 1秒おくれて とどきます。まるは 1分30秒をすぎると 30秒ごとに こうげき力が アップ。ぜんけし（全部消す）すると 次の れんさに じゃま30こが 上のせされます。</p>
   <p><b>勝ち</b>：さいごまで のこった人が そのラウンドの勝ち。きめた回数（1〜5回）先に勝った人が 優勝。</p>
-  <p><b>操作</b><br>キーボード1人：←→ 移動・↓ はやく・Space ストン（いっきに落とす）・↑/X 右回転・Z 左回転・C ホールド（ブロックだけ）<br>キーボード2人：左＝AD 移動・S はやく・W ストン・E/Q 回転・左Shift ホールド／右＝矢印・↑ ストン・/ と . 回転・右Shift ホールド<br>コントローラー：十字キー 移動・↓ はやく・↑ ストン・A 右回転・B 左回転・X/Y/L/R ホールド・START メニュー<br>スマホ：画面のボタン</p></div>
+  <p><b>操作</b><br>キーボード1人：←→ 移動・↓ はやく・Space ストン（ブロックは いっきに落とす／まるは はやく落とす）・↑/X 右回転・Z 左回転・C ホールド（ブロックだけ）。まるが せまい所で回らないときは 2回すばやく押すと 上下が入れかわります<br>キーボード2人：左＝AD 移動・S はやく・W ストン・E/Q 回転・左Shift ホールド／右＝矢印・↑ ストン・/ と . 回転・右Shift ホールド<br>コントローラー：十字キー 移動・↓ はやく・↑ ストン・A 右回転・B 左回転・X/Y/L/R ホールド・START メニュー<br>スマホ：画面のボタン</p></div>
   <div class="row"><button class="btn ghost" data-nav data-back>もどる</button></div></div>`);ui.querySelector('[data-back]').onclick=titleScreen;}
 function onlineScreen(){scr='online';G.active=false;touchEl.hidden=true;const db=dbOnline();const q=QS.get('room');
   if(!db&&!S.err)S.err='通信の部品を読み込めませんでした。ネットにつながっているか確認して、ページを開き直してください。';
