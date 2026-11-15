@@ -615,6 +615,7 @@ function drawOverlay(c){const ov=G.overlay;if(!ov)return;
   txt(c,ov.sub,W/2,by+bh-24,{s:20,col:'#6d6280'})}}
 
 /* ================= HUD ================= */
+let STK=null;
 function drawHUD(c){const pos=[[16,16],[W-246,16],[16,H-108],[W-246,H-108]];ranking();
  G.players.forEach((p,i)=>{const[x,y]=pos[i];const ch=CHARS[p.ci];const cur=G.cur===i;p.dc+=(p.coins-p.dc)*Math.min(1,DT*9);if(Math.abs(p.coins-p.dc)<.5)p.dc=p.coins;
   c.save();c.translate(x,y);if(cur){c.translate(0,Math.sin(NOW*5)*2);rr(c,-5,-5,240,102,20);c.fillStyle=C.gold;c.fill()}
@@ -631,7 +632,15 @@ function drawHUD(c){const pos=[[16,16],[W-246,16],[16,H-108],[W-246,H-108]];rank
  rr(c,W/2-110,14,220,46,23);c.fillStyle=C.ink;c.fill();txt(c,`ターン ${Math.min(G.turn,G.maxTurns)} / ${G.maxTurns}`,W/2,38,{s:22,f:FD,w:400,col:'#fff'});
  const notes=[];if(G.coinMul>1)notes.push(['青・赤マス 2ばい',C.red]);if(G.hapToChance)notes.push(['?マス→チャンス',C.red]);if(G.flip)notes.push(['西エリア 青⇔赤',C.orangeD]);if(G.night)notes.push(['夜：?→チャンス・ショップ半額','#2a2f6b']);if(SP()!==20)notes.push([`スター ${SP()}コイン`,'#4a7fc0']);
  notes.forEach(([s,col],k)=>{rr(c,W/2-110,64+k*30,220,26,13);c.fillStyle=col;c.fill();txt(c,s,W/2,77+k*30,{s:14,col:'#fff'})});
- if(canFF()){const y=64+notes.length*30;rr(c,W/2-110,y,220,26,13);c.fillStyle=FFON?C.gold:'rgba(43,33,64,.82)';c.fill();txt(c,FFON?'▶▶ はやおくり中':'B長押しで はやおくり',W/2,y+13,{s:14,col:FFON?C.ink:'#fff'})}}
+ // ★までの道のり（原作の「スターまで あと○マス」）。画面の外にあるときは 画面のはしに矢印
+ let ny=64+notes.length*30;
+ if(scene===BOARDSCENE&&G.cur>=0&&G.starNode>=0&&!G.villain){const p=P(G.cur);const k=(STK&&STK.n===p.node&&STK.s===G.starNode)?STK.v:(STK={n:p.node,s:G.starNode,v:stepsToStar(p.node)}).v;
+  if(k<99){rr(c,W/2-110,ny,220,28,14);c.fillStyle=C.paper;c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();drawStar(c,W/2-84,ny+14,10,0,C.gold,2);txt(c,`まで あと ${k} マス`,W/2+8,ny+14,{s:16,col:C.ink});ny+=32}
+  const sn=NODE(G.starNode);const sx=W/2+(sn.x-cam.x)*cam.z,sy=H/2+(sn.y-30-cam.y)*cam.z;const L=60,R=W-60,T=120,B=H-130;
+  if(cam.z>.8&&(sx<L||sx>R||sy<T||sy>B)){const cx=W/2,cy=H/2,dx=sx-cx,dy=sy-cy;const f=Math.min(dx?((dx>0?R:L)-cx)/dx:1e9,dy?((dy>0?B:T)-cy)/dy:1e9);const ex=cx+dx*f,ey=cy+dy*f,a=Math.atan2(dy,dx),bob=Math.sin(NOW*5)*4;
+   c.save();c.translate(ex-Math.cos(a)*bob,ey-Math.sin(a)*bob);c.save();c.rotate(a);c.fillStyle=C.gold;c.strokeStyle=C.ink;c.lineWidth=3;c.beginPath();c.moveTo(44,0);c.lineTo(26,-13);c.lineTo(26,13);c.closePath();c.fill();c.stroke();c.restore();
+   circ(c,0,0,26);c.fillStyle='rgba(43,33,64,.85)';c.fill();c.lineWidth=3;c.strokeStyle=C.gold;c.stroke();drawStar(c,0,-2,14,0,C.gold,2);c.restore()}}
+ if(canFF()){const y=ny;rr(c,W/2-110,y,220,26,13);c.fillStyle=FFON?C.gold:'rgba(43,33,64,.82)';c.fill();txt(c,FFON?'▶▶ はやおくり中':'B長押しで はやおくり',W/2,y+13,{s:14,col:FFON?C.ink:'#fff'})}}
 
 /* ================= カメラ・ボード描画 ================= */
 const cam={x:WW/2,y:WH/2,z:.62,tx:WW/2,ty:WH/2,tz:.62,follow:null};
