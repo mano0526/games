@@ -2917,11 +2917,11 @@ async function resultsFlow(gid){await fadeTo(1,.4);scene=RESULTSCENE;RS.mode='li
  await say('あそんでくれて ありがとう！ また あそぼうね！');if(gid!==GAMEID)return;await fadeTo(1,.5);goTitle()}
 
 /* ================= タイトル・参加画面 ================= */
-const TITLE={sel:0,opts(){const o=[['party','パーティ'],['free','ミニゲーム']];if(SAVE_INFO){const b=BOARDS.find(x=>x.id===SAVE_INFO.board)||BOARDS[0];o.push(['resume',`つづきから（${b.name} ${SAVE_INFO.turn}/${SAVE_INFO.maxTurns}）`])}return o},
+const TITLE={sel:0,opts(){const o=[['party','パーティ'],['free','ミニゲーム'],['cup','ミニゲーム大会'],['surv','サバイバル']];if(SAVE_INFO){const b=BOARDS.find(x=>x.id===SAVE_INFO.board)||BOARDS[0];o.push(['resume',`つづきから（${b.name} ${SAVE_INFO.turn}/${SAVE_INFO.maxTurns}）`])}return o},
  update(dt){const o=this.opts();if(this.sel>=o.length)this.sel=0;
   if(Input.IDS.some(id=>Input.rep(id,'left')||Input.rep(id,'up'))){this.sel=(this.sel+o.length-1)%o.length;sfx('blip')}
   else if(Input.IDS.some(id=>Input.rep(id,'right')||Input.rep(id,'down'))){this.sel=(this.sel+1)%o.length;sfx('blip')}
-  if(Input.anyPressed('a')){initAudio();sfx('ok');const k=o[this.sel][0];if(k==='resume'){const d=loadSave();if(d){resumeGame(d);return}}SETUP.reset(k==='free'?'free':'party');scene=SETUP}},
+  if(Input.anyPressed('a')){initAudio();sfx('ok');const k=o[this.sel][0];if(k==='resume'){const d=loadSave();if(d){resumeGame(d);return}}SETUP.reset(['free','cup','surv'].includes(k)?k:'party');scene=SETUP}},
  draw(c){mgBG(c,'#4fb7e8','#1f72ad');
  c.save();c.translate(W/2,-60);c.fillStyle='rgba(255,255,255,.08)';for(let i=0;i<16;i++){c.rotate(Math.PI/8);c.beginPath();c.moveTo(0,0);c.lineTo(1500,-80);c.lineTo(1500,80);c.closePath();c.fill()}c.restore();
  c.fillStyle='#fdfbf3';ell(c,W/2,690,760,140);c.fill();c.fillStyle=C.sand;ell(c,W/2,700,720,124);c.fill();c.fillStyle=C.grass;ell(c,W/2,730,620,110);c.fill();
@@ -2930,8 +2930,8 @@ const TITLE={sel:0,opts(){const o=[['party','パーティ'],['free','ミニゲ�
  [...t1].forEach((ch,i)=>{const x=W/2-(t1.length-1)*58+i*116,y=150+Math.sin(NOW*3+i*.7)*6;txt(c,ch,x,y,{s:110,f:FD,w:400,col:'#fff',st:C.ink,sw:18})});
  [...t2].forEach((ch,i)=>{const x=W/2-(t2.length-1)*66+i*132,y=278+Math.sin(NOW*3+i*.7+2)*6;txt(c,ch,x,y,{s:128,f:FD,w:400,col:C.gold,st:C.ink,sw:18})});
  CHARS.forEach((ch,i)=>{const sp=Math.min(190,1160/CHARS.length);const x=W/2-(CHARS.length-1)*sp/2+i*sp;drawChar(c,i,x,470,Math.min(40,sp*.32),{jump:Math.abs(Math.sin(NOW*4+i*.9))*22,mood:i%2?'happy':null,lx:Math.sin(NOW+i)})});
- const o=this.opts(),n=o.length,bw=n===3?360:300;o.forEach(([k,s],i)=>{const x=W/2+(i-(n-1)/2)*(bw+20),sel=i===this.sel;rr(c,x-bw/2,568,bw,56,28);c.fillStyle=sel?C.gold:'rgba(255,255,255,.8)';c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();
-  if(sel){c.fillStyle=C.red;c.beginPath();c.moveTo(x-bw/2+16,584);c.lineTo(x-bw/2+32,596);c.lineTo(x-bw/2+16,608);c.closePath();c.fill()}txt(c,s,x+10,596,{s:s.length>12?18:24,f:s.length>12?FB:FD,w:s.length>12?800:400})});
+ const o=this.opts(),n=o.length,gap=n>3?12:20,bw=Math.min(360,(W-80-(n-1)*gap)/n);o.forEach(([k,s],i)=>{const x=W/2+(i-(n-1)/2)*(bw+gap),sel=i===this.sel;rr(c,x-bw/2,568,bw,56,28);c.fillStyle=sel?C.gold:'rgba(255,255,255,.8)';c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();
+  if(sel){c.fillStyle=C.red;c.beginPath();c.moveTo(x-bw/2+16,584);c.lineTo(x-bw/2+32,596);c.lineTo(x-bw/2+16,608);c.closePath();c.fill()}{let fs=s.length>12?18:24;c.font=`${s.length>12?800:400} ${fs}px ${s.length>12?FB:FD}`;const mw=c.measureText(s).width;if(mw>bw-50)fs=Math.max(12,Math.floor(fs*(bw-50)/mw));txt(c,s,x+10,596,{s:fs,f:s.length>12?FB:FD,w:s.length>12?800:400})}});
  txt(c,'◀▶ えらぶ　A / Space / Enter'+(COARSE?' / タップ':'')+' けってい',W/2,642,{s:17,col:'#fff',st:C.ink,sw:5});
  txt(c,gpStatus(),W/2,668,{s:16,col:'#fff',st:C.ink,sw:5});
  txt(c,`1〜4人であそべる すごろくパーティゲーム（COM入り）　ボード${BOARDS.length}つ・ミニゲーム${MG_ORDER.length}しゅるい・キャラ${CHARS.length}人`,W/2,694,{s:15,col:'#fff',st:C.ink,sw:5})}};
@@ -2985,15 +2985,17 @@ const MGPICK={open:false,i:0,scroll:0,t:0,COLS:4,
   c.font=`800 17px ${FB}`;wrap(c,d.desc(d.modes[0]),pw-24).slice(0,6).forEach((l,i)=>txt(c,l,px,y+i*24,{s:17,a:'left'}));y+=6*24+4;
   rr(c,px,y,pw-16,H-40-y-4,12);c.fillStyle='#fff0c6';c.fill();c.font=`800 15px ${FB}`;wrap(c,d.ctl,pw-40).slice(0,3).forEach((l,i)=>txt(c,l,px+12,y+18+i*21,{s:15,a:'left',col:'#6a4a10'}));
   txt(c,`十字 / スティック：えらぶ　${aLabel(dev)}：けってい　${bLabel(dev)}：もどる`,W/2,H-34,{s:17,col:'#6d6280'})}};
-const SETUP={slots:[null,null,null,null],row:0,opt:loadOpt(),t:0,mode:'party',fo:{g:0,m:0,t:0},wins:[0,0,0,0],
+const SETUP={slots:[null,null,null,null],row:0,opt:loadOpt(),t:0,mode:'party',fo:{g:0,m:0,t:0,n:0,v:1},wins:[0,0,0,0],
  reset(mode){MGPICK.open=false;this.slots=[null,null,null,null];this.row=0;this.t=0;this.mode=mode||'party';this.wins=[0,0,0,0]},
  taken(ex){return this.slots.filter((s,i)=>s&&i!==ex).map(s=>s.ci)},
- rows(){const o=this.opt;if(this.mode==='free'){const key=MG_ORDER[this.fo.g%MG_ORDER.length],ms=MGS[key].modes,m=ms[this.fo.m%ms.length],to=teamOpts(m);
+ rows(){const o=this.opt;if(this.mode==='cup')return[['先に かつ数',['3勝','5勝','7勝'][this.fo.n%3],()=>3,'n'],['ミニゲームの かたち',['バトルロイヤルだけ','いろいろ（チーム戦も）'][this.fo.v%2],()=>2,'v'],['COMのつよさ',['よわい','ふつう','つよい'][o.lv],()=>3,'lv'],['決定ボタン（コントローラー）',['じどう','下のボタン（Xbox式）','右のボタン（Switch式）'][o.swap],()=>3,'swap'],['大会スタート！','',null,null]];
+  if(this.mode==='surv')return[['ルール','負けるまで つづく！ COMは だんだん 強くなる',null,null],['さいこう記録',survBest()+' れんしょう',null,null],['決定ボタン（コントローラー）',['じどう','下のボタン（Xbox式）','右のボタン（Switch式）'][o.swap],()=>3,'swap'],['サバイバル スタート！','',null,null]];
+  if(this.mode==='free'){const key=MG_ORDER[this.fo.g%MG_ORDER.length],ms=MGS[key].modes,m=ms[this.fo.m%ms.length],to=teamOpts(m);
    return[['ミニゲーム',MGS[key].name,()=>MG_ORDER.length,'g'],['かたち',MODE_NAME[m],()=>ms.length,'m'],['チーム',to[this.fo.t%to.length],()=>to.length,'t'],['COMのつよさ',['よわい','ふつう','つよい'][o.lv],()=>3,'lv'],['決定ボタン（コントローラー）',['じどう','下のボタン（Xbox式）','右のボタン（Switch式）'][o.swap],()=>3,'swap'],['あそぶ！','',null,null]]}
   return[['ボード',BOARDS[o.board%BOARDS.length].name,()=>BOARDS.length,'board'],['ターン数',TURN_OPTS[o.tn]+(TURN_OPTS[o.tn]===5?'（おためし）':''),()=>TURN_OPTS.length,'tn'],['COMのつよさ',['よわい','ふつう','つよい'][o.lv],()=>3,'lv'],['COMのテンポ',['ふつう','はやい'][o.tempo],()=>2,'tempo'],['ボーナススター',['あり','なし'][o.bonus],()=>2,'bonus'],
    ['ミニゲームの きめかた',['原作どおり（マスの色）','バトルロイヤル多め','ランダム'][o.mgrule],()=>3,'mgrule'],['決定ボタン（コントローラー）',['じどう','下のボタン（Xbox式）','右のボタン（Switch式）'][o.swap],()=>3,'swap'],['ゲームスタート！','',null,null]]},
- change(d){const r=this.rows()[this.row];if(!r||!r[2])return;const lim=r[2](),key=r[3];if(['g','m','t'].includes(key)){this.fo[key]=(this.fo[key]+d+lim*10)%lim;if(key==='g'){this.fo.m=0;this.fo.t=0}if(key==='m')this.fo.t=0}else{this.opt[key]=(this.opt[key]+d+lim*10)%lim;SWAP=this.opt.swap;saveOpt(this.opt)}sfx('blip')},
- update(dt){this.t+=dt;const sl=this.slots;const host=sl.findIndex(s=>s);const allReady=host>=0&&sl.every(s=>!s||s.ready);const rows=this.rows();if(!allReady)MGPICK.open=false;
+ change(d){const r=this.rows()[this.row];if(!r||!r[2])return;const lim=r[2](),key=r[3];if(['g','m','t','n','v'].includes(key)){this.fo[key]=(this.fo[key]+d+lim*10)%lim;if(key==='g'){this.fo.m=0;this.fo.t=0}if(key==='m')this.fo.t=0}else{this.opt[key]=(this.opt[key]+d+lim*10)%lim;SWAP=this.opt.swap;saveOpt(this.opt)}sfx('blip')},
+ update(dt){this.t+=dt;this.warn=Math.max(0,(this.warn||0)-dt);const sl=this.slots;const host=sl.findIndex(s=>s);const allReady=host>=0&&sl.every(s=>!s||s.ready);const rows=this.rows();if(!allReady)MGPICK.open=false;
   for(const id of Input.IDS){if(!Input.connected(id))continue;if(id==='touch'&&!COARSE)continue;const si=sl.findIndex(s=>s&&s.dev===id);
    if(si<0){if(this.t>.3&&(Input.pressed(id,'a')||(id.startsWith('gp')&&Input.pressed(id,'b')))){const f=sl.indexOf(null);if(f>=0){let ci=0;while(this.taken(f).includes(ci))ci++;sl[f]={dev:id,ci,ready:false};sfx('ok')}}
     else if(Input.pressed(id,'b')&&host<0&&!id.startsWith('gp')){sfx('back');scene=TITLE}continue}
@@ -3003,10 +3005,10 @@ const SETUP={slots:[null,null,null,null],row:0,opt:loadOpt(),t:0,mode:'party',fo
    else if(si===host&&allReady&&MGPICK.open){MGPICK.update(id,dt);return}
    else if(si===host&&allReady){const n=rows.length;if(Input.rep(id,'up')){this.row=(this.row+n-1)%n;sfx('blip')}if(Input.rep(id,'down')){this.row=(this.row+1)%n;sfx('blip')}
     if(Input.rep(id,'left'))this.change(-1);if(Input.rep(id,'right'))this.change(1);
-    if(Input.pressed(id,'a')){if(this.row===n-1){sfx('ok');if(this.mode==='free')startFree();else startGame();return}if(rows[this.row][3]==='g'){MGPICK.show(this.fo.g%MG_ORDER.length);sfx('ok');return}this.change(1)}if(Input.pressed(id,'b')){s.ready=false;sfx('back')}}
+    if(Input.pressed(id,'a')){if(this.row===n-1){if(this.mode==='surv'&&this.slots.filter(s=>s).length!==1){sfx('beep');this.warn=2;return}sfx('ok');if(this.mode==='free')startFree();else if(this.mode==='cup')startCup();else if(this.mode==='surv')startSurv();else startGame();return}if(rows[this.row][3]==='g'){MGPICK.show(this.fo.g%MG_ORDER.length);sfx('ok');return}this.change(1)}if(Input.pressed(id,'b')){s.ready=false;sfx('back')}}
    else if(Input.pressed(id,'b')){s.ready=false;sfx('back')}}},
- draw(c){mgBG(c,this.mode==='free'?'#ffd28a':'#7fd0f2',this.mode==='free'?'#f2994a':'#3b98cf');c.fillStyle='rgba(255,255,255,.12)';for(let i=0;i<30;i++){const x=((i*173+NOW*30)%(W+200))-100,y=(i*89)%H;circ(c,x,y,20+(i%4)*8);c.fill()}
-  txt(c,(this.mode==='free'?'ミニゲーム あそび　':'パーティ　')+'あそぶ人は A / Space / Enter で さんか',W/2,44,{s:28,f:FD,w:400,col:'#fff',st:C.ink,sw:8});
+ draw(c){const MGM=this.mode==='free'||this.mode==='cup'||this.mode==='surv';mgBG(c,MGM?'#ffd28a':'#7fd0f2',MGM?'#f2994a':'#3b98cf');c.fillStyle='rgba(255,255,255,.12)';for(let i=0;i<30;i++){const x=((i*173+NOW*30)%(W+200))-100,y=(i*89)%H;circ(c,x,y,20+(i%4)*8);c.fill()}
+  txt(c,({free:'ミニゲーム あそび　',cup:'ミニゲーム大会　',surv:'サバイバル（1人用）　'}[this.mode]||'パーティ　')+(this.mode==='surv'?(this.warn>0?'サバイバルは 1人で あそぶよ！':'A / Space / Enter で さんか（1人）'):'あそぶ人は A / Space / Enter で さんか'),W/2,44,{s:28,f:FD,w:400,col:'#fff',st:C.ink,sw:8});
   const sl=this.slots;const host=sl.findIndex(s=>s);const allReady=host>=0&&sl.every(s=>!s||s.ready);
   for(let i=0;i<4;i++){const x=48+i*300,y=78,w=284,h=268;const s=sl[i];
    rr(c,x,y,w,h,22);c.fillStyle=s?C.paper:'rgba(255,255,255,.35)';c.fill();c.lineWidth=4;c.strokeStyle=C.ink;if(!s)c.setLineDash([12,10]);c.stroke();c.setLineDash([]);
@@ -3026,7 +3028,7 @@ const SETUP={slots:[null,null,null,null],row:0,opt:loadOpt(),t:0,mode:'party',fo
    txt(c,MGS[key].name,tx+tw/2,py+th+30,{s:24,f:FD,w:400,col:C.red});txt(c,allReady&&rows[this.row][3]==='g'?`${hp0(this)} で 一覧から えらぶ`:'ミニゲームの 行で 一覧が ひらけます',tx+tw/2,py+th+56,{s:14,col:'#6d6280'})}rr(c,px,py,pw,ph,22);c.fillStyle=C.paper;c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();
   if(!allReady)c.globalAlpha=.45;
   rows.forEach((r,k)=>{const yy=py+9+rh*k+rh/2;const sel=allReady&&k===this.row,last=k===n-1;if(sel){rr(c,px+16,yy-rh/2+2,pw-32,rh-4,12);c.fillStyle=last?C.gold:'#ffe7a1';c.fill()}
-   if(last)txt(c,r[0],px+pw/2,yy,{s:24,f:FD,w:400,col:C.red});else{txt(c,r[0],px+50,yy,{s:21,a:'left'});txt(c,'◀  '+r[1]+'  ▶',px+pw-60,yy,{s:21,a:'right',col:C.blueD})}});
+   if(last)txt(c,r[0],px+pw/2,yy,{s:24,f:FD,w:400,col:C.red});else{txt(c,r[0],px+50,yy,{s:21,a:'left'});txt(c,r[2]?'◀  '+r[1]+'  ▶':r[1],px+pw-60,yy,{s:r[2]?21:18,a:'right',col:r[2]?C.blueD:'#6d6280'})}});
   c.globalAlpha=1;
   const hp=host>=0?sl[host]:null;if(MGPICK.open&&hp&&allReady){MGPICK.draw(c,hp.dev);return}const r0=rows[this.row];let foot=!hp?'まずは 1人 さんかしてね（あいた席は COMが 入ります）':!allReady?'全員が キャラを けっていすると せっていできます':`${host+1}P（${DEVNAME[hp.dev]}）が せってい：▲▼ えらぶ　◀▶ かえる　${aLabel(hp.dev)} けってい`;
   if(allReady&&this.mode==='party'&&r0&&r0[3]==='board')foot=BOARDS[this.opt.board%BOARDS.length].sub;
@@ -3036,6 +3038,37 @@ function slotPlayers(){const sl=SETUP.slots;const used=sl.filter(s=>s).map(s=>s.
  return[0,1,2,3].map(i=>{const s=sl[i];return{i,ci:s?s.ci:free.shift(),human:!!s,dev:s?s.dev:null,coins:10,dc:10,stars:0,items:[],node:0,color:'blue',mgCoins:0,maxCoins:10,haps:0,alpha:1,face:1,curse:false}})}
 function startGame(){const o=SETUP.opt;setBoard(o.board);G.players=slotPlayers();const fr=shuffle(G.players.filter(p=>!p.human).map(p=>p.ci));G.players.filter(p=>!p.human).forEach((p,k)=>p.ci=fr[k]);
  G.maxTurns=TURN_OPTS[o.tn]||15;G.cpuLv=o.lv;G.tempo=[1,.5][o.tempo];G.bonus=o.bonus===0;G.mgRule=o.mgrule;beginBoard()}
+/* ===== ミニゲーム大会／サバイバル ===== */
+function survBest(){try{return parseInt(localStorage.getItem('kk_surv_best')||'0')||0}catch(e){return 0}}
+const CUP={mode:'cup',wins:[0,0,0,0],target:3,round:0,last:[],champ:null,streak:0,lost:false,best:0,newBest:false,t:0,go:false};
+const CUPSCENE={update(dt){CUP.t+=dt;if(CUP.t>.8&&(G.players.some(p=>p.human&&Input.pressed(p.dev,'a'))||(isAuto(-1)&&CUP.t>3)))CUP.go=true},
+ draw(c){mgBG(c,'#ffd28a','#f2994a');c.fillStyle='rgba(255,255,255,.14)';for(let i=0;i<14;i++){c.beginPath();c.moveTo(W/2,-200);const a1=i/14*Math.PI*2+NOW*.1;c.lineTo(W/2+Math.cos(a1)*1600,-200+Math.sin(a1)*1600);c.lineTo(W/2+Math.cos(a1+.12)*1600,-200+Math.sin(a1+.12)*1600);c.closePath();c.fill()}
+  if(CUP.mode==='surv'){const p=G.players.find(q=>q.human)||P(0);
+   txt(c,CUP.lost?'サバイバル おわり':`${CUP.streak} れんしょう 中！`,W/2,120,{s:64,f:FD,w:400,col:CUP.lost?'#fff':C.gold,st:C.ink,sw:12});
+   drawChar(c,p.ci,W/2,330,80,{mood:CUP.lost?'sad':'happy',jump:CUP.lost?0:Math.abs(Math.sin(NOW*5))*20});
+   txt(c,`きろく ${CUP.streak} れんしょう`,W/2,470,{s:40,f:FD,w:400,col:'#fff',st:C.ink,sw:9});
+   txt(c,CUP.newBest?'★ さいこう記録 こうしん！ ★':`さいこう記録 ${CUP.best} れんしょう`,W/2,530,{s:28,col:CUP.newBest?C.gold:'#fff',st:C.ink,sw:7});
+   if(!CUP.lost)txt(c,`つぎの COM：${['よわい','ふつう','つよい'][survLv()]}`,W/2,580,{s:22,col:'#fff',st:C.ink,sw:5})}
+  else{txt(c,CUP.champ?'ゆうしょう！':`ミニゲーム大会　${CUP.round}しあい おわり`,W/2,110,{s:CUP.champ?84:46,f:FD,w:400,col:C.gold,st:C.ink,sw:12});txt(c,`先に ${CUP.target}勝 した人の 優勝`,W/2,170,{s:22,col:'#fff',st:C.ink,sw:6});
+   G.players.forEach((p,k)=>{const x=W/2+(k-1.5)*270,y=230,won=CUP.last.includes(p.i),ch=CUP.champ&&CUP.champ.includes(p.i);rr(c,x-120,y,240,330,22);c.fillStyle=ch?'#fff8e6':'rgba(255,255,255,.9)';c.fill();c.lineWidth=ch?7:3;c.strokeStyle=ch?C.gold:C.ink;c.stroke();
+    drawChar(c,p.ci,x,y+110,52,{mood:ch||won?'happy':null,jump:ch||won?Math.abs(Math.sin(NOW*6+k))*20:0});txt(c,pname(p),x,y+195,{s:24,f:FD,w:400});
+    for(let j=0;j<CUP.target;j++){const sx=x-(CUP.target-1)*15+j*30;drawStar(c,sx,y+250,13,0,j<CUP.wins[p.i]?C.gold:'#d8d0e4',2.5)}
+    txt(c,`${CUP.wins[p.i]} 勝`,x,y+295,{s:28,f:FD,w:400,col:won?C.red:C.ink});if(won&&!CUP.champ)txt(c,'+1',x+80,y+40,{s:30,f:FD,w:400,col:C.red,st:'#fff',sw:6})})}
+  if(CUP.t>.8){const h=G.players.find(p=>p.human);txt(c,(CUP.champ||CUP.lost?'おわり　':'つぎの しあいへ　')+(h?aLabel(h.dev):'A'),W/2,H-50,{s:24,col:'#fff',st:C.ink,sw:6})}}};
+const survLv=()=>Math.min(2,Math.floor(CUP.streak/3));
+function cupPick(){const all=MG_ORDER.slice();const hist=CUP.hist||(CUP.hist=[]);let pool=all.filter(k=>!hist.includes(k));if(CUP.mode==='surv'||SETUP.fo.v%2===0)pool=pool.filter(k=>MGS[k].modes.includes('ffa'));if(!pool.length){CUP.hist=[];pool=all.filter(k=>CUP.mode==='surv'||SETUP.fo.v%2===0?MGS[k].modes.includes('ffa'):true)}
+ const key=pick(pool);hist.push(key);if(hist.length>20)hist.shift();let mode='ffa';if(CUP.mode==='cup'&&SETUP.fo.v%2===1){mode=pick(MGS[key].modes)}
+ const opts=teamOpts(mode).length;return{key,mode,teams:teamsFor(mode,randi(0,Math.max(0,opts-1)))}}
+async function cupLoop(){resetAsync();const gid=GAMEID;DLG=null;G.overlay=null;G.banners=[];FX.parts=[];FX.floats=[];G.cur=-1;G.talk=-1;G.tempo=1;
+ for(;;){if(CUP.mode==='surv')G.cpuLv=survLv();const{key,mode,teams}=cupPick();teams.noCoin=true;CUP.round++;
+  await fadeTo(1,.25);if(gid!==GAMEID)return;const w=await runMinigame(key,mode,teams,CUPSCENE);if(gid!==GAMEID)return;
+  CUP.last=w.slice();CUP.t=0;CUP.go=false;
+  if(CUP.mode==='surv'){const h=G.players.find(p=>p.human);if(h&&w.includes(h.i)){CUP.streak++;sfx('fanfare')}else{CUP.lost=true;CUP.best=survBest();if(CUP.streak>CUP.best){CUP.best=CUP.streak;CUP.newBest=true;try{localStorage.setItem('kk_surv_best',String(CUP.streak))}catch(e){}}sfx(CUP.newBest?'fanfare':'lose')}}
+  else{for(const i of w)CUP.wins[i]++;const ch=G.players.filter(p=>CUP.wins[p.i]>=CUP.target).map(p=>p.i);if(ch.length){CUP.champ=ch;sfx('fanfare')}else sfx('ok')}
+  BGM.play('board');await fadeTo(0,.3);await until(()=>CUP.go);if(gid!==GAMEID)return;
+  if(CUP.champ||CUP.lost){await fadeTo(1,.3);SETUP.t=0;scene=SETUP;BGM.play('board');await fadeTo(0,.3);return}}}
+function startCup(){G.players=slotPlayers();G.cpuLv=SETUP.opt.lv;Object.assign(CUP,{mode:'cup',wins:[0,0,0,0],target:[3,5,7][SETUP.fo.n%3],round:0,last:[],champ:null,hist:[],t:0,go:false});cupLoop()}
+function startSurv(){G.players=slotPlayers();Object.assign(CUP,{mode:'surv',streak:0,lost:false,newBest:false,best:survBest(),round:0,last:[],hist:[],t:0,go:false});cupLoop()}
 async function startFree(){G.players=slotPlayers();G.cpuLv=SETUP.opt.lv;G.tempo=1;G.cur=-1;G.talk=-1;
  const key=MG_ORDER[SETUP.fo.g%MG_ORDER.length],ms=MGS[key].modes,mode=ms[SETUP.fo.m%ms.length];const teams=teamsFor(mode,SETUP.fo.t);teams.noCoin=true;
  resetAsync();const gid=GAMEID;DLG=null;G.overlay=null;G.banners=[];FX.parts=[];FX.floats=[];

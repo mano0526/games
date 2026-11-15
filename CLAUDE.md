@@ -83,6 +83,12 @@
 - 新アイテム：pipe ゴールドパイプ（スターの1マス手前へ）、mini ちびサイコロ（1〜3、rollDice の max）。
 - 新ボード：desert すなじまピラミッド（りゅうさマス `quicksand`＝4マスもどる、3ターンごとに すなあらしでスター移動 `sandstorm`）、sky くもの上のにじ島（にじの はし＝近道が偶数ターンだけ通れる `G.bridge`/`nextOf`/`bridgeOff`、風マス `wind`＝ほかの全員3マスもどる）。`backNode` で1マスもどる。
 
+## パーティ 改善11〜20（2026-11-16）
+- 結果：同点「どうてん！」、1点差「1点差の きんせん！」。練習は 人間全員が B で おわり（`S.pend`）。説明画面に 操作の図（`drawCtlIcons`）。ミニゲームの曲 4種（`mgSong(key)`、SONGS.mg/mg2/mg3/mg4）。
+- 1vs3 の勝率調整（COM同士 30回、1人チームの勝ち 約3〜5割目標）：paint（1人は太いブラシ＋こいペンキ＝3人は0.45秒とどまらないと塗りかえられない）、raft（かたむきの力 tilt*|tilt|*2550）、bomb（半径68・0.88秒）、cannon（0.75秒ごと）、keeper（セーブ幅60）。COM同士でも結果のぶれが大きい（30回で±5くらい）。
+- 新ミニゲーム：raid コインどろぼう合戦（2v2/ffa）、pushball おしだまサッカー（2v2/1v1、同点ならボールのある陣地で勝敗、2.5秒動かなければ中央から）。
+- タイトルに「ミニゲーム大会」（`startCup`、先に3/5/7勝、バトルロイヤルだけ／いろいろ）と「サバイバル」（`startSurv`、1人用、負けるまで、3連勝ごとにCOMが強く、最高記録 localStorage `kk_surv_best`）。間の画面は `CUPSCENE`、進行は `cupLoop`。
+
 ## テスト方法（この作業環境から外部には通信できない）
 - `python3 -m http.server` で配信し、Playwright の同じブラウザコンテキストで2ページ開く。
 - URL に `?np=local` を付けると Firebase の代わりに同じブラウザ内の仕組み（netplay は BroadcastChannel、fakeroom は localStorage）でつながる。
