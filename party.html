@@ -19,6 +19,7 @@ canvas:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .tb{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);right:max(12px,env(safe-area-inset-right,0px));display:flex;gap:6px;z-index:5}
 .tb button{font:800 12px var(--font-ui);color:var(--paper);background:var(--pad);border:1px solid rgba(255,255,255,.28);border-radius:8px;padding:6px 10px;cursor:pointer}
 .tb button:focus-visible{outline:2px solid var(--accent)}
+.tb.sm button{font-size:10px;padding:4px 7px}
 #pad{position:fixed;left:0;right:0;bottom:0;display:none;justify-content:space-between;align-items:flex-end;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(env(safe-area-inset-bottom,0px) + 14px);pointer-events:none;z-index:6}
 #pad.on{display:flex}
 .dp{position:relative;width:138px;height:138px;pointer-events:auto}
@@ -695,6 +696,11 @@ function drawOverlay(c){const ov=G.overlay;if(!ov)return;
   txt(c,ov.sub,W/2,by+bh-24,{s:20,col:'#6d6280'})}}
 
 /* ================= HUD ================= */
+// マップ表示中の「マスの いみ」（このボードに ある マスだけ）
+const SP_LEG={blue:'コイン +3',red:'コイン −3',happening:'ハプニング（ボードの 仕掛け）',chance:'チャンスタイム（入れかえ）',item:'アイテムが もらえる',pinch:'ドンガラ登場！',lucky:'ラッキールーレット（いいこと）',battle:'バトル（全員で コイン勝負）',duel:'けっとう（1対1）',shop:'ショップ',volcano:'ふんか（西の 青と赤が 入れかわる）',coaster:'コースターで 一気に すすむ',avalanche:'なだれ（山の上の人が 流される）',quicksand:'りゅうさ（4マス もどる）',wind:'風（ほかの全員 3マス もどる）'};
+function drawLegend(c){const have=[...new Set(BOARD.nodes.map(n=>n.type==='start'?'blue':n.type))].filter(k=>SP_LEG[k]);const rh=34,w=360,h=have.length*rh+50,x=24,y=Math.max(110,(H-h)/2-20);
+ rr(c,x,y,w,h,16);c.fillStyle='rgba(255,248,236,.95)';c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();txt(c,'マスの いみ',x+w/2,y+22,{s:20,f:FD,w:400,col:C.red});
+ have.forEach((k,i)=>{const yy=y+50+i*rh;c.save();c.translate(x+34,yy+4);c.scale(.62,.62);if(k==='shop'){c.fillStyle='#e2cfa6';ell(c,0,0,25,17);c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();txt(c,'店',0,1,{s:20,f:FD,w:400})}else drawSpace(c,{x:0,y:0,type:k,id:-9});c.restore();txt(c,SP_LEG[k],x+62,yy+2,{s:16,a:'left'})})}
 let STK=null;
 function drawHUD(c){const pos=[[16,16],[W-246,16],[16,H-108],[W-246,H-108]];ranking();
  G.players.forEach((p,i)=>{const[x,y]=pos[i];const ch=CHARS[p.ci];const cur=G.cur===i;p.dc+=(p.coins-p.dc)*Math.min(1,DT*9);if(Math.abs(p.coins-p.dc)<.5)p.dc=p.coins;
@@ -809,7 +815,7 @@ function drawBoardScene(c){c.fillStyle=BD.bg;c.fillRect(0,0,W,H);
  drawFx(c,true);
  c.restore();
  if(G.villain){c.fillStyle='rgba(30,10,50,.35)';c.fillRect(0,0,W,H)}
- if(!G.mapView){drawHUD(c);drawDiceUI(c);drawTurnMenu(c)}else{rr(c,W/2-200,H-70,400,46,23);c.fillStyle=C.ink;c.fill();const p=G.cur>=0?P(G.cur):null;txt(c,`マップ　${p?aLabel(p.dev):'A'}：もどる`,W/2,H-47,{s:20,col:'#fff'})}
+ if(!G.mapView){drawHUD(c);drawDiceUI(c);drawTurnMenu(c)}else{rr(c,W/2-200,H-70,400,46,23);c.fillStyle=C.ink;c.fill();const p=G.cur>=0?P(G.cur):null;txt(c,`マップ　${p?aLabel(p.dev):'A'}：もどる`,W/2,H-47,{s:20,col:'#fff'});drawLegend(c)}
  if(G.orderUI)drawOrderUI(c);
  drawFx(c,false);drawOverlay(c);drawBanners(c);drawDialog(c)}
 const SEACACHE={};function minDistCache(i,x,y){if(SEACACHE[i]===undefined)SEACACHE[i]=minDistLoop(x,y);return SEACACHE[i]}
@@ -2314,7 +2320,7 @@ MGS.raft={name:'ゆれるイカダ',modes:['1v3'],desc:()=>'1人チームは ◀
   g.update=dt=>{g.el+=dt;if(g.endT>=0){g.endT-=dt;if(g.endT<=0)g.done=true}if(g.el>=g.dur&&g.endT<0)g.endT=.01;
    g.think(dt);const sx=P(solo).human?Input.axis(P(solo).dev).x:(g.ai[solo]||{x:0}).x;const pw=1.25+g.el*.03;g.tilt=clamp(g.tilt+sx*pw*dt,-1,1);
    for(const f of g.fall)f.t+=dt;
-   for(const i of trio){const a=g.actors[i];if(!a.alive)continue;const inp=mgIn(g,i);const sl=g.tilt*Math.abs(g.tilt)*2550;
+   for(const i of trio){const a=g.actors[i];if(!a.alive)continue;const inp=mgIn(g,i);const sl=g.tilt*Math.abs(g.tilt)*2650;
     a.vx+=((inp.x||0)*250-a.vx)*Math.min(1,8*dt)+sl*dt;a.vy+=((inp.y||0)*220-a.vy)*Math.min(1,8*dt);a.x+=a.vx*dt;a.y+=a.vy*dt;a.y=clamp(a.y,RY+a.r,RY+RH-a.r);a.t+=dt;if(Math.abs(a.vx)>20)a.face=Math.sign(a.vx);
     if(a.x<RX-6||a.x>RX+RW+6){a.alive=false;g.alive[i]=false;g.lastDeath=[i];g.fall.push({a,t:0,side:a.x<RX?-1:1});sfx('lose');burst(a.x,RY+RH,20,['#9cd3f5','#fff'],{max:260,up:200})}}
    separate(trio.map(i=>g.actors[i]).filter(a=>a.alive));
@@ -2666,14 +2672,17 @@ MGS.crush={name:'ドッスンよけ',modes:['1v3'],roles:()=>['岩で ぜんい�
   return g}};
 /* --- エアホッケー（1vs1／2vs2）：パックを はじいて 相手の ゴールへ --- */
 MGS.hockey={name:'エアホッケー',modes:['1v1','2v2'],roles:m=>['左の ゴールを まもれ','右の ゴールを まもれ'],
- desc:m=>'スティックで マレットを 動かして パックを はじこう！ 相手の ゴールに 入れたら 1点。自分の 陣地からは 出られないよ。先に 5点 か、40秒で 多い ほうの 勝ち。Aで ダッシュ（強く 打てる）。',
+ desc:m=>'スティックで マレットを 動かして パックを はじこう！ 相手の ゴールに 入れたら 1点。自分の 陣地からは 出られないよ。先に 5点 か、40秒で 多い ほうの 勝ち（同点なら サドンデス）。Aで ダッシュ（強く 打てる）。',
  ctl:'いどう：スティック / 十字　A：ダッシュして 強打',
  create(mode,teams){const ar={x:110,y:140,w:1060,h:540},MX=ar.x+ar.w/2,GH=250,GY0=ar.y+ar.h/2-GH/2,GY1=GY0+GH,PR=20,MR=34;
   const side=i=>teamOf(teams,i); // 0=左 1=右
   const g={ar,time:40,done:false,ai:[],sc:[0,0],pk:{x:MX+(Math.random()<.5?-70:70),y:ar.y+ar.h/2,vx:0,vy:0},serve:1.2,flash:0,endT:-1,trail:[]};
   const PL=PLs(teams);g.actors=PL.map(i=>{const s=side(i),mates=teams.groups[s],k=mates.indexOf(i),n=mates.length;const a=mkActor(i,s?ar.x+ar.w-150:ar.x+150,ar.y+ar.h*(n===1?.5:(k?.72:.28)));a.side=s;a.dash=0;a.cd=0;a.hx=a.x;a.hy=a.y;return a});
   const resetPk=to=>{g.pk={x:MX+(to?60:-60),y:ar.y+ar.h/2+rand(-80,80),vx:0,vy:0};g.serve=1};
-  g.update=dt=>{g.time-=dt;g.flash=Math.max(0,g.flash-dt);if(g.endT>=0){g.endT-=dt;if(g.endT<=0)g.done=true}if(g.time<=0){g.time=0;g.done=true;return}g.think(dt);
+  g.update=dt=>{if(g.done)return;g.time-=dt;g.flash=Math.max(0,g.flash-dt);if(g.endT>=0){g.endT-=dt;if(g.endT<=0)g.done=true}
+   // 同点で 時間切れ → サドンデス（つぎの 1点で 勝ち、さらに15秒で 決まらなければ ひきわけ）
+   if(g.time<=0){if(!g.ot&&g.sc[0]===g.sc[1]&&g.endT<0){g.ot=true;g.time=15;sfx('whistle')}else{g.time=0;g.done=true;return}}
+   if(g.ot&&g.sc[0]!==g.sc[1]&&g.endT<0)g.endT=1.2;g.think(dt);
    for(const a of g.actors){const inp=mgIn(g,a.pi);a.cd=Math.max(0,a.cd-dt);a.dash=Math.max(0,a.dash-dt);if(inp.a&&a.cd<=0){a.dash=.18;a.cd=.7;sfx('hop')}
     const ox=a.x,oy=a.y;const half={x:a.side?MX:ar.x,y:ar.y,w:ar.w/2,h:ar.h};moveActor(a,inp,a.dash>0?760:430,dt,half);a.mvx=(a.x-ox)/dt;a.mvy=(a.y-oy)/dt}
    separate(g.actors);
@@ -2718,6 +2727,7 @@ MGS.hockey={name:'エアホッケー',modes:['1v1','2v2'],roles:m=>['左の ゴ�
     if(a.dash>0){c.strokeStyle=C.gold;c.lineWidth=5;circ(c,a.x,a.y,MR+6);c.stroke()}drawChar(c,a.ci,a.x,a.y-6,16,{noShadow:true})}
    drawMGTop(c,'エアホッケー',g.time,null,teams);
    rr(c,W/2-150,82,300,48,24);c.fillStyle=C.ink;c.fill();txt(c,''+g.sc[0],W/2-70,106,{s:34,f:FD,w:400,col:teams.colors[0]==='#3a7fdc'?'#7fb5ff':teams.colors[0]});txt(c,'−',W/2,106,{s:24,col:'#fff'});txt(c,''+g.sc[1],W/2+70,106,{s:34,f:FD,w:400,col:'#ff8a7a'});
+   if(g.ot&&g.endT<0)txt(c,'サドンデス！ つぎの 1点で 勝ち',W/2,150,{s:26,f:FD,w:400,col:C.gold,st:C.ink,sw:7});
    if(g.flash>0)txt(c,'ゴール！',W/2,H/2,{s:90*(1+g.flash*.2),f:FD,w:400,col:C.gold,st:C.ink,sw:12})};
   return g}};
 /* --- コインどろぼう合戦（2vs2／バトルロイヤル）：まん中の コインを 自分の 基地へ。あいての 基地からも ぬすめる --- */
@@ -2869,7 +2879,7 @@ async function minigamePhase(){overview();await wait(.4);
  let t=0;await until(()=>{t+=DT;return t>2.6*(isAuto(-1)?.6:1)||(t>.6&&ownerPressed(-1,'a'))});G.overlay=null;
  const pool=mgRoulettePool(mode);const k=await roulette({title:'ミニゲーム ルーレット',items:pool.map(k=>MGS[k].name),owner:-1});const key=pool[k];G.lastMG=key;
  const winners=await playMG(key,mode,teams);
- if(winners.length){for(const i of winners){changeCoins(P(i),10);P(i).mgCoins+=10;P(i).happy=2}await say(`${winners.map(i=>pname(P(i))).join('、')} が 10コイン ゲット！`)}
+ if(winners.length){for(const i of winners){changeCoins(P(i),10);P(i).mgCoins+=10;P(i).happy=2;P(i).jumpT=.3;floatText(P(i).wx,P(i).wy-80,'+10',C.gold,{world:true,size:34,dur:1.8});burst(P(i).wx,P(i).wy-60,14,[C.gold,'#fff7b0'],{world:true,max:240,up:120})}sfx('coin');await say(`${winners.map(i=>pname(P(i))).join('、')} が 10コイン ゲット！`)}
  else await say('ひきわけ！ こんどは だれも コインを もらえなかった。')}
 const MODE_NAME={ffa:'バトルロイヤル',
  '2v2':'2 vs 2','1v3':'1 vs 3','1v1':'1 vs 1'};
@@ -2994,16 +3004,35 @@ async function resultsFlow(gid){await fadeTo(1,.4);scene=RESULTSCENE;RS.mode='li
  await say(`${win.map(pname).join('と')} の 優勝！ おめでとう！`);RS.showStats=true;
  await say('あそんでくれて ありがとう！ また あそぼうね！');if(gid!==GAMEID)return;await fadeTo(1,.5);goTitle()}
 
+/* ================= あそびかた ================= */
+const HELP={page:0,t:0,N:4,
+ update(dt){this.t+=dt;if(this.t<.25)return;if(Input.IDS.some(id=>Input.rep(id,'right')||Input.rep(id,'down'))&&this.page<this.N-1){this.page++;sfx('blip')}if(Input.IDS.some(id=>Input.rep(id,'left')||Input.rep(id,'up'))&&this.page>0){this.page--;sfx('blip')}
+  if(Input.anyPressed('a')){if(this.page<this.N-1){this.page++;sfx('blip')}else{sfx('ok');scene=TITLE}}if(Input.anyPressed('b')||Input.anyPressed('start')){sfx('back');scene=TITLE}},
+ draw(c){mgBG(c,'#7fd0f2','#3b98cf');rr(c,60,40,W-120,H-80,28);c.fillStyle=C.paper;c.fill();c.lineWidth=6;c.strokeStyle=C.ink;c.stroke();
+  const T=['ゲームの ながれ','マスの いみ','アイテム','そうさ'];txt(c,'あそびかた　'+T[this.page],W/2,86,{s:36,f:FD,w:400,col:C.red});
+  for(let i=0;i<this.N;i++){circ(c,W/2-(this.N-1)*14+i*28,H-70,7);c.fillStyle=i===this.page?C.red:'#d8d0e4';c.fill()}
+  txt(c,'◀▶ ページ　A：つぎへ　B：もどる',W/2,H-100,{s:18,col:'#6d6280'});
+  const L=(s,x,y,o={})=>txt(c,s,x,y,{s:22,a:'left',...o});
+  if(this.page===0){const steps=[['1','じぶんの番','左下の メニューで サイコロを ふって すすむ。止まった マスで いろいろ おきる。'],['2','スターを 買う','光る スターの マスを 通ると、20コインで スターが 買える。'],['3','ミニゲーム','全員の 番が おわると ミニゲーム！ 勝つと 10コイン。'],['4','けっか','さいごに スターが いちばん 多い人の 優勝！（同じなら コインが 多い人）']];
+   steps.forEach(([n,a,d],i)=>{const y=150+i*110;circ(c,150,y+20,30);c.fillStyle=C.gold;c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();txt(c,n,150,y+22,{s:30,f:FD,w:400});L(a,200,y,{s:28,f:FD,w:400,col:C.blueD});c.font=`800 20px ${FB}`;wrap(c,d,900).slice(0,2).forEach((l,k)=>L(l,200,y+36+k*26,{s:20}))});
+   drawStar(c,1080,240,50,NOW*.5,C.gold,5);drawCharPose(c,0,1080,470,60)}
+  else if(this.page===1){const ks=['blue','red','happening','chance','item','lucky','pinch','battle','duel','shop'];ks.forEach((k,i)=>{const col=i<5?0:1,row=i%5,x=150+col*540,y=160+row*88;c.save();c.translate(x,y+4);if(k==='shop'){c.fillStyle='#e2cfa6';ell(c,0,0,25,17);c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();txt(c,'店',0,1,{s:20,f:FD,w:400})}else drawSpace(c,{x:0,y:0,type:k,id:-9});c.restore();L(SP_LEG[k],x+46,y+2,{s:22})});
+   txt(c,'ボードごとに とくべつな マスも あるよ（マップを 見ると 左に 説明が 出る）',W/2,H-140,{s:18,col:'#6d6280'})}
+  else if(this.page===2){const ids=Object.keys(ITEMS);ids.forEach((id,i)=>{const col=i<5?0:1,row=i%5,x=140+col*540,y=160+row*88;drawItemIcon(c,id,x,y,52);L(ITEMS[id].name+'（'+ITEMS[id].price+'コイン）',x+44,y-12,{s:21,f:FD,w:400});L(ITEMS[id].desc,x+44,y+16,{s:16,col:'#5d5270'})});
+   txt(c,'アイテムは 3こまで。1ターンに 1こ 使える（サイコロの 前に メニューから）',W/2,H-140,{s:18,col:'#6d6280'})}
+  else{const rows=[['','キーボード1','キーボード2','コントローラー'],['いどう / えらぶ','W A S D','矢印キー','スティック・十字'],['けってい / A','Space','Enter','A'],['もどる / B','G・左Shift','右Shift','B'],['ポーズ','Esc・P','Esc・P','START'],['COMの番を はやく','Bを 長押し','Bを 長押し','Bを 長押し']];
+   rows.forEach((r,i)=>{const y=170+i*64;r.forEach((s,k)=>txt(c,s,[260,560,800,1040][k],y,{s:i===0?20:22,f:i===0||k===0?FD:FB,w:i===0||k===0?400:800,col:i===0?C.blueD:C.ink}));if(i>0){c.strokeStyle='rgba(43,33,64,.12)';c.lineWidth=2;c.beginPath();c.moveTo(130,y-32);c.lineTo(W-130,y-32);c.stroke()}});
+   txt(c,'スマホは 画面の ボタン、またはメニューを 直接 タップ',W/2,H-140,{s:18,col:'#6d6280'})}}};
 /* ================= タイトル・参加画面 ================= */
-const TITLE={sel:0,opts(){const o=[['party','パーティ'],['free','ミニゲーム'],['cup','ミニゲーム大会'],['surv','サバイバル'],['online','オンライン']];if(SAVE_INFO){const b=BOARDS.find(x=>x.id===SAVE_INFO.board)||BOARDS[0];o.push(['resume',`つづきから（${b.name} ${SAVE_INFO.turn}/${SAVE_INFO.maxTurns}）`])}return o},
+const TITLE={sel:0,opts(){const o=[['party','パーティ'],['free','ミニゲーム'],['cup','ミニゲーム大会'],['surv','サバイバル'],['online','オンライン'],['help','あそびかた']];if(SAVE_INFO){const b=BOARDS.find(x=>x.id===SAVE_INFO.board)||BOARDS[0];o.push(['resume',`つづきから（${b.name} ${SAVE_INFO.turn}/${SAVE_INFO.maxTurns}）`])}return o},
  update(dt){const o=this.opts();if(this.sel>=o.length)this.sel=0;
   if(Input.IDS.some(id=>Input.rep(id,'left')||Input.rep(id,'up'))){this.sel=(this.sel+o.length-1)%o.length;sfx('blip')}
   else if(Input.IDS.some(id=>Input.rep(id,'right')||Input.rep(id,'down'))){this.sel=(this.sel+1)%o.length;sfx('blip')}
-  if(Input.anyPressed('a')){initAudio();sfx('ok');const k=o[this.sel][0];if(k==='online'){if(window.__NP&&__NP.UI)__NP.UI.show();return}if(k==='resume'){const d=loadSave();if(d){resumeGame(d);return}}SETUP.reset(['free','cup','surv'].includes(k)?k:'party');scene=SETUP}},
+  if(Input.anyPressed('a')){initAudio();sfx('ok');const k=o[this.sel][0];if(k==='help'){HELP.page=0;HELP.t=0;scene=HELP;return}if(k==='online'){if(window.__NP&&__NP.UI)__NP.UI.show();return}if(k==='resume'){const d=loadSave();if(d){resumeGame(d);return}}SETUP.reset(['free','cup','surv'].includes(k)?k:'party');scene=SETUP}},
  draw(c){mgBG(c,'#4fb7e8','#1f72ad');
  c.save();c.translate(W/2,-60);c.fillStyle='rgba(255,255,255,.08)';for(let i=0;i<16;i++){c.rotate(Math.PI/8);c.beginPath();c.moveTo(0,0);c.lineTo(1500,-80);c.lineTo(1500,80);c.closePath();c.fill()}c.restore();
  c.fillStyle='#fdfbf3';ell(c,W/2,690,760,140);c.fill();c.fillStyle=C.sand;ell(c,W/2,700,720,124);c.fill();c.fillStyle=C.grass;ell(c,W/2,730,620,110);c.fill();
- drawDeco(c,{k:'palm',x:170,y:640,s:1.5});drawDeco(c,{k:'palm',x:1090,y:650,s:1.3});
+ drawDeco(c,{k:'palm',x:46,y:560,s:1.3});drawDeco(c,{k:'palm',x:1200,y:570,s:1.15});
  const t1='コロコロ島',t2='パーティ';
  [...t1].forEach((ch,i)=>{const x=W/2-(t1.length-1)*58+i*116,y=150+Math.sin(NOW*3+i*.7)*6;txt(c,ch,x,y,{s:110,f:FD,w:400,col:'#fff',st:C.ink,sw:18})});
  [...t2].forEach((ch,i)=>{const x=W/2-(t2.length-1)*66+i*132,y=278+Math.sin(NOW*3+i*.7+2)*6;txt(c,ch,x,y,{s:128,f:FD,w:400,col:C.gold,st:C.ink,sw:18})});
@@ -3192,8 +3221,15 @@ let SC=1,DPR=1;
 function resize(){const wrap=document.getElementById('wrap');const cs=getComputedStyle(wrap);const aw=wrap.clientWidth-parseFloat(cs.paddingLeft||0)-parseFloat(cs.paddingRight||0);const ah=wrap.clientHeight-parseFloat(cs.paddingTop||0)-parseFloat(cs.paddingBottom||0);
  SC=Math.max(.1,Math.min(aw/W,ah/H));DPR=Math.min(2,window.devicePixelRatio||1);cv.style.width=Math.floor(W*SC)+'px';cv.style.height=Math.floor(H*SC)+'px';cv.width=Math.round(W*SC*DPR);cv.height=Math.round(H*SC*DPR)}
 addEventListener('resize',resize);
+// 右上の BGM／全画面 と 左上の オンライン ボタンが、画面いっぱいの時に プレイヤー欄へ 重ならないよう、
+// 横に すきまが ない時は 画面上の 左よりの あき場所（プレイヤー欄と「ターン」表示の あいだ）へ 移す
+function placeTopUI(){try{const r=cv.getBoundingClientRect(),tb=document.querySelector('.tb'),fab=document.querySelector('.np-fab');const small=r.width<1000;
+  const top=Math.max(6,r.top+r.height*20/720)+'px';
+  if(tb){tb.classList.toggle('sm',small);if(innerWidth-r.right<190){tb.style.top=top;tb.style.left='auto';tb.style.right=(innerWidth-(r.left+r.width*(1018/1280)))+'px'}else{tb.style.top='';tb.style.left='';tb.style.right=''}}
+  if(fab){if(r.left<140){fab.style.setProperty('top',top,'important');fab.style.setProperty('left',(r.left+r.width*(262/1280))+'px','important')}else{fab.style.removeProperty('top');fab.style.removeProperty('left')}}}catch(e){}}
+addEventListener('resize',()=>setTimeout(placeTopUI,50));setTimeout(placeTopUI,300);setTimeout(placeTopUI,1500);
 function step(dt){NOW+=dt;Input.poll(dt);if(scene===SETUP)THUMB.tick();
- const inGame=scene===BOARDSCENE||(scene&&scene.game!==undefined)||scene===RESULTSCENE;
+ const inGame=scene===BOARDSCENE||(scene&&scene.game!==undefined)||scene===RESULTSCENE||scene===CUPSCENE;
  if(inGame&&Input.anyPressed('start')){paused=!paused;pauseSel=0;sfx(paused?'ok':'back')}
  else if(paused)pauseUpdate();
  else{FFON=isFF();const n=FFON?3:1;for(let k=0;k<n;k++){if(k>0)Input.clearEdges();tickAsync(dt);scene.update(dt);updateUI(dt);updateFx(dt)}}
