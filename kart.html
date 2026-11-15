@@ -1642,7 +1642,7 @@ function frame(now){requestAnimationFrame(frame);let dt=(now-lastT)/1000;lastT=n
   const devs=pollDevices();
   if(app.screen==='race'&&race){
     if(!app.paused&&race.phase==='intro'&&race.introT>.4){for(const id in devs){const p=devs[id].pressed;if(p.confirm||p.accel||p.item||p.drift){race.introT=race.introLen;break;}}}
-    if(!app.paused&&!app.netMenu){for(const id in devs)if(devs[id].pressed.pause){if(race.net)netPauseMenu();else pauseMenu();break;}}
+    if(!app.paused&&!app.netMenu){for(const id in devs)if(devs[id].pressed.pause){if(race.net)netPauseMenu();else pauseMenu();for(const j in devs)devs[j].pressed={};break;}}
     if(app.netMenu)menuStep(devs);
     if(!app.paused){race.acc+=dt;let n=0;while(race.acc>=DT&&n<12){stepRace(DT);race.acc-=DT;n++;if(n===1)for(const id in devs)devs[id].pressed={};if(app.screen!=='race')break;}
       if(race&&race.net)netTick(dt);
