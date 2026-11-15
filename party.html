@@ -301,8 +301,13 @@ function sfx(n){try{SFX[n]&&SFX[n]()}catch(e){}}
 const SONGS={
  board:{bpm:116,mel:[72,0,76,0,79,0,76,0,77,0,76,0,74,0,72,0,69,0,72,0,76,0,74,72,71,0,72,0,69,0,0,0,65,0,69,0,72,0,77,0,76,0,74,0,72,0,69,0,71,0,74,0,79,0,77,76,74,0,72,0,71,0,0,0],bass:[48,45,41,43]},
  mg:{bpm:150,mel:[69,72,76,72,69,72,76,79,77,0,76,0,74,0,72,0,65,69,72,69,65,69,72,77,76,0,74,0,72,0,0,0,67,72,76,72,67,72,76,79,81,0,79,0,77,0,76,0,74,0,71,0,67,0,71,0,74,0,76,0,74,0,71,0],bass:[45,41,48,43]},
+ mg2:{bpm:168,mel:[69,0,72,69,76,0,74,72,71,0,74,71,67,0,71,0,69,0,72,69,76,0,79,76,77,0,76,74,72,0,71,0,65,0,69,65,72,0,71,69,67,0,71,67,74,0,72,71,69,0,0,69,72,76,81,0,80,0,76,0,71,0,0,0],bass:[45,41,43,40]},
+ mg3:{bpm:132,mel:[72,0,0,74,76,0,72,0,77,0,76,0,74,0,0,0,71,0,0,72,74,0,71,0,76,0,74,0,72,0,0,0,69,0,72,0,76,0,79,0,81,0,79,0,76,0,72,0,74,0,0,76,77,0,74,0,72,0,0,0,0,0,0,0],bass:[48,45,41,43]},
+ mg4:{bpm:140,mel:[67,0,67,0,72,0,0,0,71,0,69,0,67,0,0,0,65,0,65,0,69,0,0,0,67,0,65,0,64,0,0,0,67,0,67,0,72,0,74,0,76,0,74,0,72,0,71,0,69,0,71,0,72,0,67,0,72,0,0,0,0,0,0,0],bass:[48,41,43,48]},
  night:{bpm:84,mel:[64,0,0,67,0,0,71,0,69,0,0,0,67,0,0,0,62,0,0,65,0,0,69,0,67,0,0,0,64,0,0,0,60,0,0,64,0,0,67,0,72,0,71,0,69,0,67,0,62,0,65,0,69,0,72,0,71,0,0,0,0,0,0,0],bass:[45,41,48,43]},
 };
+// ミニゲームごとに 曲を かえる（4曲）
+const mgSong=key=>['mg','mg2','mg3','mg4'][[...String(key)].reduce((s,ch)=>s+ch.charCodeAt(0),0)%4];
 const BGM={song:null,step:0,next:0,
  play(n){this.song=n?SONGS[n]:null;this.step=0;if(AU.c)this.next=AU.c.currentTime+.08},
  tick(){if(!AU.c||!this.song||!AU.on)return;const s=this.song,sp=60/s.bpm/4,ct=AU.c.currentTime;if(this.next<ct-.25)this.next=ct+.05;
@@ -1355,7 +1360,7 @@ MGS.bomb={name:'ばくだんドロップ',modes:['1v3'],desc:()=>'1人チーム�
   const g={ar,time:20,cur:{x:640,y:415,vx:0,vy:0},cd:.5,bombs:[],flash:[],done:false,ai:[],endT:-1,rt:{},wander:{},actors:run.map((i,k)=>mkActor(i,400+k*240,560))};
   g.update=dt=>{g.time-=dt;g.cd-=dt;if(g.endT>=0){g.endT-=dt;if(g.endT<=0)g.done=true}if(g.time<=0){g.time=0;g.done=true;return}
    g.think(dt);const si=mgIn(g,solo);const k=Math.min(1,14*dt);g.cur.vx+=(si.x*520-g.cur.vx)*k;g.cur.vy+=(si.y*520-g.cur.vy)*k;g.cur.x=clamp(g.cur.x+g.cur.vx*dt,ar.x,ar.x+ar.w);g.cur.y=clamp(g.cur.y+g.cur.vy*dt,ar.y,ar.y+ar.h);
-   if(si.a&&g.cd<=0&&g.endT<0){g.cd=.4;g.bombs.push({x:g.cur.x,y:g.cur.y,t:.72,T:.72,r:86});sfx('hop')}
+   if(si.a&&g.cd<=0&&g.endT<0){g.cd=.6;g.bombs.push({x:g.cur.x,y:g.cur.y,t:.88,T:.88,r:68});sfx('hop')}
    for(let i=g.bombs.length-1;i>=0;i--){const b=g.bombs[i];b.t-=dt;if(b.t<=0){sfx('boom');g.flash.push({x:b.x,y:b.y,r:b.r,l:.35});burst(b.x,b.y,22,['#ffb347','#ff6b3d','#fff2a8'],{max:320});
      for(const a of g.actors)if(a.alive&&Math.hypot(a.x-b.x,a.y-b.y)<b.r+a.r*.3){a.alive=false;a.dvx=(a.x-b.x)*5;a.dvy=-560;sfx('lose')}g.bombs.splice(i,1)}}
    for(let i=g.flash.length-1;i>=0;i--){g.flash[i].l-=dt;if(g.flash[i].l<=0)g.flash.splice(i,1)}
@@ -1449,7 +1454,7 @@ MGS.dodge={name:'ボールあてバトル',modes:['ffa','2v2'],
   return g}};
 /* --- ぬりぬり陣取り：歩いたマスを 自分の色に --- */
 MGS.paint={name:'ぬりぬり陣取り',modes:['ffa','2v2','1v3'],roles:m=>m==='1v3'?['ふとい ブラシで ぬりまくれ','3人で ぬりかえせ']:['チームの 色で ぬれ','チームの 色で ぬれ'],
- desc:m=>(m==='1v3'?'1人チームは ふとい ブラシで すばやく ぬれる！ 3人チームは 力を あわせて ぬりかえそう。':m==='ffa'?'歩いた ところが 自分の 色に なるよ。人の 色も ぬりかえせる。':'チームの 色で 広場を ぬりつぶせ！')+' ペンキ玉を とると まわりを 一気に ぬれる。Aで ダッシュ（ぶつかった あいては 少し 止まる）。のこり10秒は ブラシが 太くなる！',
+ desc:m=>(m==='1v3'?'1人チームは ふとい ブラシで すばやく ぬれる！ しかも ペンキが こいので 3人チームは 少し 長く とどまらないと ぬりかえられない。3人チームは 力を あわせて ぬりかえそう。':m==='ffa'?'歩いた ところが 自分の 色に なるよ。人の 色も ぬりかえせる。':'チームの 色で 広場を ぬりつぶせ！')+' ペンキ玉を とると まわりを 一気に ぬれる。Aで ダッシュ（ぶつかった あいては 少し 止まる）。のこり10秒は ブラシが 太くなる！',
  ctl:'いどう：スティック / 十字　ダッシュ：A（体当たり）',
  create(mode,teams){const ar={x:160,y:160,w:960,h:480},CS=40,COLS=24,ROWS=12;const pos=[[260,260],[1020,260],[260,540],[1020,540]];
   const g={ar,time:30,done:false,ai:[],grid:new Array(COLS*ROWS).fill(-1),age:new Float32Array(COLS*ROWS),rt:[0,0,0,0],tg:[null,null,null,null],balls:[],bt:2.5,fever:false,shake:0};
@@ -1458,15 +1463,18 @@ MGS.paint={name:'ぬりぬり陣取り',modes:['ffa','2v2','1v3'],roles:m=>m==='
   const jit=[];for(let k=0;k<COLS*ROWS;k++)jit.push([rand(-6,6),rand(-6,6),rand(.9,1.25),rand(0,1)]);
   g.actors=[0,1,2,3].map(i=>{const a=mkActor(i,pos[i][0],pos[i][1]);a.cd=0;a.dash=0;return a});
   const cellAt=(x,y)=>{const cx=Math.floor((x-ar.x)/CS),cy=Math.floor((y-ar.y)/CS);if(cx<0||cy<0||cx>=COLS||cy>=ROWS)return-1;return cy*COLS+cx};
-  const paint=(k,o)=>{if(k<0)return;if(g.grid[k]!==o){g.grid[k]=o;g.age[k]=0;}};
+  // 1vs3：1人チームの ペンキは こい（3人チームは 0.45秒 とどまらないと ぬりかえられない）
+  const soloO=mode==='1v3'?teamOf(teams,teams.groups[0][0]):-9;
+  const prog=new Float32Array(COLS*ROWS);
+  const paint=(k,o)=>{if(k<0)return;if(g.grid[k]!==o){if(g.grid[k]===soloO){prog[k]+=g.dt0||0;if(prog[k]<.45)return}g.grid[k]=o;g.age[k]=0;prog[k]=0}};
   g.counts=()=>{const cnt=new Array(nOwn).fill(0);for(const v of g.grid)if(v>=0)cnt[v]++;return cnt};
-  g.update=dt=>{g.time-=dt;if(g.time<=0){g.time=0;g.done=true;return}g.think(dt);g.shake=Math.max(0,g.shake-dt);
+  g.update=dt=>{g.dt0=dt;g.time-=dt;if(g.time<=0){g.time=0;g.done=true;return}g.think(dt);g.shake=Math.max(0,g.shake-dt);
    if(!g.fever&&g.time<=10){g.fever=true;sfx('go');floatText(W/2,H/2,'ラスト10秒！ ふとブラシ！',C.gold,{size:40,dur:1.6});}
    for(let k=0;k<g.age.length;k++)g.age[k]+=dt;
    g.bt-=dt;if(g.bt<=0&&g.balls.length<3){g.bt=rand(2.2,3.6);g.balls.push({x:rand(ar.x+60,ar.x+ar.w-60),y:rand(ar.y+60,ar.y+ar.h-60),t:0})}
    for(const a of g.actors){a.stun=Math.max(0,a.stun-dt);const inp=a.stun>0?{x:0,y:0,a:false}:mgIn(g,a.pi);a.cd=Math.max(0,a.cd-dt);a.dash=Math.max(0,a.dash-dt);if(inp.a&&a.cd<=0){a.dash=.45;a.cd=2;sfx('hop')}
-    const big=mode==='1v3'&&a.pi===teams.groups[0][0];moveActor(a,inp,a.stun>0?0:a.dash>0?480:big?305:265,dt,ar);const o=owner(a.pi);
-    const R2=big||g.fever?(big&&g.fever?60:40):18;for(let ox=-R2;ox<=R2;ox+=18)for(let oy=-R2*.7;oy<=R2*.7;oy+=18)paint(cellAt(a.x+ox,a.y-4+oy),o);}
+    const big=mode==='1v3'&&a.pi===teams.groups[0][0];moveActor(a,inp,a.stun>0?0:a.dash>0?480:big?350:265,dt,ar);const o=owner(a.pi);
+    const R2=big||g.fever?(big&&g.fever?86:big?68:40):18;for(let ox=-R2;ox<=R2;ox+=18)for(let oy=-R2*.7;oy<=R2*.7;oy+=18)paint(cellAt(a.x+ox,a.y-4+oy),o);}
    // dash bump: the other player is stunned briefly
    for(const a of g.actors){if(a.dash<=0)continue;for(const b of g.actors){if(a===b||b.stun>0||owner(a.pi)===owner(b.pi))continue;if(Math.hypot(a.x-b.x,a.y-b.y)<a.r+b.r){b.stun=.8;b.vx=a.vx*.8;b.vy=a.vy*.8;a.dash=0;sfx('thud');g.shake=.15;burst((a.x+b.x)/2,(a.y+b.y)/2-30,10,['#fff',C.gold],{max:200});}}}
    separate(g.actors);
@@ -1722,7 +1730,7 @@ MGS.keeper={name:'PKまもりきれ',modes:['1v3'],desc:()=>'1人チームは �
    for(const s of g.shooters){s.cd-=dt;const inp=mgIn(g,s.pi);s.aim=clamp(s.aim+(inp.y||0)*480*dt,GT+16,GB-16);
     if(inp.a&&s.cd<=0&&g.time>0){s.cd=1.9;g.balls.push({sx:s.x-30,sy:s.y,tx:GX,ty:s.aim,t:0,T:.82,x:s.x-30,y:s.y,o:s.pi,seen:null});sfx('hop')}}
    for(let j=g.balls.length-1;j>=0;j--){const b=g.balls[j];b.t+=dt;const u=Math.min(1,b.t/b.T);b.x=lerp(b.sx,b.tx,u);b.y=lerp(b.sy,b.ty,u)-Math.sin(u*Math.PI)*40;
-    if(u>=1){if(Math.abs(g.kp.y-b.ty)<66){g.msg='セーブ！';sfx('thud');burst(GX+20,b.ty,12,['#fff',C.blue],{max:220})}else{g.goals++;g.msg='ゴール！';sfx('coin');burst(GX-20,b.ty,16,[C.gold,'#fff'],{max:260})}g.msgT=.9;g.balls.splice(j,1)}}
+    if(u>=1){if(Math.abs(g.kp.y-b.ty)<60){g.msg='セーブ！';sfx('thud');burst(GX+20,b.ty,12,['#fff',C.blue],{max:220})}else{g.goals++;g.msg='ゴール！';sfx('coin');burst(GX-20,b.ty,16,[C.gold,'#fff'],{max:260})}g.msgT=.9;g.balls.splice(j,1)}}
    if(g.goals>=g.need||(g.time<=0&&!g.balls.length))g.done=true};
   g.think=dt=>{const lv=LV();
    if(!P(solo).human){let tgt=GM,bt=1e9;for(const b of g.balls){if(b.seen===null){b.seen=b.t+[.22,.19,.16][lv];b.guess=b.ty+gauss()*[44,36,28][lv]}if(b.t>=b.seen){const rem=b.T-b.t;if(rem<bt){bt=rem;tgt=b.guess}}}
@@ -2261,7 +2269,7 @@ MGS.cannon={name:'たいほうよけ',modes:['1v3'],desc:()=>'1人チームは �
   g.update=dt=>{g.el+=dt;if(g.endT>=0){g.endT-=dt;if(g.endT<=0)g.done=true}if(g.el>=g.dur&&g.endT<0){g.endT=.01}
    g.think(dt);const sp=P(solo).human?(()=>{const a=Input.axis(P(solo).dev);return{x:a.x,a:Input.pressed(P(solo).dev,'a')}})():(g.ai[solo]||{x:0,a:false});
    g.ang=clamp(g.ang-sp.x*1.9*dt,Math.PI*.18,Math.PI*.82);g.cd=Math.max(0,g.cd-dt);
-   if(sp.a&&g.cd<=0&&g.endT<0){g.cd=.75;const v=Math.min(820,520+g.el*10);g.balls.push({x:CX+Math.cos(g.ang)*70,y:CY+Math.sin(g.ang)*70,vx:Math.cos(g.ang)*v,vy:Math.sin(g.ang)*v,r:24});sfx('boom');burst(CX+Math.cos(g.ang)*80,CY+Math.sin(g.ang)*80,10,['#fff','#ccc'],{max:140})}
+   if(sp.a&&g.cd<=0&&g.endT<0){g.cd=.75;const v=Math.min(830,525+g.el*10);g.balls.push({x:CX+Math.cos(g.ang)*70,y:CY+Math.sin(g.ang)*70,vx:Math.cos(g.ang)*v,vy:Math.sin(g.ang)*v,r:25});sfx('boom');burst(CX+Math.cos(g.ang)*80,CY+Math.sin(g.ang)*80,10,['#fff','#ccc'],{max:140})}
    for(let k=g.balls.length-1;k>=0;k--){const b=g.balls[k];b.x+=b.vx*dt;b.y+=b.vy*dt;if(b.x<ar.x-60||b.x>ar.x+ar.w+60||b.y>ar.y+ar.h+60){g.balls.splice(k,1);continue}
     for(const i of trio){const a=g.actors[i];if(!a.alive)continue;if(Math.hypot(a.x-b.x,a.y-a.r*.6-b.y)<a.r+b.r-6){a.alive=false;g.alive[i]=false;g.lastDeath=[i];a.dvx=b.vx*.4;a.dvy=-480;a.deadT=0;sfx('lose');burst(a.x,a.y,14,['#fff',C.gold],{max:220})}}}
    for(const i of trio){const a=g.actors[i];if(a.alive)moveActor(a,mgIn(g,i),300,dt,ar);else{a.deadT+=dt;a.x+=a.dvx*dt;a.y+=a.dvy*dt;a.dvy+=900*dt;a.rot+=dt*8}}separate(trio.map(i=>g.actors[i]).filter(a=>a.alive));
@@ -2292,13 +2300,15 @@ MGS.raft={name:'ゆれるイカダ',modes:['1v3'],desc:()=>'1人チームは ◀
   g.update=dt=>{g.el+=dt;if(g.endT>=0){g.endT-=dt;if(g.endT<=0)g.done=true}if(g.el>=g.dur&&g.endT<0)g.endT=.01;
    g.think(dt);const sx=P(solo).human?Input.axis(P(solo).dev).x:(g.ai[solo]||{x:0}).x;const pw=1.25+g.el*.03;g.tilt=clamp(g.tilt+sx*pw*dt,-1,1);
    for(const f of g.fall)f.t+=dt;
-   for(const i of trio){const a=g.actors[i];if(!a.alive)continue;const inp=mgIn(g,i);const sl=g.tilt*560;
-    a.vx+=((inp.x||0)*270-a.vx)*Math.min(1,8*dt)+sl*dt;a.vy+=((inp.y||0)*220-a.vy)*Math.min(1,8*dt);a.x+=a.vx*dt;a.y+=a.vy*dt;a.y=clamp(a.y,RY+a.r,RY+RH-a.r);a.t+=dt;if(Math.abs(a.vx)>20)a.face=Math.sign(a.vx);
+   for(const i of trio){const a=g.actors[i];if(!a.alive)continue;const inp=mgIn(g,i);const sl=g.tilt*Math.abs(g.tilt)*2550;
+    a.vx+=((inp.x||0)*250-a.vx)*Math.min(1,8*dt)+sl*dt;a.vy+=((inp.y||0)*220-a.vy)*Math.min(1,8*dt);a.x+=a.vx*dt;a.y+=a.vy*dt;a.y=clamp(a.y,RY+a.r,RY+RH-a.r);a.t+=dt;if(Math.abs(a.vx)>20)a.face=Math.sign(a.vx);
     if(a.x<RX-6||a.x>RX+RW+6){a.alive=false;g.alive[i]=false;g.lastDeath=[i];g.fall.push({a,t:0,side:a.x<RX?-1:1});sfx('lose');burst(a.x,RY+RH,20,['#9cd3f5','#fff'],{max:260,up:200})}}
    separate(trio.map(i=>g.actors[i]).filter(a=>a.alive));
    if(g.endT<0&&trio.every(i=>!g.alive[i]))g.endT=1.2};
   g.think=dt=>{const lv=LV();
-   if(!P(solo).human){g.planT-=dt;if(g.planT<=0){const al=trio.filter(i=>g.alive[i]).map(i=>g.actors[i]);const avg=al.length?al.reduce((s,a)=>s+a.x,0)/al.length:RX+RW/2;g.plan=avg<RX+RW/2?-1:1;if(Math.random()<[.4,.25,.1][lv])g.plan=-g.plan;g.planT=rand(.6,1.6)}
+   if(!P(solo).human){g.planT-=dt;if(g.planT<=0){const al=trio.filter(i=>g.alive[i]).map(i=>g.actors[i]);const avg=al.length?al.reduce((s,a)=>s+a.x,0)/al.length:RX+RW/2;g.plan=avg<RX+RW/2?-1:1;if(Math.random()<[.4,.25,.1][lv])g.plan=-g.plan;g.planT=rand(.5,1.2)}
+    // 3人が 高い方へ にげきったら 一気に 反対へ かたむけて ゆさぶる
+    {const al=trio.filter(i=>g.alive[i]).map(i=>g.actors[i]);if(al.length&&Math.abs(g.tilt)>.6&&al.every(a=>(a.x-(RX+RW/2))*g.tilt<-RW*.2)&&Math.random()<[.02,.05,.08][lv]){g.plan=-Math.sign(g.tilt);g.planT=rand(.6,1)}}
     const want=g.plan;g.ai[solo]={x:clamp((want-g.tilt)*3,-1,1)*[.7,.85,1][lv]}}
    for(const i of trio){const a=g.actors[i];if(P(i).human||!a.alive)continue;g.rt[i]-=dt;if(g.rt[i]>0)continue;g.rt[i]=[.28,.16,.08][lv];
     const tx=RX+RW/2-g.tilt*RW*.42-a.vx*[0.05,.12,.2][lv];g.ai[i]={x:clamp((tx-a.x)/60,-1,1),y:0}}};
@@ -2726,9 +2736,9 @@ function makeMGScene(key,mode,teams,res,back){const def=MGS[key];const PL=PLs(te
  const S={phase:'intro',t:0,ready:G.players.map(p=>!p.human||!PL.includes(p.i)),game:null,winners:null,beeped:-1};
  const humansIn=()=>G.players.filter(p=>p.human&&PL.includes(p.i));
  S.update=dt=>{S.t+=dt;
-  if(S.phase==='intro'){for(const p of humansIn())if(S.t>.4){if(!S.ready[p.i]&&Input.pressed(p.dev,'a')){S.ready[p.i]=true;sfx('ok')}else if(Input.pressed(p.dev,'b')){S.phase='practice';S.t=0;S.game=def.create(mode,teams);S.game.practice=true;BGM.play('mg');sfx('ok');return}}
-   if((S.ready.every(r=>r)&&S.t>.8)||(!humansIn().length&&S.t>2.2)){S.game=def.create(mode,teams);S.phase='count';S.t=0;BGM.play('mg')}}
-  else if(S.phase==='practice'){S.game.update(dt);if(S.game.done||S.t>20||(S.t>.6&&humansIn().some(p=>Input.pressed(p.dev,'b')))){S.phase='intro';S.t=.45;S.game=null;FX.parts=[];FX.floats=[];BGM.play('board');sfx('back')}}
+  if(S.phase==='intro'){for(const p of humansIn())if(S.t>.4){if(!S.ready[p.i]&&Input.pressed(p.dev,'a')){S.ready[p.i]=true;sfx('ok')}else if(Input.pressed(p.dev,'b')){S.phase='practice';S.t=0;S.pend={};S.pend[p.i]=false;S.game=def.create(mode,teams);S.game.practice=true;BGM.play(mgSong(key));sfx('ok');return}}
+   if((S.ready.every(r=>r)&&S.t>.8)||(!humansIn().length&&S.t>2.2)){S.game=def.create(mode,teams);S.phase='count';S.t=0;BGM.play(mgSong(key))}}
+  else if(S.phase==='practice'){S.game.update(dt);if(S.t>.6)for(const p of humansIn())if(Input.pressed(p.dev,'b')&&!S.pend[p.i]){S.pend[p.i]=true;sfx('ok')}if(S.game.done||S.t>20||(S.t>.6&&humansIn().every(p=>S.pend[p.i]))){S.phase='intro';S.t=.45;S.game=null;FX.parts=[];FX.floats=[];BGM.play('board');sfx('back')}}
   else if(S.phase==='count'){const n=3-Math.floor(S.t/.8);if(n!==S.beeped){S.beeped=n;if(n>0)sfx('beep');else sfx('go')}if(S.t>=3*.8+.35){S.phase='play';S.t=0}}
   else if(S.phase==='play'){S.game.update(dt);const tm=S.game.time;if(typeof tm==='number'&&S.prevT!=null&&tm<S.prevT&&tm>0){if(S.prevT>10&&tm<=10&&!S.game.practice)S.spurt=1.4;if(tm<=5){const sec=Math.ceil(tm);if(sec!==S.lastSec){S.lastSec=sec;sfx('tick')}S.last5=true}}else if(typeof tm==='number'&&tm>5)S.last5=false;S.prevT=tm;if(S.spurt>0)S.spurt-=dt;if(S.game.done){S.last5=false;S.phase='finish';S.t=0;sfx('whistle');S.winners=S.game.winners();S.winners.scores=S.game.scores?S.game.scores():null;S.winners.vals=S.game.resultVals?S.game.resultVals():(MG_LASTVALS&&MG_LASTVALS.some(v=>v!=null)?MG_LASTVALS:scoreFallback(S.winners));BGM.play(null)}}
   else if(S.phase==='finish'){if(S.t>1.4){S.phase='result';S.t=0;if(S.winners.length)sfx('fanfare');else sfx('lose')}}
@@ -2737,7 +2747,8 @@ function makeMGScene(key,mode,teams,res,back){const def=MGS[key];const PL=PLs(te
   S.game.draw(c);drawFx(c,false);
   if(S.phase==='play'&&S.last5){const k=(S.game.time%1);c.save();c.globalAlpha=.25*k;const vg=c.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,H*.85);vg.addColorStop(0,'rgba(255,40,40,0)');vg.addColorStop(1,'rgba(255,40,40,1)');c.fillStyle=vg;c.fillRect(0,0,W,H);c.restore()}
   if(S.phase==='play'&&S.spurt>0){const k=Math.min(1,(1.4-S.spurt)*5);c.save();c.globalAlpha=Math.min(1,S.spurt*2);txt(c,'ラストスパート！',W/2,150,{s:46*easeBack(k),f:FD,w:400,col:C.gold,st:C.ink,sw:10});c.restore()}
-  if(S.phase==='practice'){rr(c,W/2-230,H-60,460,44,22);c.fillStyle=C.ink;c.fill();txt(c,`れんしゅう中（のこり ${Math.max(0,Math.ceil(20-S.t))}秒）　B でおわる`,W/2,H-38,{s:20,col:C.gold})}
+  if(S.phase==='practice'){const hs=humansIn(),bw=520+hs.length*56;rr(c,W/2-bw/2,H-62,bw,48,24);c.fillStyle=C.ink;c.fill();txt(c,`れんしゅう中（のこり ${Math.max(0,Math.ceil(20-S.t))}秒）　B で おわりOK`,W/2-hs.length*28,H-38,{s:19,col:C.gold});
+   hs.forEach((p,k)=>{const x=W/2+bw/2-40-(hs.length-1-k)*56,y=H-38,ok=S.pend&&S.pend[p.i];circ(c,x,y,19);c.fillStyle=ok?C.green:'#5d5270';c.fill();drawChar(c,p.ci,x,y+2,11,{noShadow:true,alpha:ok?1:.6});if(ok)txt(c,'OK',x,y-26,{s:12,f:FD,w:400,col:C.green,st:'#fff',sw:3})})}
   if(S.phase==='count'){const n=3-Math.floor(S.t/.8);const k=(S.t%.8)/.8;c.fillStyle='rgba(20,10,40,.3)';c.fillRect(0,0,W,H);txt(c,n>0?''+n:'スタート！',W/2,H/2,{s:n>0?160*(1.3-k*.3):110,f:FD,w:400,col:n>0?'#fff':C.gold,st:C.ink,sw:16})}
   if(S.phase==='finish'){txt(c,'そこまで！',W/2,H/2,{s:110,f:FD,w:400,col:'#fff',st:C.ink,sw:16})}
   if(S.phase==='result'||S.phase==='out')drawMGResult(c,S.winners,teams,S.t)};
@@ -2748,7 +2759,7 @@ function drawMGIntro(c,def,mode,teams,S){mgBG(c,'#ffe3a8','#ffb36b');c.fillStyle
  txt(c,def.name,W/2,128,{s:def.name.length>8?52:62,f:FD,w:400,col:C.red,st:C.ink,sw:10});
  c.font=`800 24px ${FB}`;wrap(c,def.desc(mode),760).slice(0,5).forEach((l,i)=>txt(c,l,140,210+i*34,{s:24,a:'left'}));
  const tk=MG_ORDER.find(k=>MGS[k]===def);if(tk&&!THUMB.map[tk])THUMB.map[tk]=THUMB.make(tk);if(tk)drawThumb(c,tk,930,146,240,135,{r:12});
- rr(c,930,290,240,84,14);c.fillStyle='#fff0c6';c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();c.font=`800 15px ${FB}`;wrap(c,'そうさ：'+def.ctl,220).slice(0,3).forEach((l,i)=>txt(c,l,940,310+i*22,{s:15,a:'left'}));
+ rr(c,930,290,240,84,14);c.fillStyle='#fff0c6';c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();drawCtlIcons(c,def.ctl,958,332);c.font=`800 14px ${FB}`;wrap(c,def.ctl,166).slice(0,3).forEach((l,i)=>txt(c,l,994,310+i*21,{s:14,a:'left'}));
  const gs=teams.groups;const slots=[];if(mode==='ffa')gs.forEach((g0,k)=>slots.push({i:g0[0],x:260+k*255,col:CHARS[P(g0[0]).ci].col}));
  else{const tot=gs.reduce((a,g0)=>a+g0.length,0);let x=W/2-((tot-1)*200+60)/2;gs.forEach((g0,k)=>{g0.forEach(i=>{slots.push({i,x,col:teams.colors[k]});x+=200});x+=60})}
  if(mode!=='ffa'){const sx=slots[gs[0].length-1].x+130;txt(c,'VS',sx,470,{s:44,f:FD,w:400,col:C.ink})}
@@ -2756,6 +2767,11 @@ function drawMGIntro(c,def,mode,teams,S){mgBG(c,'#ffe3a8','#ffb36b');c.fillStyle
   txt(c,pname(p),s.x,540,{s:22});rr(c,s.x-70,560,140,36,18);c.fillStyle=S.ready[s.i]?C.green:'#fff';c.fill();c.lineWidth=3;c.stroke();txt(c,p.human?(S.ready[s.i]?'OK！':aLabel(p.dev)+'でOK'):'COM',s.x,578,{s:18,col:S.ready[s.i]?'#fff':C.ink})}
  if(mode!=='ffa'&&def.roles){const rl=def.roles(mode);gs.forEach((g0,k)=>{const xs=slots.filter(s=>g0.includes(s.i)).map(s=>s.x);const cx=(Math.min(...xs)+Math.max(...xs))/2;c.font=`800 16px ${FB}`;const tw=c.measureText(rl[k]).width+28;rr(c,cx-tw/2,604,tw,28,14);c.fillStyle=teams.colors[k];c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();txt(c,rl[k],cx,618,{s:16,col:'#fff',st:C.ink,sw:4})})}
  txt(c,G.players.some(p=>p.human&&PLs(teams).includes(p.i))?'A：じゅんびOK　　B：れんしゅう　　（全員 OK で スタート）':'まもなく スタート',W/2,652,{s:20,col:'#8a7aa0'})}
+// 操作の図：ctl の文に 出てくる 入力だけを 小さな 絵で ならべる（スティック／十字／A／B）
+function drawCtlIcons(c,ctl,x,y){const L=[];if(/スティック|十字|◀|▲|WASD|矢印/.test(ctl))L.push('stick');if(/A/.test(ctl))L.push('a');if(/B/.test(ctl))L.push('b');const n=L.length,gap=26;
+ L.forEach((k,i)=>{const yy=y+(i-(n-1)/2)*gap;c.lineWidth=2.5;c.strokeStyle=C.ink;
+  if(k==='stick'){c.fillStyle='#d9d4e4';circ(c,x,yy,11);c.fill();c.stroke();const a=NOW*3;c.fillStyle='#5d5270';circ(c,x+Math.cos(a)*4,yy+Math.sin(a)*4,6);c.fill();c.stroke()}
+  else{c.fillStyle=k==='a'?C.green:C.red;circ(c,x,yy,11);c.fill();c.stroke();txt(c,k.toUpperCase(),x,yy+1,{s:13,f:FD,w:400,col:'#fff'})}})}
 // バトルロイヤルのとき 負けた人にも 順位を出す（scores の向きが 勝ち負けと くいちがう時は 出さない）
 function mgRanks(winners,teams){const sc=winners.scores;if(teams.mode!=='ffa'||!sc||!winners.length)return null;const L=PLs(teams).filter(i=>!winners.includes(i));if(!L.length)return null;
  const wmin=Math.min(...winners.map(i=>sc[i])),wmax=Math.max(...winners.map(i=>sc[i])),lmax=Math.max(...L.map(i=>sc[i])),lmin=Math.min(...L.map(i=>sc[i]));
@@ -2768,6 +2784,8 @@ function fmtVal(v){if(v==null)return null;if(typeof v==='number'){if(!Number.isF
 function drawMGResult(c,winners,teams,t){c.fillStyle='rgba(20,10,40,.66)';c.fillRect(0,0,W,H);const k=easeBack(Math.min(1,t*2.5));
  txt(c,winners.length?'勝ち！':'ひきわけ',W/2,118,{s:90*k,f:FD,w:400,col:winners.length?C.gold:'#fff',st:C.ink,sw:14});
  const rk=mgRanks(winners,teams),vals=winners.vals,all=PLs(teams);
+ {let sub='';const num=v=>typeof v==='number'&&Number.isFinite(v);if(winners.length>1&&teams.mode==='ffa')sub='どうてん！';else if(vals&&winners.length===1&&teams.mode==='ffa'){const w=vals[winners[0]],ls=all.filter(i=>!winners.includes(i)).map(i=>vals[i]).filter(num);if(num(w)&&ls.length){const d=Math.abs(w-Math.max(...ls));if(Number.isInteger(w)&&d===1)sub='1点差の きんせん！';else if(!Number.isInteger(w)&&d<.1)sub='わずかな さ！'}}
+  if(sub&&t>.5){c.font=`800 22px ${FB}`;const sw=c.measureText(sub).width+40;rr(c,W/2-sw/2,160,sw,36,18);c.fillStyle=C.red;c.fill();txt(c,sub,W/2,178,{s:22,col:'#fff'})}}
  const order=all.slice().sort((a,b)=>{const wa=winners.includes(a)?0:1,wb=winners.includes(b)?0:1;if(wa!==wb)return wa-wb;if(rk&&!wa)return 0;if(rk)return(rk[a]||0)-(rk[b]||0);return 0});
  const n=order.length,cw=Math.min(270,(W-80)/n),gap=14;
  order.forEach((i,j)=>{const win=winners.includes(i),x=W/2+(j-(n-1)/2)*cw,cy=200,ch=380,app=Math.min(1,Math.max(0,(t-.15-j*.12)*4)),yo=(1-app)*40;
