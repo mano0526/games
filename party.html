@@ -1664,7 +1664,7 @@ function drawCritter(c,k,x,y,s,t,dir=-1){c.save();c.translate(x,y-Math.abs(Math.
  if(k==='mouse'){c.fillStyle=C.ink;circ(c,-s*.98,s*.02,s*.1);c.fill();c.strokeStyle='rgba(43,33,64,.6)';c.lineWidth=Math.max(1,s*.05);for(const dy of[-.06,.1]){c.beginPath();c.moveTo(-s*.8,s*dy);c.lineTo(-s*1.3,s*(dy*2));c.stroke()}}
  c.fillStyle='rgba(255,120,150,.35)';ell(c,-s*.3,s*.2,s*.13,s*.08);c.fill();
  c.restore()}
-MGS.count={name:'かぞえてカウント',modes:['ffa','1v1'],desc:()=>'画面を 横切る どうぶつの 中から、お題の どうぶつ だけを かぞえよう！ そっくりさんや、とちゅうで 引き返す子、しげみに かくれる子も いるよ。そのあと ↑↓で 数を えらんで Aで けってい。ぴったり、または いちばん 近い人の 勝ち。',ctl:'かぞえる：見るだけ　数：▲▼　けってい：A',
+MGS.count={name:'かぞえてカウント',modes:['ffa','1v1'],desc:()=>'画面を 横切る どうぶつの 中から、お題の どうぶつ だけを かぞえよう！ そっくりさんや、とちゅうで 引き返す子、しげみに かくれる子も いるよ。見つけたら そのたびに Aを 押して かぞえよう（押しすぎたら Bで 1つ もどす）。数は 最後まで だれにも 見えないよ。ぴったり、または いちばん 近い人の 勝ち。',ctl:'かぞえる：A（1回ごとに +1）　まちがえたら：B（−1）',
  create(mode,teams){const PL=PLs(teams);const lv=LV();const kinds=Object.keys(CRIT);const tgt=pick(['chick','pig','mouse']);
   // そっくりさん（ひよこ↔あひる、ねずみ↔ハムスター）を混ぜ、まとめて出てきたり、途中で引き返したり、しげみに隠れたりする
   const N=randi(15,26),dec=randi(14,22),alike=CRIT_ALIKE[tgt];const all=[];for(let k=0;k<N;k++)all.push(tgt);
@@ -1674,14 +1674,15 @@ MGS.count={name:'かぞえてカウント',modes:['ffa','1v1'],desc:()=>'画面�
    tt+=rand(.25,.55)*(1.25-f*.5)}
   const tEnd=Math.max(...list.map(a=>a.t0));const sc=8.6/Math.max(8.6,tEnd);for(const a of list)a.t0*=sc;
   const crossX=(a,dt0)=>{const L=W+160;let d=dt0*a.sp,dir=a.dir;if(a.turn&&d>a.turn*L){d=a.turn*L-(d-a.turn*L);dir=-a.dir}const x=a.dir>0?-80+d:W+80-d;return[x,dir,d<-1]};
-  const g={t:0,phase:'show',list,N,tgt,ans:[0,1,2,3].map(()=>10),lock:[0,1,2,3].map(i=>!PL.includes(i)),cpu:[null,null,null,null],done:false,ai:[],rv:0,inT:0,shown:0};
+  const g={t:0,phase:'show',list,N,tgt,ans:[0,1,2,3].map(()=>0),bump:[0,0,0,0],lock:[0,1,2,3].map(i=>!PL.includes(i)),cpu:[null,null,null,null],done:false,ai:[],rv:0,inT:0,shown:0};
   const SHOW=11,INP=9;
   g.update=dt=>{g.t+=dt;
-   if(g.phase==='show'){if(g.t>SHOW){g.phase='input';g.inT=0;sfx('go')}return}
-   if(g.phase==='input'){g.inT+=dt;for(const i of PL){if(g.lock[i])continue;const p=P(i);
-     if(p.human){if(Input.rep(p.dev,'up')||Input.rep(p.dev,'right')){g.ans[i]=Math.min(40,g.ans[i]+1);sfx('blip')}if(Input.rep(p.dev,'down')||Input.rep(p.dev,'left')){g.ans[i]=Math.max(0,g.ans[i]-1);sfx('blip')}if(g.inT>.3&&Input.pressed(p.dev,'a')){g.lock[i]=true;sfx('ok')}}
-     else{if(!g.cpu[i])g.cpu[i]={v:clamp(Math.round(g.N+gauss()*[2.6,1.5,.7][lv]),0,40),t:rand(1.5,4),mv:0};const cp=g.cpu[i];cp.mv-=dt;if(g.ans[i]!==cp.v){if(cp.mv<=0){g.ans[i]+=g.ans[i]<cp.v?1:-1;cp.mv=.11}}else if(g.inT>cp.t){g.lock[i]=true;sfx('ok')}}}
-    if(PL.every(i=>g.lock[i])||g.inT>INP){for(const i of PL)g.lock[i]=true;g.phase='reveal';g.rv=0}return}
+   for(const i of PL)g.bump[i]=Math.max(0,g.bump[i]-dt*5);
+   if(g.phase==='show'){// 見ながら A で かぞえる（数は 表示しない＝ほかの人に 見られない）
+    for(const i of PL){const p=P(i);if(p.human){if(Input.pressed(p.dev,'a')){g.ans[i]=Math.min(60,g.ans[i]+1);g.bump[i]=1;sfx('tick')}if(Input.pressed(p.dev,'b')&&g.ans[i]>0){g.ans[i]--;g.bump[i]=.6;sfx('back')}}
+     else{if(!g.cpu[i]){const v=clamp(Math.round(g.N+gauss()*[2.6,1.5,.7][lv]),0,60);const ts=[];for(let k=0;k<v;k++)ts.push(rand(.6,SHOW-.4));ts.sort((a,b)=>a-b);g.cpu[i]={v,ts}}const cp=g.cpu[i];while(cp.ts.length&&cp.ts[0]<=g.t){cp.ts.shift();g.ans[i]++;g.bump[i]=1}}}
+    if(g.t>SHOW){for(const i of PL){if(g.cpu[i])g.ans[i]=g.cpu[i].v;g.lock[i]=true}g.phase='input';g.inT=0;sfx('whistle')}return}
+   if(g.phase==='input'){g.inT+=dt;if(g.inT>1.6){g.phase='reveal';g.rv=0}return}
    if(g.phase==='reveal'){g.rv+=dt;const n=Math.min(g.N,Math.floor(g.rv/2.4*g.N));if(n>g.shown){g.shown=n;sfx('tick')}if(g.rv>2.4&&g.rv-dt<=2.4)sfx('fanfare');if(g.rv>5)g.done=true}};
   g.scores=()=>[0,1,2,3].map(i=>PL.includes(i)?-Math.abs(g.ans[i]-g.N):-1e9);
   g.winners=()=>{const s=g.scores();const m=Math.max(...PL.map(i=>s[i]));return PL.filter(i=>s[i]===m)};
@@ -1691,15 +1692,16 @@ MGS.count={name:'かぞえてカウント',modes:['ffa','1v1'],desc:()=>'画面�
    rr(c,W/2-230,92,460,92,22);c.fillStyle=C.paper;c.fill();c.lineWidth=4;c.stroke();drawCritter(c,g.tgt,W/2-160,146,24,NOW*.3);txt(c,`${CRIT[g.tgt].name}を かぞえよう！`,W/2+30,138,{s:30,f:FD,w:400,col:C.redD});
    if(g.phase==='show'){const vis=g.list.filter(a=>g.t>=a.t0).sort((a,b)=>a.y-b.y);for(const a of vis){const[x,dir,gone]=crossX(a,g.t-a.t0);if(gone||x<-100||x>W+100)continue;drawCritter(c,a.k,x,a.y,a.s,g.t+a.y,dir)}
     for(const[bx,by,bw]of[[250,470,150],[700,330,170],[1060,500,140]]){c.fillStyle='#5ca449';c.strokeStyle=C.ink;c.lineWidth=4;for(let q=0;q<4;q++){circ(c,bx-bw/2+q*bw/3,by-(q%2)*14,bw/3.4);c.fill();c.stroke()}c.fillStyle='#7cc65a';for(let q=0;q<4;q++){circ(c,bx-bw/2+q*bw/3-6,by-(q%2)*14-8,bw/6);c.fill()}}
+    PL.forEach((i,k)=>{const x=W/2+(k-(PL.length-1)/2)*230,y=660,p=P(i),bp=g.bump[i];rr(c,x-90,y-34,180,62,18);c.fillStyle='rgba(255,255,255,.88)';c.fill();c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();drawChar(c,p.ci,x-52,y+8,20,{noShadow:true,jump:bp*8});
+     c.save();c.translate(x+30,y-2);c.scale(1+bp*.25,1-bp*.15);rr(c,-26,-20,52,40,12);c.fillStyle='#d9d4e4';c.fill();c.lineWidth=3;c.stroke();circ(c,0,-20-bp*-6,9);c.fillStyle=C.red;c.fill();c.stroke();c.restore();
+     if(p.human&&g.t<3)txt(c,`${aLabel(p.dev)}で かぞえる`,x,y-46,{s:13,col:C.ink,st:'#fff',sw:4})});
     const k=Math.max(0,1-g.t/SHOW);rr(c,W/2-200,594,400,16,8);c.fillStyle='rgba(43,33,64,.3)';c.fill();rr(c,W/2-200,594,400*k,16,8);c.fillStyle=C.gold;c.fill()}
    else{c.fillStyle='rgba(20,10,40,.35)';c.fillRect(0,210,W,350);
     if(g.phase==='reveal'){txt(c,''+g.shown,W/2,300,{s:110,f:FD,w:400,col:'#fff',st:C.ink,sw:14});txt(c,g.rv>2.4?'せいかい！':'かぞえているよ…',W/2,385,{s:26,col:'#fff',st:C.ink,sw:6})}
-    else{txt(c,'いくつ だった？',W/2,280,{s:56,f:FD,w:400,col:'#fff',st:C.ink,sw:12});const k=Math.max(0,1-g.inT/INP);rr(c,W/2-200,340,400,16,8);c.fillStyle='rgba(255,255,255,.4)';c.fill();rr(c,W/2-200,340,400*k,16,8);c.fillStyle=C.gold;c.fill()}}
+    else{txt(c,'しゅうりょう！',W/2,280,{s:56,f:FD,w:400,col:'#fff',st:C.ink,sw:12});txt(c,'みんなの 数を 見てみよう…',W/2,350,{s:24,col:'#fff',st:C.ink,sw:6})}}
    if(g.phase!=='show')PL.forEach((i,k)=>{const x=640+(k-(PL.length-1)/2)*290,y=520;const p=P(i);rr(c,x-120,y-40,240,150,20);c.fillStyle='#fff';c.fill();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();
     const win=g.phase==='reveal'&&g.rv>2.4&&g.winners().includes(i);drawChar(c,p.ci,x-66,y+30,30,{mood:win?'happy':g.lock[i]?null:null,jump:win?Math.abs(Math.sin(NOW*8))*12:0});txt(c,pname(p),x+40,y-16,{s:18});
     if(g.phase==='reveal'&&g.rv>2.4+k*.2){const d=g.ans[i]-g.N;txt(c,''+g.ans[i],x+40,y+34,{s:46,f:FD,w:400,col:d===0?C.redD:C.ink});txt(c,d===0?'ぴったり！':(d>0?'+':'')+d,x+40,y+78,{s:18,col:d===0?C.redD:'#6d6280'})}
-    else if(g.lock[i]&&g.phase==='input')txt(c,'OK！',x+40,y+34,{s:38,f:FD,w:400,col:C.greenD});
-    else if(g.phase==='input'){txt(c,''+g.ans[i],x+40,y+34,{s:46,f:FD,w:400});c.fillStyle=C.gold;c.strokeStyle=C.ink;c.lineWidth=2.5;for(const sy of[-1,1]){c.beginPath();c.moveTo(x+40,y+34+sy*42);c.lineTo(x+28,y+34+sy*30);c.lineTo(x+52,y+34+sy*30);c.closePath();c.fill();c.stroke()}if(p.human)txt(c,`▲▼　${aLabel(p.dev)} けってい`,x+20,y+96,{s:13,col:'#6d6280'})}
     else txt(c,'？',x+40,y+34,{s:40,f:FD,w:400,col:'#b3aac4'})});
    drawMGTop(c,'かぞえてカウント',null,null,teams)};
   return g}};
