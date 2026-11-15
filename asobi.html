@@ -700,6 +700,189 @@ GAMES.push({key:'wolf',name:'ワードウルフ',min:3,max:4,hidden:true,noCom:t
    if(g.msgT>0)toast(c,g.msg)};
   return g}});
 
+/* ================= ババ抜き（2〜4人・手札は 自分にだけ 見える） ================= */
+GAMES.push({key:'oldmaid',name:'ババ抜き',min:2,max:4,hidden:true,desc:'となりの人から 1まい ひいて、同じ 数字が そろったら すてる。さいごに ジョーカーを 持っていた 人の 負け！',
+ rules:['はじめに 同じ 数字の 2まいは 自動で すてる。','自分の 番に、となり（次の人）の 手札から 1まい えらんで ひく。そろったら すてる。','手札が なくなったら あがり。さいごに ジョーカー（ババ）を 持っていた 人の 負け。','ひかれた 人の 手札は ひかれる たびに まぜられる。'],
+ thumb(c,x,y,w,h){c.fillStyle='#2b6a4b';c.fillRect(x,y,w,h);for(let i=0;i<5;i++){c.save();c.translate(x+w/2+(i-2)*w*.14,y+h*.62);c.rotate((i-2)*.15);drawCard(c,-w*.09,-h*.33,w*.18,h*.5,0,{back:i!==2});if(i===2)drawCard(c,-w*.09,-h*.33,w*.18,h*.5,52);c.restore()}},
+ create(n){const g={n,turn:0,hands:[],out:[],last:{},anim:0,msg:'',msgT:0,cur:0,done:false,drawn:null,discard:[]};
+  const d=Rshuffle([...Array(53).keys()]);g.hands=[...Array(n)].map(()=>[]);d.forEach((id,i)=>g.hands[i%n].push(id));
+  const rk=id=>id===52?-1:id%13;
+  const pairOff=s=>{const h=g.hands[s],by={};for(const id of h){if(id===52)continue;(by[rk(id)]=by[rk(id)]||[]).push(id)}let rm=[];for(const r in by){const L=by[r];for(let k=0;k+1<L.length;k+=2)rm.push(L[k],L[k+1])}g.hands[s]=h.filter(x=>!rm.includes(x));g.discard.push(...rm);return rm.length};
+  for(let s=0;s<n;s++){pairOff(s);Rshuffle(g.hands[s])}
+  const active=()=>[...Array(n).keys()].filter(s=>!g.out.includes(s));
+  const nextA=s=>{for(let k=1;k<=n;k++){const q=(s+k)%n;if(!g.out.includes(q))return q}return s};
+  const checkOut=()=>{for(const s of [...Array(n).keys()])if(!g.out.includes(s)&&!g.hands[s].length){g.out.push(s);g.msg=`${seatName(s)} あがり！`;g.msgT=1.8;sfx('home')}if(active().length<=1){g.out.push(...active());g.done=true;return true}return false};
+  checkOut();if(!g.done&&g.out.includes(g.turn))g.turn=nextA(g.turn);
+  g.target=()=>nextA(g.turn);
+  g.tryMove=m=>{if(m.i==null)return false;const s=g.turn,t=nextA(s),th=g.hands[t];if(m.i<0||m.i>=th.length)return false;const id=th[m.i];g.hands[t]=th.filter((x,k)=>k!==m.i);g.hands[s].push(id);
+   const before=g.hands[s].length;pairOff(s);const paired=g.hands[s].length<before;g.drawn={s,t,id,paired,time:0};Rshuffle(g.hands[t]);Rshuffle(g.hands[s]);sfx(paired?'box':'put');g.anim=paired?1.1:.8;g.cur=0;
+   if(!checkOut())g.turn=nextA(s);return true};
+  g.update=dt=>{g.anim=Math.max(0,g.anim-dt);g.msgT=Math.max(0,g.msgT-dt);if(g.drawn)g.drawn.time+=dt};g.busy=()=>g.anim>0;
+  g.ranking=()=>g.out.map(s=>[s]);g.score=s=>g.out.indexOf(s)===n-1?'ババ…':`${g.out.indexOf(s)+1}ばんめに あがり`;
+  g.ai=()=>({i:Math.floor(Math.random()*g.hands[nextA(g.turn)].length)});
+  const CW=78,CH=112;const tPos=len=>{const span=Math.min(70,(900-CW)/Math.max(1,len-1));const tot=CW+span*(len-1);return i=>({x:W/2-tot/2+i*span,y:250,w:i===len-1?CW:span})};
+  const hPos=len=>{const span=Math.min(64,(900-CW)/Math.max(1,len-1));const tot=CW+span*(len-1);return i=>({x:W/2-tot/2+i*span,y:H-CH-16,w:i===len-1?CW:span})};
+  g.human=s=>{const t=nextA(s),len=g.hands[t].length;if(!len)return null;g.cur=clamp(g.cur,0,len-1);if(sRep(s,'left')){g.cur=(g.cur+len-1)%len;sfx('blip')}if(sRep(s,'right')){g.cur=(g.cur+1)%len;sfx('blip')}
+   const P=tPos(len);const hv=sHover(s);if(hv)for(let i=len-1;i>=0;i--){const q=P(i);if(hit(hv,q.x,q.y-20,q.w,CH+20)){g.cur=i;break}}
+   for(const p of sClicks(s))for(let i=len-1;i>=0;i--){const q=P(i);if(hit(p,q.x,q.y-20,q.w,CH+20))return{i}}if(sPressed(s,'a'))return{i:g.cur};return null};
+  g.draw=c=>{bgFelt(c);const v=PLAY.viewer>=0?PLAY.viewer:0,hidden=PLAY.viewer<0||PLAY.curtain>=0;const t=nextA(g.turn);
+   // みんな（上に ならべる）
+   for(let s=0;s<n;s++){const x=W/2-(n*250-16)/2+s*250,on=s===g.turn&&!g.done;panel(c,x,62,234,76,{fill:on?'#fff':'rgba(255,248,236,.9)',stroke:on?SEATC[s].c:C.ink,lw:on?6:3,r:16});token(c,x+28,100,17,s);txt(c,shortName(s)+(s===v&&!hidden?'（あなた）':''),x+54,86,{s:18,a:'left',f:FD,w:400,col:SEATC[s].d});
+    const oi=g.out.indexOf(s);txt(c,oi>=0?(g.done&&oi===n-1?'ババ…':'あがり！'):`${g.hands[s].length}まい`,x+54,114,{s:18,a:'left',col:oi>=0?'#c4570a':C.ink});if(s===t&&!g.done){txt(c,'← ひかれる',x+226,114,{s:15,a:'right',col:C.red})}}
+   // ひかれる人の 手札（うら）
+   const myTurn=!g.done&&g.turn===v&&!hidden&&!isCom(v)&&seatDev(v)!=='net';const th=g.hands[t],P=tPos(th.length);
+   if(!g.done){txt(c,myTurn?`${shortName(t)} の 手札から 1まい えらんで ひこう！`:`${shortName(g.turn)} が ${shortName(t)} から ひきます`,W/2,215,{s:22,f:FD,w:400,col:'#fff',st:C.ink,sw:5});
+    for(let i=0;i<th.length;i++){const q=P(i),sel=myTurn&&i===g.cur;const isMine=t===v&&!hidden;drawCard(c,q.x,q.y-(sel?22:0),CW,CH,th[i],{back:!isMine,sel})}}
+   // ひいた カード
+   const dr=g.drawn;if(dr&&g.anim>0){const see=(dr.s===v||dr.t===v)&&!hidden;const k=Math.min(1,dr.time/.4);drawCard(c,W/2-CW/2,250+(k*90),CW,CH,dr.id,{back:!see});if(dr.paired)txt(c,'そろった！',W/2,440,{s:30,f:FD,w:400,col:C.gold,st:C.ink,sw:6})}
+   // 自分の 手札
+   const mh=g.hands[v],HP=hPos(mh.length);const sorted=hidden?mh:mh.slice().sort((a,b)=>(a===52?99:a%13)-(b===52?99:b%13));for(let i=0;i<sorted.length;i++){const q=HP(i);drawCard(c,q.x,q.y,CW,CH,sorted[i],{back:hidden})}
+   if(!hidden)txt(c,'あなたの 手札',W/2,H-CH-34,{s:16,col:'#fff',st:C.ink,sw:3});if(g.msgT>0)toast(c,g.msg)};
+  return g}});
+
+/* ================= 神経衰弱（2〜4人） ================= */
+GAMES.push({key:'memory',name:'神経衰弱',min:2,max:4,desc:'うらがえしの カードを 2まい めくって、同じ 数字なら もらえる。たくさん 取った 人の 勝ち！',
+ opts:[{k:'pairs',name:'カードの 数',vals:[12,20,26],labels:['24まい（はやい）','40まい','52まい（ぜんぶ）'],def:1}],
+ rules:['自分の 番に カードを 2まい めくる。','同じ 数字なら その 2まいを もらえて、もう1回 めくれる。','ちがったら うらに もどして 次の 人へ。どこに 何が あったか 覚えておこう。','ぜんぶ なくなったら おわり。いちばん 多く 取った 人の 勝ち。'],
+ thumb(c,x,y,w,h){c.fillStyle='#2b6a4b';c.fillRect(x,y,w,h);const cw=w/7,ch=h/3.4;for(let i=0;i<5;i++)for(let j=0;j<2;j++){const up=(i===1&&j===0)||(i===3&&j===1);drawCard(c,x+w/2+(i-2.5)*cw*1.12+cw*.06,y+h*.12+j*ch*1.25,cw,ch,up?11:0,{back:!up})}},
+ create(n,O){O=O||{};const NP=O.pairs||20;// 数字ごとに 2まい（マークは 赤黒で ちがうものを）
+  const ids=[];const ranks=[];for(let r=0;r<13;r++)ranks.push(r);Rshuffle(ranks);for(let k=0;k<NP;k++){const r=ranks[k%13],pair=Math.floor(k/13);ids.push(r+(pair*2)*13,r+(pair*2+1)*13)}Rshuffle(ids);
+  const g={n,turn:0,cards:ids.map(id=>({id,taken:-1})),open:[],pts:new Array(n).fill(0),seen:{},anim:0,flipBack:0,done:false,cur:0,msg:'',msgT:0};
+  const N=ids.length,COLS=N<=24?8:N<=40?10:13,ROWS=Math.ceil(N/COLS);
+  g.tryMove=m=>{const i=m.f;if(i==null||i<0||i>=N||g.cards[i].taken>=0||g.open.includes(i)||g.open.length>=2)return false;g.open.push(i);g.seen[i]=g.cards[i].id%13;sfx('flip');g.anim=.35;
+   if(g.open.length===2){const[a,b]=g.open;if(g.cards[a].id%13===g.cards[b].id%13){g.cards[a].taken=g.cards[b].taken=g.turn;g.pts[g.turn]++;g.open=[];sfx('box');g.anim=.6;if(g.cards.every(q=>q.taken>=0))g.done=true}
+    else{g.flipBack=1.3;g.anim=1.3}}return true};
+  g.update=dt=>{g.anim=Math.max(0,g.anim-dt);g.msgT=Math.max(0,g.msgT-dt);if(g.flipBack>0){g.flipBack-=dt;if(g.flipBack<=0){g.open=[];g.turn=(g.turn+1)%n;sfx('back')}}};
+  g.busy=()=>g.anim>0||g.flipBack>0;g.ranking=()=>rankBy(g.pts.slice());g.score=s=>g.pts[s]+'組';
+  g.ai=lv=>{const rec=[.25,.6,.95][lv];const left=g.cards.map((q,i)=>i).filter(i=>g.cards[i].taken<0&&!g.open.includes(i));
+   const known={};for(const i of left)if(g.seen[i]!=null&&Math.random()<rec)known[i]=g.seen[i];
+   if(g.open.length===1){const a=g.open[0],r=g.cards[a].id%13;const m=Object.keys(known).map(Number).find(i=>i!==a&&known[i]===r);if(m!=null)return{f:m};const unk=left.filter(i=>known[i]==null);return{f:pick(unk.length?unk:left)}}
+   const by={};for(const i in known)(by[known[i]]=by[known[i]]||[]).push(+i);for(const r in by)if(by[r].length>=2)return{f:by[r][0]};
+   const unk=left.filter(i=>g.seen[i]==null);return{f:pick(unk.length?unk:left)}};
+  const CWd=Math.min(80,Math.floor(900/COLS)-8),CHd=Math.floor(CWd*1.4),GX=W/2-(COLS*(CWd+8)-8)/2+40,GY=Math.max(70,370-(ROWS*(CHd+8))/2);
+  const pos=i=>({x:GX+(i%COLS)*(CWd+8),y:GY+Math.floor(i/COLS)*(CHd+8)});
+  g.human=s=>{if(sRep(s,'left'))g.cur=(g.cur+N-1)%N;if(sRep(s,'right'))g.cur=(g.cur+1)%N;if(sRep(s,'up'))g.cur=(g.cur-COLS+N)%N;if(sRep(s,'down'))g.cur=(g.cur+COLS)%N;
+   const hv=sHover(s);if(hv)for(let i=0;i<N;i++){const p=pos(i);if(hit(hv,p.x,p.y,CWd,CHd)){g.cur=i;break}}
+   for(const p0 of sClicks(s))for(let i=0;i<N;i++){const p=pos(i);if(hit(p0,p.x,p.y,CWd,CHd)){g.cur=i;return{f:i}}}if(sPressed(s,'a'))return{f:g.cur};return null};
+  g.draw=c=>{bgFelt(c);const mine=!isCom(g.turn)&&seatDev(g.turn)!=='net'&&!g.done;
+   for(let i=0;i<N;i++){const q=g.cards[i],p=pos(i);if(q.taken>=0){rr(c,p.x,p.y,CWd,CHd,8);c.strokeStyle='rgba(255,255,255,.12)';c.lineWidth=2;c.stroke();continue}
+    const up=g.open.includes(i);drawCard(c,p.x,p.y,CWd,CHd,q.id,{back:!up,sel:mine&&i===g.cur&&!up});if(mine&&i===g.cur&&up){c.strokeStyle=C.gold;c.lineWidth=4;rr(c,p.x-3,p.y-3,CWd+6,CHd+6,10);c.stroke()}}
+   sidePanels2(c,s=>`${g.pts[s]}組`);if(g.msgT>0)toast(c,g.msg)};
+  return g}});
+// 左の はしに 全員を たてに ならべる（せまい 盤の ゲーム用）
+function sidePanels2(c,scoreFn){const g=PLAY.g,n=PLAY.n;for(let s=0;s<n;s++){const x=14,y=70+s*120,on=s===g.turn&&!g.done;panel(c,x,y,190,106,{fill:on?'#fff':'rgba(255,248,236,.9)',stroke:on?SEATC[s].c:C.ink,lw:on?6:3,r:16});token(c,x+30,y+32,18,s);txt(c,shortName(s),x+58,y+32,{s:19,a:'left',f:FD,w:400,col:SEATC[s].d});txt(c,scoreFn(s),x+95,y+76,{s:28,f:FD,w:400})}}
+
+/* ================= マンカラ（2人） ================= */
+GAMES.push({key:'mancala',name:'マンカラ',min:2,max:2,desc:'穴の 石を 1こずつ まいて すすむ。自分の 大きな 穴（ゴール）に 多く 集めた ほうの 勝ち！',
+ rules:['自分の 側の 穴を 1つ えらび、中の 石を ぜんぶ 取って 反時計まわりに 1こずつ まく（あいての ゴールは とばす）。','さいごの 石が 自分の ゴールに 入ったら もう1回。','さいごの 石が 自分の 側の からっぽの 穴に 入ったら、向かいの 穴の 石と いっしょに ゴールへ（横どり）。','どちらかの 側が からっぽに なったら おわり。のこった 石は その側の 人の もの。ゴールの 石が 多い ほうの 勝ち。'],
+ thumb(c,x,y,w,h){c.fillStyle='#8a5a2b';rr(c,x+8,y+h*.2,w-16,h*.6,h*.3);c.fill();for(let i=0;i<6;i++)for(let j=0;j<2;j++){circ(c,x+w*.2+i*w*.12,y+h*.38+j*h*.24,h*.09);c.fillStyle='#5e3a17';c.fill();for(let k=0;k<3;k++){circ(c,x+w*.2+i*w*.12+(k-1)*5,y+h*.38+j*h*.24+(k%2)*4-2,3.5);c.fillStyle=['#e5473c','#3a7fdc','#2fb36b'][k];c.fill()}}},
+ create(n,O){O=O||{};const SEEDS=O.st||4;// 0〜5＝1Pの穴、6＝1Pゴール、7〜12＝2Pの穴、13＝2Pゴール
+  const B=new Array(14).fill(SEEDS);B[6]=B[13]=0;const g={n,turn:0,B,done:false,anim:0,sow:null,cur:0,msg:'',msgT:0,last:-1};
+  const sowOn=(B,p,s)=>{const nb=B.slice();let k=nb[p];nb[p]=0;let i=p;const path=[];while(k>0){i=(i+1)%14;if(i===(s===0?13:6))continue;nb[i]++;k--;path.push(i)}
+   let again=i===(s===0?6:13);const mine=s===0?(i>=0&&i<=5):(i>=7&&i<=12);let cap=false;if(!again&&mine&&nb[i]===1&&nb[12-i]>0){nb[s===0?6:13]+=nb[12-i]+1;nb[12-i]=0;nb[i]=0;cap=true}
+   let end=false;const a=[0,1,2,3,4,5].every(q=>!nb[q]),b=[7,8,9,10,11,12].every(q=>!nb[q]);if(a||b){for(let q=0;q<6;q++){nb[6]+=nb[q];nb[q]=0}for(let q=7;q<13;q++){nb[13]+=nb[q];nb[q]=0}end=true}
+   return{nb,again:again&&!end,cap,end,path}};
+  const legal=(B,s)=>(s===0?[0,1,2,3,4,5]:[7,8,9,10,11,12]).filter(p=>B[p]>0);
+  g.tryMove=m=>{const s=g.turn,p=m.p;if(!legal(g.B,s).includes(p))return false;const r=sowOn(g.B,p,s);g.sow={from:g.B.slice(),path:r.path,t:0,p};g.B=r.nb;g.last=p;g.anim=.18+r.path.length*.09;sfx('put');
+   if(r.cap){g.msg='横どり！';g.msgT=1.4;setTimeout(()=>sfx('cap'),g.anim*1000)}if(r.end){g.done=true}else if(r.again){g.msg='もう1回！';g.msgT=1.2}else g.turn=1-s;return true};
+  g.update=dt=>{g.anim=Math.max(0,g.anim-dt);g.msgT=Math.max(0,g.msgT-dt);if(g.sow)g.sow.t+=dt};g.busy=()=>g.anim>0;
+  g.ranking=()=>g.B[6]===g.B[13]?[[0,1]]:g.B[6]>g.B[13]?[[0],[1]]:[[1],[0]];g.score=s=>(s===0?g.B[6]:g.B[13])+'こ';
+  const ev=(B,s)=>(s===0?B[6]-B[13]:B[13]-B[6])+.25*((s===0?[0,1,2,3,4,5]:[7,8,9,10,11,12]).reduce((a,q)=>a+B[q],0)-(s===0?[7,8,9,10,11,12]:[0,1,2,3,4,5]).reduce((a,q)=>a+B[q],0));
+  const search=(B,s,d,a,b)=>{const L=legal(B,s);if(!d||!L.length)return ev(B,s);let best=-1e9;for(const p of L){const r=sowOn(B,p,s);const v=r.end?ev(r.nb,s)*10:r.again?search(r.nb,s,d,a,b):-search(r.nb,1-s,d-1,-b,-a);if(v>best)best=v;if(best>a)a=best;if(a>=b)break}return best};
+  g.ai=lv=>{const s=g.turn,L=legal(g.B,s);if(lv===0&&Math.random()<.5)return{p:pick(L)};const d=[1,3,6][lv];let best=L[0],bv=-1e9;for(const p of L){const r=sowOn(g.B,p,s);const v=(r.end?ev(r.nb,s)*10:r.again?search(r.nb,s,d,-1e9,1e9):-search(r.nb,1-s,d-1,-1e9,1e9))+(lv===1?rand(0,1.5):0);if(v>bv){bv=v;best=p}}return{p:best}};
+  // 画面：1Pは 下の列（左→右）、2Pは 上の列（右→左）
+  const PW=104,PY1=440,PY2=260,X0=W/2-3*PW+PW/2;const pitXY=p=>p<6?[X0+p*PW,PY1]:p===6?[X0+6*PW+40,340]:p<13?[X0+(12-p)*PW,PY2]:[X0-PW-40+PW/2-PW/2,340];
+  g.human=s=>{const L=legal(g.B,s);if(!L.length)return null;g.cur=clamp(g.cur,0,L.length-1);if(sRep(s,'left')||sRep(s,'up')){g.cur=(g.cur+L.length-1)%L.length;sfx('blip')}if(sRep(s,'right')||sRep(s,'down')){g.cur=(g.cur+1)%L.length;sfx('blip')}
+   const ord=s===0?L:L.slice().sort((a,b)=>b-a);g.cur=clamp(g.cur,0,ord.length-1);const near=p0=>ord.findIndex(p=>{const[x,y]=pitXY(p);return Math.hypot(p0.x-x,p0.y-y)<52});
+   const hv=sHover(s);if(hv){const k=near(hv);if(k>=0)g.cur=k}for(const p0 of sClicks(s)){const k=near(p0);if(k>=0)return{p:ord[k]}}if(sPressed(s,'a'))return{p:ord[g.cur]};g.curP=ord[g.cur];return null};
+  const stones=(c,x,y,k,r)=>{for(let i=0;i<Math.min(k,24);i++){const a=i*2.4,d=Math.sqrt(i)*r*.22;circ(c,x+Math.cos(a)*d,y+Math.sin(a)*d,7);c.fillStyle=['#e5473c','#3a7fdc','#2fb36b','#f2b705','#fff8ec'][i%5];c.fill();c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1.5;c.stroke()}};
+  g.draw=c=>{bgFelt(c);const BL=pitXY(13)[0]-70,BR=pitXY(6)[0]+70;rr(c,BL,190,BR-BL,320,150);c.fillStyle='#9a6634';c.fill();c.lineWidth=6;c.strokeStyle=C.ink;c.stroke();rr(c,BL+12,202,BR-BL-24,296,140);c.strokeStyle='rgba(255,255,255,.18)';c.lineWidth=3;c.stroke();
+   const human=!isCom(g.turn)&&seatDev(g.turn)!=='net'&&!g.done&&g.anim<=0;const L=human?legal(g.B,g.turn):[];const ord=g.turn===0?L:L.slice().sort((a,b)=>b-a);const curP=human?ord[clamp(g.cur,0,ord.length-1)]:-1;
+   // 見える 石の 数（まいている とちゅうは 少しずつ）
+   let show=g.B;if(g.sow&&g.anim>0){const k=Math.floor(g.sow.t/.09);show=g.sow.from.slice();show[g.sow.p]=0;for(let i=0;i<Math.min(k,g.sow.path.length);i++)show[g.sow.path[i]]++;if(k>=g.sow.path.length)show=g.B}
+   for(let p=0;p<14;p++){const[x,y]=pitXY(p);const store=p===6||p===13;if(store){rr(c,x-46,y-120,92,240,46);c.fillStyle='#5e3a17';c.fill();c.strokeStyle=SEATC[p===6?0:1].c;c.lineWidth=5;c.stroke();stones(c,x,y,show[p],120);txt(c,String(show[p]),x,y+150,{s:30,f:FD,w:400,col:'#fff',st:C.ink,sw:5})}
+    else{circ(c,x,y,48);c.fillStyle='#5e3a17';c.fill();c.strokeStyle=p===curP?C.gold:L.includes(p)?'rgba(255,255,255,.6)':'rgba(0,0,0,.4)';c.lineWidth=p===curP?7:3;c.stroke();stones(c,x,y,show[p],48);txt(c,String(show[p]),x,y+(p<6?70:-70),{s:22,f:FD,w:400,col:'#fff',st:C.ink,sw:4})}}
+   txt(c,`↓ ${shortName(0)} の 側（ゴールは 右）`,X0+2.5*PW,PY1+108,{s:17,col:'#fff',st:C.ink,sw:3});txt(c,`${shortName(1)} の 側（ゴールは 左） ↑`,X0+2.5*PW,PY2-104,{s:17,col:'#fff',st:C.ink,sw:3});
+   for(let s=0;s<2;s++){const x=s===0?24:W-264,y=s===0?560:60,on=s===g.turn&&!g.done;panel(c,x,y,240,96,{fill:on?'#fff':'rgba(255,248,236,.9)',stroke:on?SEATC[s].c:C.ink,lw:on?6:3,r:16});token(c,x+30,y+32,17,s);txt(c,shortName(s),x+56,y+32,{s:19,a:'left',f:FD,w:400,col:SEATC[s].d});txt(c,`ゴール ${s===0?g.B[6]:g.B[13]}こ`,x+120,y+70,{s:22,f:FD,w:400})}
+   if(g.msgT>0)toast(c,g.msg)};
+  return g}});
+
+/* ================= 五目並べ（2人） ================= */
+GAMES.push({key:'gomoku',name:'五目並べ',min:2,max:2,desc:'交互に 石を 置いて、たて・よこ・ななめに 5つ ならべたら 勝ち！',
+ rules:['黒（1P）と 白（2P）が 交互に 石を 1つずつ 置く。','たて・よこ・ななめの どれかに 自分の 石を 5つ 以上 ならべたら 勝ち。','禁じ手は なし（だれでも 自由に 置ける）。'],
+ thumb(c,x,y,w,h){c.fillStyle='#e2b46a';c.fillRect(x,y,w,h);const s=Math.min(w,h)/9;c.strokeStyle='rgba(0,0,0,.5)';for(let i=0;i<9;i++){c.beginPath();c.moveTo(x+w/2-4*s,y+h/2+(i-4)*s);c.lineTo(x+w/2+4*s,y+h/2+(i-4)*s);c.stroke();c.beginPath();c.moveTo(x+w/2+(i-4)*s,y+h/2-4*s);c.lineTo(x+w/2+(i-4)*s,y+h/2+4*s);c.stroke()}
+  [[0,0,0],[1,1,0],[2,2,0],[3,3,0],[1,0,1],[2,1,1],[0,2,1],[3,1,1]].forEach(([a,b,v])=>{circ(c,x+w/2+(a-2)*s,y+h/2+(b-2)*s,s*.42);c.fillStyle=v?'#fff':'#222';c.fill();c.strokeStyle='#000';c.stroke()})},
+ create(n){const N=15;const B=new Array(N*N).fill(-1);B[7*N+7]=-1;const g={n,turn:0,B,cur:{x:7,y:7},last:-1,done:false,win:-1,line:[],anim:0,moves:0};
+  const D=[[1,0],[0,1],[1,1],[1,-1]];
+  const runAt=(B,i,p)=>{const x=i%N,y=Math.floor(i/N);let best=null;for(const[dx,dy]of D){const L=[i];for(const sg of[1,-1]){let cx=x+dx*sg,cy=y+dy*sg;while(cx>=0&&cx<N&&cy>=0&&cy<N&&B[cy*N+cx]===p){L.push(cy*N+cx);cx+=dx*sg;cy+=dy*sg}}if(L.length>=5&&(!best||L.length>best.length))best=L}return best};
+  g.tryMove=m=>{const i=m.i;if(i==null||i<0||i>=N*N||g.B[i]>=0)return false;g.B[i]=g.turn;g.last=i;g.moves++;sfx('put');g.anim=.15;const L=runAt(g.B,i,g.turn);if(L){g.done=true;g.win=g.turn;g.line=L}else if(g.moves>=N*N)g.done=true;else g.turn=1-g.turn;return true};
+  g.update=dt=>{g.anim=Math.max(0,g.anim-dt)};g.busy=()=>g.anim>0;
+  g.ranking=()=>g.win<0?[[0,1]]:[[g.win],[1-g.win]];g.score=s=>s===0?'黒':'白';
+  // COM：空いた 点ごとに「自分が 置いたら」「あいてが 置いたら」の 形を 点数に して いちばん 高い 所
+  const SC=[0,1,12,120,1500,100000];
+  const lineScore=(B,i,p)=>{const x=i%N,y=Math.floor(i/N);let t=0;for(const[dx,dy]of D){let cnt=1,open=0;for(const sg of[1,-1]){let cx=x+dx*sg,cy=y+dy*sg;while(cx>=0&&cx<N&&cy>=0&&cy<N&&B[cy*N+cx]===p){cnt++;cx+=dx*sg;cy+=dy*sg}if(cx>=0&&cx<N&&cy>=0&&cy<N&&B[cy*N+cx]<0)open++}
+    if(cnt>=5)t+=SC[5];else if(open)t+=SC[cnt]*(open===2?2.2:1)}return t};
+  g.ai=lv=>{const p=g.turn;if(!g.moves)return{i:7*N+7};let best=-1,bv=-1e9;
+   for(let i=0;i<N*N;i++){if(g.B[i]>=0)continue;const x=i%N,y=Math.floor(i/N);let near=false;for(let dy=-2;dy<=2&&!near;dy++)for(let dx=-2;dx<=2;dx++){const cx=x+dx,cy=y+dy;if(cx>=0&&cx<N&&cy>=0&&cy<N&&g.B[cy*N+cx]>=0){near=true;break}}if(!near)continue;
+    const atk=lineScore(g.B,i,p),def=lineScore(g.B,i,1-p);const v=lv===0?atk+def*.5+rand(0,400):lv===1?atk*1.1+def*.95+rand(0,40):atk*1.15+def+rand(0,4);if(v>bv){bv=v;best=i}}return{i:best}};
+  const S=40,BX=W/2-7*S,BY=H/2-7*S+14;
+  g.human=s=>{for(const k of['left','right','up','down'])if(sRep(s,k)){const d={left:[-1,0],right:[1,0],up:[0,-1],down:[0,1]}[k];g.cur.x=clamp(g.cur.x+d[0],0,N-1);g.cur.y=clamp(g.cur.y+d[1],0,N-1);sfx('blip')}
+   const cell=p=>{const x=Math.round((p.x-BX)/S),y=Math.round((p.y-BY)/S);return x>=0&&x<N&&y>=0&&y<N?{x,y}:null};const hv=sHover(s);if(hv){const q=cell(hv);if(q)g.cur=q}
+   for(const p of sClicks(s)){const q=cell(p);if(q){g.cur=q;return{i:q.y*N+q.x}}}if(sPressed(s,'a'))return{i:g.cur.y*N+g.cur.x};return null};
+  g.draw=c=>{bgFelt(c);rr(c,BX-34,BY-34,14*S+68,14*S+68,14);c.fillStyle='#e2b46a';c.fill();c.lineWidth=5;c.strokeStyle=C.ink;c.stroke();c.strokeStyle='rgba(60,35,10,.75)';c.lineWidth=1.6;
+   for(let k=0;k<N;k++){c.beginPath();c.moveTo(BX,BY+k*S);c.lineTo(BX+14*S,BY+k*S);c.stroke();c.beginPath();c.moveTo(BX+k*S,BY);c.lineTo(BX+k*S,BY+14*S);c.stroke()}
+   c.fillStyle='rgba(60,35,10,.9)';for(const[a,b]of[[3,3],[11,3],[7,7],[3,11],[11,11]]){circ(c,BX+a*S,BY+b*S,4.5);c.fill()}
+   for(let i=0;i<N*N;i++){const v=g.B[i];if(v<0)continue;const x=BX+(i%N)*S,y=BY+Math.floor(i/N)*S;c.fillStyle='rgba(0,0,0,.25)';circ(c,x+2,y+4,S*.44);c.fill();circ(c,x,y,S*.44);const gr=c.createRadialGradient(x-6,y-7,2,x,y,S*.46);gr.addColorStop(0,v?'#fff':'#666');gr.addColorStop(1,v?'#d8d4cc':'#111');c.fillStyle=gr;c.fill();c.strokeStyle='#000';c.lineWidth=1.5;c.stroke();
+    if(i===g.last){circ(c,x,y,6);c.fillStyle=C.red;c.fill()}if(g.line.includes(i)&&(NOW*4%1)<.6){circ(c,x,y,S*.5);c.strokeStyle=C.gold;c.lineWidth=4;c.stroke()}}
+   const human=!isCom(g.turn)&&seatDev(g.turn)!=='net'&&!g.done;if(human){const x=BX+g.cur.x*S,y=BY+g.cur.y*S;circ(c,x,y,S*.44);c.fillStyle=g.turn?'rgba(255,255,255,.55)':'rgba(0,0,0,.4)';c.fill();c.strokeStyle=C.gold;c.lineWidth=3;c.stroke()}
+   sidePanels(c,[0,1],s=>s===0?'黒（先手）':'白')};
+  return g}});
+
+/* ================= ヒット＆ブロー（2人・答えは 自分にだけ 見える） ================= */
+GAMES.push({key:'hitblow',name:'ヒット＆ブロー',min:2,max:2,hidden:true,desc:'あいての ひみつの 数字を 当てよう。場所も 数字も 同じなら ヒット、数字だけ 同じなら ブロー。',
+ opts:[{k:'dg',name:'けた数',vals:[3,4],labels:['3けた','4けた'],def:0}],
+ rules:['はじめに おたがい、同じ 数字を 使わない ひみつの 数字（3けた）を 決める。','交互に あいての 数字を 予想する。数字と 場所が 合っていれば「ヒット」、数字は あるけど 場所が ちがえば「ブロー」と 教えてもらえる。','先に ぜんぶ ヒット（3ヒット）した 人の 勝ち。先手が 当てたら 後手も あと1回 ちょうせん できて、当てたら 引きわけ。'],
+ thumb(c,x,y,w,h){c.fillStyle='#24384f';c.fillRect(x,y,w,h);['3','7','1'].forEach((d,i)=>{panel(c,x+w/2+(i-1)*w*.2-w*.08,y+h*.18,w*.16,h*.36,{fill:C.paper,lw:3,r:8});txt(c,d,x+w/2+(i-1)*w*.2,y+h*.36,{s:h*.26,f:FD,w:400})});txt(c,'1ヒット 1ブロー',x+w/2,y+h*.75,{s:Math.min(20,w*.08),f:FD,w:400,col:C.gold})},
+ create(n,O){O=O||{};const DG=O.dg||3;const g={n,turn:0,phase:'set',sec:['',''],hist:[[],[]],input:'',done:false,anim:0,win:[],last:null,msg:'',msgT:0,firstHit:-1,cur:0};
+  const fb=(sec,gs)=>{let h=0,b=0;for(let i=0;i<DG;i++){if(gs[i]===sec[i])h++;else if(sec.includes(gs[i]))b++}return[h,b]};
+  const ok=s=>typeof s==='string'&&s.length===DG&&/^[0-9]+$/.test(s)&&new Set(s).size===DG;
+  g.public=()=>g.phase==='guess';
+  g.tryMove=m=>{const s=g.turn;
+   if(m.sec!=null){if(g.phase!=='set'||!ok(m.sec))return false;g.sec[s]=m.sec;sfx('ok');g.anim=.3;if(s===0)g.turn=1;else{g.phase='guess';g.turn=0}return true}
+   if(m.g!=null){if(g.phase!=='guess'||!ok(m.g))return false;const[h,b]=fb(g.sec[1-s],m.g);g.hist[s].push({g:m.g,h,b});g.last={s,h,b,t:0};sfx(h===DG?'win':h?'box':'put');g.anim=.9;
+    if(h===DG){if(s===0&&g.firstHit<0){g.firstHit=0;g.msg='1Pが 当てた！ 2Pは あと1回で 引きわけを ねらえる';g.msgT=2.4;g.turn=1}else{g.win=g.firstHit===0&&s===1?[0,1]:[s];g.done=true}}
+    else if(g.firstHit===0){g.win=[0];g.done=true}else g.turn=1-s;return true}return false};
+  g.update=dt=>{g.anim=Math.max(0,g.anim-dt);g.msgT=Math.max(0,g.msgT-dt);if(g.last)g.last.t+=dt};g.busy=()=>g.anim>0;
+  g.ranking=()=>g.win.length===2?[[0,1]]:[[g.win[0]],[1-g.win[0]]];g.score=s=>`${g.hist[s].length}回で ${g.hist[s].some(q=>q.h===DG)?'正解':'…'}（答え ${g.sec[s]}）`;
+  // COM：これまでの ヒント全部に 合う 数字の 中から 予想（よわいと ときどき むし）
+  const ALL=[];(function gen(p){if(p.length===DG){ALL.push(p);return}for(let d=0;d<10;d++)if(!p.includes(d))gen(p+d)})('');
+  g.ai=lv=>{const s=g.turn;if(g.phase==='set')return{sec:pick(ALL)};const H=g.hist[s];let C2=ALL.filter(x=>H.every(q=>{const[h,b]=fb(x,q.g);return h===q.h&&b===q.b}));
+   if(lv===0&&Math.random()<.45){const part=ALL.filter(x=>H.slice(-2).every(q=>{const[h,b]=fb(x,q.g);return h===q.h&&b===q.b}));C2=part.length?part:ALL}
+   if(lv===1&&H.length<2&&Math.random()<.5)return{g:pick(ALL)};return{g:pick(C2.length?C2:ALL)}};
+  // 入力用の 数字キー
+  const KX=W-430,KY=300,KS=86;const keys=[1,2,3,4,5,6,7,8,9,'けす',0,'OK'];const kpos=i=>({x:KX+(i%3)*(KS+10),y:KY+Math.floor(i/3)*(KS*.72+10),w:KS,h:KS*.72});
+  g.human=s=>{let k=null;for(const p of sClicks(s)){const i=keys.findIndex((q,j)=>{const r=kpos(j);return hit(p,r.x,r.y,r.w,r.h)});if(i>=0){k=keys[i];g.cur=i}}
+   if(sRep(s,'left')){g.cur=(g.cur+11)%12;sfx('blip')}if(sRep(s,'right')){g.cur=(g.cur+1)%12;sfx('blip')}if(sRep(s,'up')){g.cur=(g.cur+9)%12;sfx('blip')}if(sRep(s,'down')){g.cur=(g.cur+3)%12;sfx('blip')}
+   if(sPressed(s,'a'))k=keys[g.cur];if(sPressed(s,'b'))k='けす';
+   for(let d=0;d<10;d++)if(seatDev(s)!=='net'&&(In.keys['Digit'+d]||In.keys['Numpad'+d])&&!g['_k'+d]){g['_k'+d]=1;k=d}else if(!(In.keys['Digit'+d]||In.keys['Numpad'+d]))g['_k'+d]=0;
+   if(k==null)return null;if(k==='けす'){g.input=g.input.slice(0,-1);sfx('back');return null}
+   if(k==='OK'){if(g.input.length<DG){g.msg=`${DG}けた 入れてね`;g.msgT=1.2;sfx('bad');return null}const v=g.input;g.input='';return g.phase==='set'?{sec:v}:{g:v}}
+   if(g.input.length>=DG||g.input.includes(String(k))){sfx('bad');if(g.input.includes(String(k))){g.msg='同じ 数字は 使えないよ';g.msgT=1.2}return null}g.input+=String(k);sfx('blip');return null};
+  g.draw=c=>{c.fillStyle='#1c2c3e';c.fillRect(0,0,W,H);const vw=PLAY.viewer,cur=g.turn,hidden=PLAY.curtain>=0;const mine=!g.done&&!hidden&&!isCom(cur)&&seatDev(cur)!=='net'&&(vw===cur||PLAY.locals.length>1);
+   // 左右に 2人の 予想の きろく
+   for(let s=0;s<2;s++){const x=s===0?24:W/2-210,w=380;panel(c,x,62,w,H-80,{fill:'rgba(255,248,236,.95)',stroke:s===cur&&!g.done?SEATC[s].c:C.ink,lw:s===cur?6:3,r:16});token(c,x+30,92,17,s);txt(c,shortName(s)+' の 予想',x+56,92,{s:20,a:'left',f:FD,w:400,col:SEATC[s].d});
+    const showSec=g.done||(vw===s&&!hidden&&(NET||PLAY.locals.length===1||g.phase==='set'));txt(c,g.sec[s]?(showSec?`ひみつ：${g.sec[s]}`:'ひみつ：'+'？'.repeat(DG)):'（まだ 決めていない）',x+w-16,92,{s:16,a:'right',col:C.sub});
+    g.hist[s].slice(-11).forEach((q,i)=>{const y=134+i*46;txt(c,q.g.split('').join(' '),x+40,y,{s:26,a:'left',f:FD,w:400});txt(c,`${q.h} ヒット`,x+220,y,{s:20,a:'left',col:q.h?C.red:C.sub});txt(c,`${q.b} ブロー`,x+300,y,{s:20,a:'left',col:q.b?'#3a7fdc':C.sub})})}
+   // 入力
+   if(mine){const title=g.phase==='set'?`${shortName(cur)}：ひみつの 数字を 決めてね`:`${shortName(cur)}：あいての 数字を 予想！`;txt(c,title,KX+138,KY-150,{s:20,f:FD,w:400,col:'#fff',st:C.ink,sw:4});
+    for(let i=0;i<DG;i++){panel(c,KX+138-(DG*70)/2+i*70+4,KY-120,62,80,{fill:C.paper,lw:3,r:10});txt(c,g.input[i]||'',KX+138-(DG*70)/2+i*70+35,KY-80,{s:44,f:FD,w:400})}
+    keys.forEach((k,i)=>{const r=kpos(i),sel=i===g.cur;panel(c,r.x,r.y,r.w,r.h,{fill:k==='OK'?C.gold:sel?'#fff':C.paper,stroke:sel?C.red:C.ink,lw:sel?5:3,r:12});txt(c,String(k),r.x+r.w/2,r.y+r.h/2,{s:k==='けす'?20:28,f:FD,w:400})});
+    if(g.phase==='set')txt(c,'同じ 数字は 使えない（キーボードの 数字でも 入力できる）',KX+138,KY+300,{s:14,col:'#ccc'})}
+   else if(!g.done){txt(c,g.phase==='set'?`${shortName(cur)} が ひみつの 数字を 決めています`:`${shortName(cur)} が 予想しています`,KX+138,KY,{s:22,f:FD,w:400,col:'#fff',st:C.ink,sw:4})}
+   if(g.last&&g.last.t<1.6){const L=g.last;txt(c,L.h===DG?'せいかい！':`${L.h} ヒット　${L.b} ブロー`,KX+138,H-70,{s:34,f:FD,w:400,col:L.h===DG?C.gold:'#fff',st:C.ink,sw:6})}
+   if(g.msgT>0)toast(c,g.msg)};
+  return g}});
+
 /* ================= 共通の 描画：プレイヤー欄・お知らせ ================= */
 const shortName=s=>{const q=SEATS[s];if(!q)return'';if(q.name)return q.name.length>5?q.name.slice(0,5)+'…':q.name;return q.com?'COM':`${s+1}P`};
 const seatName=s=>SEATS[s]?(SEATS[s].name?SEATS[s].name+(SEATS[s].com?'（COM）':''):SEATS[s].com?`COM（${SEATC[s].n}）`:`${s+1}P（${SEATC[s].n}）`):'';
@@ -714,16 +897,16 @@ let TOAST=null;function toast(c,s){rr(c,W/2-260,H-64,520,44,22);c.fillStyle='rgb
 /* ================= 画面：タイトル（ゲームえらび） ================= */
 let scene=null,PLAY=null;
 const TITLE={sel:0,t:0,
- update(dt){this.t+=dt;const n=GAMES.length,cols=5;const d=In.devs;for(const id of d){if(In.rep(id,'right')){this.sel=(this.sel+1)%n;sfx('blip')}if(In.rep(id,'left')){this.sel=(this.sel+n-1)%n;sfx('blip')}if(In.rep(id,'down')){this.sel=Math.min(n-1,this.sel+cols);sfx('blip')}if(In.rep(id,'up')){this.sel=Math.max(0,this.sel-cols);sfx('blip')}}
+ update(dt){this.t+=dt;const n=GAMES.length,cols=7;const d=In.devs;for(const id of d){if(In.rep(id,'right')){this.sel=(this.sel+1)%n;sfx('blip')}if(In.rep(id,'left')){this.sel=(this.sel+n-1)%n;sfx('blip')}if(In.rep(id,'down')){this.sel=Math.min(n-1,this.sel+cols);sfx('blip')}if(In.rep(id,'up')){this.sel=Math.max(0,this.sel-cols);sfx('blip')}}
   const R=this.rects();if(MOUSE){const k=R.findIndex(r=>hit(MOUSE,r.x,r.y,r.w,r.h));if(k>=0&&k!==this.sel&&MOUSE.moved!==false)this.sel=k}
   for(const p of In.clicks){const k=R.findIndex(r=>hit(p,r.x,r.y,r.w,r.h));if(k>=0){this.sel=k;this.open();return}if(hit(p,W/2-150,H-58,300,40)){onlineMenu();return}}
   if(In.any('a')&&this.t>.25)this.open()},
  open(){sfx('ok');SETUP.reset(GAMES[this.sel]);scene=SETUP},
- rects(){const cols=5,w=228,h=240,gx=14,gy=14;const n=GAMES.length;return GAMES.map((g,i)=>{const r=Math.floor(i/cols),k=i%cols;return{x:W/2-(cols*w+(cols-1)*gx)/2+k*(w+gx),y:122+r*(h+gy),w,h}})},
+ rects(){const cols=7,w=164,h=236,gx=10,gy=14;const n=GAMES.length;return GAMES.map((g,i)=>{const r=Math.floor(i/cols),k=i%cols;return{x:W/2-(cols*w+(cols-1)*gx)/2+k*(w+gx),y:122+r*(h+gy),w,h}})},
  draw(c){bgFelt(c);txt(c,'あそび大全',W/2,62,{s:64,f:FD,w:400,col:C.gold,st:C.ink,sw:12});txt(c,'2〜4人で あそべる テーブルゲーム集（たりない人数は COM）',W/2,108,{s:18,col:'#fff',st:C.ink,sw:5});
   this.rects().forEach((r,i)=>{const g=GAMES[i],sel=i===this.sel;const bob=sel?Math.sin(NOW*4)*3:0;panel(c,r.x,r.y+bob,r.w,r.h,{fill:sel?'#fff':C.paper,stroke:sel?C.gold:C.ink,lw:sel?7:4});
-   c.save();rr(c,r.x+12,r.y+12+bob,r.w-24,170,12);c.clip();g.thumb(c,r.x+12,r.y+12+bob,r.w-24,170);c.restore();rr(c,r.x+12,r.y+12+bob,r.w-24,170,12);c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();
-   txt(c,g.name,r.x+r.w/2,r.y+214+bob,{s:g.name.length>7?22:g.name.length>5?26:30,f:FD,w:400});const pl=g.min===g.max?`${g.min}人`:`${g.min}〜${g.max}人`;rr(c,r.x+r.w-92,r.y+20+bob,72,30,15);c.fillStyle='rgba(43,33,64,.88)';c.fill();txt(c,pl,r.x+r.w-56,r.y+35+bob,{s:16,col:'#fff'});
+   c.save();rr(c,r.x+8,r.y+8+bob,r.w-16,150,10);c.clip();g.thumb(c,r.x+8,r.y+8+bob,r.w-16,150);c.restore();rr(c,r.x+8,r.y+8+bob,r.w-16,150,10);c.lineWidth=3;c.strokeStyle=C.ink;c.stroke();
+   {let fs=26;c.font=`400 ${fs}px ${FD}`;while(fs>15&&c.measureText(g.name).width>r.w-14){fs--;c.font=`400 ${fs}px ${FD}`}txt(c,g.name,r.x+r.w/2,r.y+184+bob,{s:fs,f:FD,w:400})}const rc=REC.get(g.key);txt(c,rc.p?`${rc.p}回・${rc.w}勝`:'まだ あそんでない',r.x+r.w/2,r.y+214+bob,{s:15,col:rc.p?C.sub:'#b3a990'});const pl=g.min===g.max?`${g.min}人`:`${g.min}〜${g.max}人`;rr(c,r.x+r.w-84,r.y+14+bob,72,28,14);c.fillStyle='rgba(43,33,64,.88)';c.fill();txt(c,pl,r.x+r.w-48,r.y+28+bob,{s:15,col:'#fff'});
   });
   {const g=GAMES[this.sel];rr(c,W/2-420,H-104,840,40,20);c.fillStyle='rgba(16,25,20,.6)';c.fill();txt(c,g.desc,W/2,H-84,{s:17,col:'#fff'})}
   rr(c,W/2-150,H-58,300,40,20);c.fillStyle='rgba(43,33,64,.8)';c.fill();txt(c,'オンラインで あそぶ（部屋）',W/2,H-38,{s:17,col:'#fff'})}};
@@ -807,9 +990,14 @@ function toggleFS(){try{document.fullscreenElement?document.exitFullscreen():doc
 addEventListener('pointerdown',e=>{if(scene!==PLAYSCENE||!PLAY||!PLAY.pause)return;const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,y=(e.clientY-r.top)/r.height*H;if(hit({x,y},W/2-200,PY0+3*64,400,54))toggleFS()});
 addEventListener('keydown',e=>{if(scene===PLAYSCENE&&PLAY&&PLAY.pause&&PLAY.psel===3&&['Enter','Space','KeyZ','KeyJ'].includes(e.code))toggleFS()});
 
+/* ================= 記録（この端末で 人が 遊んだ 回数・勝った 回数） ================= */
+const REC={all(){try{return JSON.parse(localStorage.getItem('ab_rec')||'{}')}catch(e){return{}}},get(k){return this.all()[k]||{p:0,w:0}},
+ add(k,win){const a=this.all();const r=a[k]||{p:0,w:0};r.p++;if(win)r.w++;a[k]=r;try{localStorage.setItem('ab_rec',JSON.stringify(a))}catch(e){}}};
 /* ================= 画面：結果 ================= */
 const RESULT={t:0,rk:[],sel:0,
- open(){this.t=0;this.sel=0;this.rk=PLAY.g.ranking();sfx('win');scene=RESULT;In.clear()},
+ open(){this.t=0;this.sel=0;this.rk=PLAY.g.ranking();sfx('win');scene=RESULT;In.clear();
+  // 記録：この端末の 人が いれば 1回、その人が 1位なら 勝ち
+  const mine=SEATS.map((q,i)=>i).filter(i=>!SEATS[i].com&&SEATS[i].dev&&SEATS[i].dev!=='net');if(mine.length&&!PLAY.rec){PLAY.rec=1;REC.add(PLAY.def.key,this.rk.length>1&&this.rk[0].some(i=>mine.includes(i)))}},
  update(dt){this.t+=dt;if(this.t<1)return;if(NET&&!NET.host)return;const opts=2;for(const id of In.devs){if(In.rep(id,'right')||In.rep(id,'down')){this.sel=(this.sel+1)%opts;sfx('blip')}if(In.rep(id,'left')||In.rep(id,'up')){this.sel=(this.sel+opts-1)%opts;sfx('blip')}}
   let go=In.any('a')?this.sel:-1;for(const p of In.clicks){if(hit(p,W/2-330,H-110,300,60))go=0;if(hit(p,W/2+30,H-110,300,60))go=1}
   if(go<0)return;sfx('ok');
