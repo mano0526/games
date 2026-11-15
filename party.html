@@ -57,7 +57,7 @@ const FB='"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif
 const C={ink:'#2b2140',paper:'#fff8ec',cream:'#fbefd5',sand:'#f2d593',sandD:'#d9b46b',grass:'#7cc65a',grassD:'#5ca449',road:'#f0dfb2',roadD:'#b99659',
  blue:'#3a7fdc',blueD:'#22559f',red:'#e5473c',redD:'#9f2a22',green:'#2fb36b',greenD:'#1b7a47',gold:'#ffc531',goldD:'#c98a06',purple:'#6a3fae',purpleD:'#3f2470',
  orange:'#f39322',orangeD:'#ad5f0b',teal:'#17b3ae',tealD:'#0b7773',night:'#1b2440',dim:'rgba(20,14,38,.62)'};
-const SPC={blue:[C.blue,C.blueD],start:[C.blue,C.blueD],red:[C.red,C.redD],happening:[C.green,C.greenD],chance:[C.orange,C.orangeD],item:[C.teal,C.tealD],pinch:[C.purple,C.purpleD],volcano:['#e8572a','#9c2f12'],battle:['#c2255c','#7d1239'],duel:['#5a5f73','#33374a'],coaster:['#ff7ab6','#b83f79'],avalanche:['#7fb3e6','#3f6f9e'],lucky:['#8bd13c','#4f8a1c']};
+const SPC={blue:[C.blue,C.blueD],start:[C.blue,C.blueD],red:[C.red,C.redD],happening:[C.green,C.greenD],chance:[C.orange,C.orangeD],item:[C.teal,C.tealD],pinch:[C.purple,C.purpleD],volcano:['#e8572a','#9c2f12'],battle:['#c2255c','#7d1239'],duel:['#5a5f73','#33374a'],coaster:['#ff7ab6','#b83f79'],avalanche:['#7fb3e6','#3f6f9e'],quicksand:['#c9944a','#8a5a22'],wind:['#7fd3e8','#3a93ad'],lucky:['#8bd13c','#4f8a1c']};
 const rand=(a=1,b)=>b===undefined?Math.random()*a:a+Math.random()*(b-a);
 const randi=(a,b)=>Math.floor(rand(a,b+1));
 const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -358,6 +358,16 @@ const BOARDS=[
   J:[265,860],M:[1540,400],bc:[[600,720],[900,580],[1220,470]],
   LP:'BBBRBBHBBIBBBXBBRBBHBBCBBBIBBRBBDBBHBBPBBBIBBRBBBH',BP:'BRBBHBRBBCBRB',
   sc:[.14,.34,.52,.70,.88],shops:[.24,.80],spec:'avalanche',specPts:[[960,150],[640,225]],specBranch:[]},
+ {id:'desert',name:'すなじまピラミッド',sub:'りゅうさに しずみ、すなあらしで スターが にげる さばく',bg:'#efd29a',gate:'ピラミッドの中',gateShort:'ピラミッド',
+  wp:[[260,300],[560,200],[920,240],[1260,190],[1580,300],[1640,600],[1520,900],[1180,1000],[820,930],[480,1000],[230,820],[180,560]],
+  J:[920,240],M:[820,930],bc:[[930,420],[900,620],[860,780]],
+  LP:'BBRBBHBBIBBQBBBRBBHBCBBBIBBQBBRBBDBBPBBXBIBBBRBBHBQCBB',BP:'RBBHBCBRBBB',
+  sc:[.12,.32,.50,.68,.88],shops:[.22,.70],spec:'quicksand',specPts:[[1600,450],[480,1000],[200,700]],specBranch:[]},
+ {id:'sky',name:'くもの上の にじ島',sub:'にじの はしが 1ターンおきに かかる 空の島',bg:'#9fd3f7',gate:'にじの はし',gateShort:'にじ',
+  wp:[[300,250],[680,170],[1100,200],[1500,260],[1640,520],[1560,860],[1220,1010],[840,1000],[460,930],[220,700],[200,450]],
+  J:[680,172],M:[1220,1010],bc:[[820,400],[960,600],[1100,800]],
+  LP:'BBBRBBHBBIBBWBBBRBBHBCBBBIBBRBBWBBDBBPBBXBIBBBRBBHBBCB',BP:'BRBBCBBRBBH',
+  sc:[.10,.30,.50,.70,.90],shops:[.20,.62],spec:'wind',specPts:[[1640,520],[460,930]],specBranch:[]},
 ];
 let BD=BOARDS[0];
 function crPt(p0,p1,p2,p3,t){const t2=t*t,t3=t2*t;const f=(a,b,c2,d)=>.5*((2*b)+(-a+c2)*t+(2*a-5*b+4*c2-d)*t2+(-a+3*b-3*c2+d)*t3);return[f(p0[0],p1[0],p2[0],p3[0]),f(p0[1],p1[1],p2[1],p3[1])]}
@@ -375,7 +385,7 @@ function buildBoard(){const def=BD,wp=def.wp;
  for(let k=1;k<=m;k++){const[x,y]=polyAt(bi,k*bi.L/(m+1));const id=nodes.length;nodes.push({id,x,y,type:'blue',next:[],branch:true});bids.push(id)}
  for(let k=0;k<bids.length;k++)nodes[bids[k]].next=[k<bids.length-1?bids[k+1]:M];
  nodes[J].next=[(J+1)%N,bids[0]];
- const map={B:'blue',R:'red',H:'happening',I:'item',P:'pinch',C:'chance',X:'battle',D:'duel',K:'coaster',A:'avalanche'};
+ const map={B:'blue',R:'red',H:'happening',I:'item',P:'pinch',C:'chance',X:'battle',D:'duel',K:'coaster',A:'avalanche',Q:'quicksand',W:'wind'};
  for(let i=1;i<N;i++)nodes[i].type=map[def.LP[i%def.LP.length]]||'blue';nodes[0].type='start';
  bids.forEach((id,k)=>nodes[id].type=map[def.BP[k%def.BP.length]]||'blue');
  const base=def.id==='snow'?near(290,930):0;
@@ -384,10 +394,10 @@ function buildBoard(){const def=BD,wp=def.wp;
  const sc=def.sc.map(claim);const shops=def.shops.map(claim);
  shops.forEach(i=>nodes[i].type='shop');sc.forEach(i=>nodes[i].type='blue');
  const bm=bids[Math.floor(bids.length/2)];nodes[bm].type='blue';
- for(const id of[J,M,base,bids[0]])if(['shop','battle','duel','coaster','avalanche','volcano'].includes(nodes[id].type))nodes[id].type='blue';
+ for(const id of[J,M,base,bids[0]])if(['shop','battle','duel','coaster','avalanche','volcano','quicksand','wind'].includes(nodes[id].type))nodes[id].type='blue';
  for(const nd of nodes){nd.west=def.id==='island'&&nd.x<540;nd.slope=def.id==='snow'&&nd.y<520}
  const ex=new Set([0,J,M,(J+1)%N,base,bids[0],...sc,bm,...shops]);
- for(const nd of nodes)if(['volcano','coaster','avalanche'].includes(nd.type)&&nd.type!==def.spec)nd.type='blue';
+ for(const nd of nodes)if(['volcano','coaster','avalanche','quicksand','wind'].includes(nd.type)&&nd.type!==def.spec)nd.type='blue';
  const spec=[];
  for(const[px,py]of def.specPts){let vi=near(px,py),gg=0;while(ex.has(vi)&&gg++<N)vi=(vi+1)%N;nodes[vi].type=def.spec;ex.add(vi);spec.push(vi)}
  for(const k of def.specBranch){let vb=bids[Math.min(k,bids.length-1)];if(ex.has(vb))vb=bids[Math.min(k+1,bids.length-1)];if(!ex.has(vb)){nodes[vb].type=def.spec;ex.add(vb);spec.push(vb)}}
@@ -398,9 +408,12 @@ function buildBoard(){const def=BD,wp=def.wp;
  BOARD.spec=spec;BOARD.base=base;BOARD.starCands=[...sc,bm];BOARD.nodes=nodes;BOARD.J=J;BOARD.M=M;BOARD.bids=bids;BOARD.branchPts=bd;BOARD.lamps=[];
 }
 const NODE=i=>BOARD.nodes[i];
+// にじの はし（sky）が かかっていない ターンは 分かれ道の 近道を 通れない
+const bridgeOff=()=>BD.id==='sky'&&!G.bridge;
+function nextOf(nd){return bridgeOff()&&nd.id===BOARD.J?nd.next.filter(x=>x!==BOARD.bids[0]):nd.next}
 function isPass(n){return n.type==='shop'||n.id===G.starNode}
 function stepsBetween(from,to){const n=BOARD.nodes.length,d=new Array(n).fill(1e9);d[from]=0;let ch=true,g=0;
- while(ch&&g++<300){ch=false;for(const nd of BOARD.nodes){if(d[nd.id]>=1e9)continue;for(const nx of nd.next){const c=d[nd.id]+(isPass(NODE(nx))?0:1);if(c<d[nx]){d[nx]=c;ch=true}}}}return d[to]}
+ while(ch&&g++<300){ch=false;for(const nd of BOARD.nodes){if(d[nd.id]>=1e9)continue;for(const nx of nextOf(nd)){const c=d[nd.id]+(isPass(NODE(nx))?0:1);if(c<d[nx]){d[nx]=c;ch=true}}}}return d[to]}
 const stepsToStar=from=>G.starNode<0?99:stepsBetween(from,G.starNode)+1;
 
 function pointInPoly(x,y,pts){let ins=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const xi=pts[i][0],yi=pts[i][1],xj=pts[j][0],yj=pts[j][1];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))ins=!ins}return ins}
@@ -450,7 +463,7 @@ function renderIslandBG(){
  for(const[x,y,s]of[[1700,140,1],[120,1060,.85],[1730,1050,.75]])drawBoat(g,x,y,s);
  BOARDIMG=cnv;
 }
-function renderBoardBG(){if(BD.id==='park')return renderParkBG();if(BD.id==='snow')return renderSnowBG();return renderIslandBG()}
+function renderBoardBG(){if(BD.id==='desert')return renderDesertBG();if(BD.id==='sky')return renderSkyBG();if(BD.id==='park')return renderParkBG();if(BD.id==='snow')return renderSnowBG();return renderIslandBG()}
 function setBoard(i){const def=BOARDS[clamp(i|0,0,BOARDS.length-1)];if(def===BD&&BOARDIMG)return;BD=def;buildBoard();renderBoardBG();for(const k in SEACACHE)delete SEACACHE[k]}
 function boardRoads(g,edge,fill){const segs=[];for(const nd of BOARD.nodes)for(const nx of nd.next)segs.push([nd,NODE(nx)]);g.lineCap='round';
  g.strokeStyle=edge;g.lineWidth=30;for(const[a,b]of segs){g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke()}
@@ -516,6 +529,41 @@ function renderSnowBG(){const cnv=document.createElement('canvas');cnv.width=WW;
  const ok=decos.filter(d=>d.k==='pine'||clearOf(d.x,d.y,60,mids));ok.sort((a,b)=>a.y-b.y);
  for(const d of ok){if(d.k==='pine')drawPine(g,d.x,d.y,d.s);else if(d.k==='snowman')drawSnowman(g,d.x,d.y);else if(d.k==='lodge')drawLodge(g,d.x,d.y)}
  rr(g,90,470,250,34,8);g.fillStyle='#fff';g.fill();g.lineWidth=3;g.strokeStyle=C.ink;g.stroke();txt(g,'ここから上は なだれ注意',215,488,{s:16,col:C.redD});
+ BOARDIMG=cnv}
+function drawPyramid(g,x,y,s){g.lineJoin='round';g.fillStyle='rgba(120,80,30,.18)';g.beginPath();g.moveTo(x-110*s,y);g.lineTo(x+170*s,y);g.lineTo(x+40*s,y-150*s);g.closePath();g.fill();
+ g.lineWidth=5;g.strokeStyle=C.ink;g.fillStyle='#e7b866';g.beginPath();g.moveTo(x-130*s,y);g.lineTo(x,y-170*s);g.lineTo(x+130*s,y);g.closePath();g.fill();g.stroke();
+ g.fillStyle='#c8913e';g.beginPath();g.moveTo(x,y-170*s);g.lineTo(x+130*s,y);g.lineTo(x+20*s,y);g.closePath();g.fill();g.stroke();
+ g.strokeStyle='rgba(120,80,30,.35)';g.lineWidth=2;for(let k=1;k<6;k++){const yy=y-k*28*s,hw=130*s*(1-k*28/170);g.beginPath();g.moveTo(x-hw,yy);g.lineTo(x+hw,yy);g.stroke()}}
+function drawCactus(g,x,y,s){g.fillStyle='rgba(120,80,30,.18)';ell(g,x+6*s,y+3,16*s,5*s);g.fill();g.lineWidth=3;g.strokeStyle=C.ink;g.fillStyle='#5daa4a';
+ rr(g,x-8*s,y-48*s,16*s,48*s,8*s);g.fill();g.stroke();rr(g,x-24*s,y-34*s,10*s,20*s,5*s);g.fill();g.stroke();rr(g,x+14*s,y-40*s,10*s,22*s,5*s);g.fill();g.stroke();
+ g.fillStyle='#ff6fa5';circ(g,x,y-50*s,4*s);g.fill()}
+function drawCloud(g,x,y,s,col){g.fillStyle=col||'#fff';for(const[a,b,r]of[[0,0,30],[-30,8,22],[30,8,24],[-12,-14,22],[16,-12,20]]){circ(g,x+a*s,y+b*s,r*s);g.fill()}}
+function renderDesertBG(){const cnv=document.createElement('canvas');cnv.width=WW;cnv.height=WH;const g=cnv.getContext('2d');const R=mulberry(23);
+ g.fillStyle=BD.bg;g.fillRect(0,0,WW,WH);g.strokeStyle='rgba(180,130,60,.25)';g.lineWidth=3;for(let i=0;i<120;i++){const x=R()*WW,y=R()*WH,w=40+R()*60;g.beginPath();g.moveTo(x,y);g.quadraticCurveTo(x+w/2,y-10,x+w,y);g.stroke()}
+ g.lineJoin='round';loopPath(g);g.strokeStyle='#d8a85a';g.lineWidth=262;g.stroke();loopPath(g);g.strokeStyle='#f6e3b8';g.lineWidth=248;g.stroke();
+ loopPath(g);g.fillStyle='#f3d8a2';g.fill();g.strokeStyle='#f3d8a2';g.lineWidth=200;g.stroke();
+ g.fillStyle='#7cc6e0';ell(g,1330,560,120,62);g.fill();g.lineWidth=4;g.strokeStyle='#4f97b3';g.stroke();g.fillStyle='rgba(255,255,255,.5)';ell(g,1300,545,40,10);g.fill();
+ drawPyramid(g,900,720,1.55);
+ const mids=boardRoads(g,'#b98a47','#fbeccc');
+ const decos=[{k:'pyr',x:470,y:700,s:.75},{k:'pyr',x:1250,y:860,s:.6}];
+ for(const[x,y]of[[1230,520],[1440,600],[1400,500]])decos.push({k:'palm',x,y,s:.9});
+ for(let i=0;i<500&&decos.length<46;i++){const x=120+R()*1600,y=100+R()*1000;if(!clearOf(x,y,56,mids))continue;if(Math.hypot(x-900,y-600)<230||Math.hypot(x-1330,y-560)<150)continue;if(decos.some(d=>Math.hypot(d.x-x,d.y-y)<60))continue;decos.push({k:R()<.7?'cactus':'rock',x,y,s:.8+R()*.5})}
+ const ok=decos.filter(d=>d.k!=='pyr'||clearOf(d.x,d.y-60,90,mids));ok.sort((a,b)=>a.y-b.y);
+ for(const d of ok){if(d.k==='pyr')drawPyramid(g,d.x,d.y,d.s);else if(d.k==='cactus')drawCactus(g,d.x,d.y,d.s);else if(d.k==='palm')drawDeco(g,d);else{g.fillStyle='#b3936a';g.strokeStyle=C.ink;g.lineWidth=3;ell(g,d.x,d.y-8*d.s,16*d.s,11*d.s);g.fill();g.stroke()}}
+ BOARDIMG=cnv}
+function renderSkyBG(){const cnv=document.createElement('canvas');cnv.width=WW;cnv.height=WH;const g=cnv.getContext('2d');const R=mulberry(41);
+ const gr=g.createLinearGradient(0,0,0,WH);gr.addColorStop(0,'#86c5f2');gr.addColorStop(1,'#d6efff');g.fillStyle=gr;g.fillRect(0,0,WW,WH);
+ for(let i=0;i<26;i++)drawCloud(g,R()*WW,R()*WH,.8+R()*1.4,'rgba(255,255,255,.55)');
+ g.lineJoin='round';loopPath(g);g.strokeStyle='#e8f4ff';g.lineWidth=270;g.stroke();
+ const lp=BOARD.loopPts;for(let i=0;i<lp.length;i+=7){const p=lp[i];drawCloud(g,p[0],p[1],2.6,'#ffffff')}
+ loopPath(g);g.fillStyle='#bfe6a0';g.fill();g.strokeStyle='#bfe6a0';g.lineWidth=170;g.stroke();
+ // にじの はし
+ const bp=BOARD.branchPts;const cols=['#ff6b6b','#ffa94d','#ffd43b','#69db7c','#4dabf7','#9775fa'];g.lineCap='round';cols.forEach((col,k)=>{g.strokeStyle=col;g.lineWidth=70-k*10;g.beginPath();bp.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));g.stroke()});
+ const mids=boardRoads(g,'#9fb6d6','#ffffff');
+ const decos=[];for(let i=0;i<500&&decos.length<40;i++){const x=120+R()*1600,y=100+R()*1000;if(!clearOf(x,y,58,mids))continue;if(decos.some(d=>Math.hypot(d.x-x,d.y-y)<64))continue;const inIsle=pointInPoly(x,y,lp)&&minDistLoop(x,y)>80;
+  if(!inIsle&&minDistLoop(x,y)<150)continue;decos.push({k:inIsle?(R()<.82?'tree':'balloon'):(R()<.5?'isle':'cloud'),x,y,s:.8+R()*.4})}
+ decos.sort((a,b)=>a.y-b.y);for(const d of decos){if(d.k==='tree')drawDeco(g,d);else if(d.k==='balloon')drawBalloons(g,d.x,d.y);else if(d.k==='cloud')drawCloud(g,d.x,d.y,d.s*1.2,'#fff');
+  else{g.fillStyle='#8a5a2e';g.strokeStyle=C.ink;g.lineWidth=3;g.beginPath();g.moveTo(d.x-40*d.s,d.y);g.lineTo(d.x+40*d.s,d.y);g.lineTo(d.x,d.y+40*d.s);g.closePath();g.fill();g.stroke();g.fillStyle='#8fd16c';ell(g,d.x,d.y,44*d.s,12*d.s);g.fill();g.stroke()}}
  BOARDIMG=cnv}
 function drawDeco(g,d){const{x,y,s}=d;g.lineJoin='round';g.lineCap='round';
  if(d.k==='palm'){g.fillStyle='rgba(40,30,20,.18)';ell(g,x+14*s,y+4,30*s,9*s);g.fill();
@@ -654,7 +702,7 @@ function drawHUD(c){const pos=[[16,16],[W-246,16],[16,H-108],[W-246,H-108]];rank
  notes.forEach(([s,col],k)=>{rr(c,W/2-110,64+k*30,220,26,13);c.fillStyle=col;c.fill();txt(c,s,W/2,77+k*30,{s:14,col:'#fff'})});
  // ★までの道のり（原作の「スターまで あと○マス」）。画面の外にあるときは 画面のはしに矢印
  let ny=64+notes.length*30;
- if(scene===BOARDSCENE&&G.cur>=0&&G.starNode>=0&&!G.villain){const p=P(G.cur);const k=(STK&&STK.n===p.node&&STK.s===G.starNode)?STK.v:(STK={n:p.node,s:G.starNode,v:stepsToStar(p.node)}).v;
+ if(scene===BOARDSCENE&&G.cur>=0&&G.starNode>=0&&!G.villain){const p=P(G.cur);const k=(STK&&STK.n===p.node&&STK.s===G.starNode&&STK.b===!!G.bridge)?STK.v:(STK={n:p.node,s:G.starNode,b:!!G.bridge,v:stepsToStar(p.node)}).v;
   if(k<99){rr(c,W/2-110,ny,220,28,14);c.fillStyle=C.paper;c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();drawStar(c,W/2-84,ny+14,10,0,C.gold,2);txt(c,`まで あと ${k} マス`,W/2+8,ny+14,{s:16,col:C.ink});ny+=32}
   const sn=NODE(G.starNode);const sx=W/2+(sn.x-cam.x)*cam.z,sy=H/2+(sn.y-30-cam.y)*cam.z;const L=G.tmenu?300:60,R=W-60,T=120,B=H-130;
   if(cam.z>.8&&(sx<L||sx>R||sy<T||sy>B)){const cx=W/2,cy=H/2,dx=sx-cx,dy=sy-cy;const f=Math.min(dx?((dx>0?R:L)-cx)/dx:1e9,dy?((dy>0?B:T)-cy)/dy:1e9);const ex=cx+dx*f,ey=cy+dy*f,a=Math.atan2(dy,dx),bob=Math.sin(NOW*5)*4;
@@ -693,6 +741,8 @@ function drawSpace(c,n){const x=n.x,y=n.y;
  else if(t==='red'){c.fillStyle='#fff';rr(c,x-9,y-2.5,18,5,2.5);c.fill()}
  else if(t==='happening')txt(c,'?',x,y+1,{s:22,f:FD,w:400,col:'#fff'});
  else if(t==='chance')txt(c,'!',x,y+1,{s:22,f:FD,w:400,col:'#fff'});
+ else if(t==='quicksand'){c.strokeStyle='#fff';c.lineWidth=2.5;c.beginPath();for(let k=0;k<26;k++){const a=k*.5,r=1+k*.42;const px=x+Math.cos(a)*r*1.3,py=y+Math.sin(a)*r*.8;k?c.lineTo(px,py):c.moveTo(px,py)}c.stroke()}
+ else if(t==='wind'){c.strokeStyle='#fff';c.lineWidth=2.5;c.lineCap='round';for(const[dy,w]of[[-5,14],[0,18],[5,11]]){c.beginPath();c.moveTo(x-10,y+dy);c.lineTo(x-10+w,y+dy);c.stroke()}c.beginPath();c.arc(x+8,y-7,3,Math.PI*.5,Math.PI*2.1);c.stroke()}
  else if(t==='lucky'){c.fillStyle='#fff';for(let k=0;k<4;k++){const a=k*Math.PI/2+Math.PI/4;c.save();c.translate(x+Math.cos(a)*4.5,y+Math.sin(a)*3.2);c.rotate(a);ell(c,0,0,5.5,4);c.fill();c.restore()}c.strokeStyle='#fff';c.lineWidth=2;c.beginPath();c.moveTo(x,y+2);c.quadraticCurveTo(x+3,y+7,x+7,y+8);c.stroke()}
  else if(t==='item'){c.fillStyle='#fff';c.fillRect(x-8,y-5,16,11);c.fillStyle=f;c.fillRect(x-1.5,y-5,3,11);c.fillStyle='#fff';c.beginPath();c.arc(x-4,y-7,3.5,0,7);c.arc(x+4,y-7,3.5,0,7);c.fill()}
  else if(t==='pinch'){c.fillStyle='#fff';circ(c,x,y,7);c.fill();c.fillStyle=f;circ(c,x-2.5,y-1,1.8);c.fill();circ(c,x+2.5,y-1,1.8);c.fill();c.fillStyle='#fff';c.beginPath();c.moveTo(x-7,y-4);c.lineTo(x-10,y-11);c.lineTo(x-3,y-6);c.fill();c.beginPath();c.moveTo(x+7,y-4);c.lineTo(x+10,y-11);c.lineTo(x+3,y-6);c.fill()}
@@ -728,8 +778,9 @@ function drawBoardScene(c){c.fillStyle=BD.bg;c.fillRect(0,0,W,H);
  if(BOARDIMG)c.drawImage(BOARDIMG,0,0);
  if(G.night){c.fillStyle='rgba(18,16,60,.55)';c.fillRect(-400,-400,WW+800,WH+800);for(const l of BOARD.lamps){const rg=c.createRadialGradient(l[0],l[1]-50,2,l[0],l[1]-50,95);rg.addColorStop(0,'rgba(255,230,140,.55)');rg.addColorStop(1,'rgba(255,230,140,0)');c.fillStyle=rg;circ(c,l[0],l[1]-50,95);c.fill()}}
  c.strokeStyle='rgba(255,255,255,.35)';c.lineWidth=3;c.lineCap='round';for(let i=0;i<26;i++){const bx=(i*397)%WW,by=(i*263)%WH;if(BD.id!=='island'||minDistCache(i,bx,by)<250)continue;const o=Math.sin(NOW*1.3+i)*10;c.beginPath();c.moveTo(bx+o,by);c.quadraticCurveTo(bx+o+12,by-6,bx+o+24,by);c.stroke()}
- for(const n of BOARD.nodes)drawSpace(c,n);
- {const gp=BOARD.gatePos;drawGate(c,gp[0],gp[1])}
+ if(bridgeOff()&&BOARD.branchPts){c.save();c.lineCap='round';c.lineJoin='round';c.strokeStyle='rgba(159,211,247,.82)';c.lineWidth=64;c.beginPath();BOARD.branchPts.forEach((q,i)=>i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]));c.stroke();c.restore()}
+ for(const n of BOARD.nodes){if(bridgeOff()&&n.branch){c.save();c.globalAlpha=.3;drawSpace(c,n);c.restore()}else drawSpace(c,n)}
+ {const gp=BOARD.gatePos;drawGate(c,gp[0],gp[1]);if(bridgeOff()){rr(c,gp[0]-58,gp[1]+18,116,26,13);c.fillStyle='#5a7fa8';c.fill();c.lineWidth=2.5;c.strokeStyle=C.ink;c.stroke();txt(c,'いまは 通れない',gp[0],gp[1]+31,{s:13,col:'#fff'})}}
  if(G.junc){const n=NODE(G.junc.node);G.junc.opts.forEach((o,i)=>{const m=NODE(o);const a=Math.atan2(m.y-n.y,m.x-n.x);const sel=i===G.junc.sel;const d=48+(sel?Math.sin(NOW*8)*5:0);
   c.save();c.translate(n.x+Math.cos(a)*d,n.y-30+Math.sin(a)*d);c.rotate(a);c.fillStyle=sel?C.gold:'rgba(255,255,255,.85)';c.lineWidth=4;c.strokeStyle=C.ink;c.beginPath();c.moveTo(18,0);c.lineTo(-8,-16);c.lineTo(-8,-6);c.lineTo(-20,-6);c.lineTo(-20,6);c.lineTo(-8,6);c.lineTo(-8,16);c.closePath();c.fill();c.stroke();c.restore();
   if(G.junc.info&&G.junc.info[i]){const inf=G.junc.info[i],ix=n.x+Math.cos(a)*(d+92),iy=n.y-30+Math.sin(a)*(d+92);const lines=[inf.star<99?`★まで ${inf.star}`:'',...inf.seen].filter(Boolean);if(lines.length){const bw=112,bh=lines.length*22+12;rr(c,ix-bw/2,iy-bh/2,bw,bh,10);c.fillStyle=sel?'#fff8dc':'rgba(255,255,255,.88)';c.fill();c.lineWidth=2.5;c.strokeStyle=sel?C.goldD:C.ink;c.stroke();lines.forEach((l,k)=>txt(c,l,ix,iy-bh/2+17+k*22,{s:16,col:l==='わな'||l==='ピンチ'?C.redD:l.startsWith('★')?'#b26a00':C.ink}))}}
@@ -770,7 +821,7 @@ async function boardMain(gid,resume){
  const sn=NODE(G.starNode);await panTo(sn.x,sn.y,1);sfx('star');await say('さいしょの スターは ここだ！ 先に たどりついて 買っちゃおう！');
  await boardIntro();}
  let skipHook=!!resume;
- for(G.turn=resume?G.turn:1;G.turn<=G.maxTurns;G.turn++){if(gid!==GAMEID)return;if(skipHook)skipHook=false;else await boardTurnHook();if(gid!==GAMEID)return;saveGame();
+ for(G.turn=resume?G.turn:1;G.turn<=G.maxTurns;G.turn++){if(gid!==GAMEID)return;G.bridge=BD.id==='sky'&&G.turn%2===0;if(skipHook)skipHook=false;else await boardTurnHook();if(gid!==GAMEID)return;saveGame();
   if(G.maxTurns>=10&&G.turn===G.maxTurns-4)await last5Event();
   overview();await banner(G.turn===G.maxTurns?'さいごの ターン！':`ターン ${G.turn}`,{col:G.turn===G.maxTurns?C.red:C.blue,sub:`のこり ${G.maxTurns-G.turn+1} ターン`,dur:1.4});
   for(const pi of G.order){if(gid!==GAMEID)return;await playerTurn(P(pi))}
@@ -779,14 +830,18 @@ async function boardMain(gid,resume){
  if(gid!==GAMEID)return;G.turn=G.maxTurns;clearSave();sfx('whistle');overview();await banner('ゲーム しゅうりょう！',{col:C.red,dur:1.8});await resultsFlow(gid)}
 const SP=()=>G.starPrice||20;
 const iprice=id=>G.night?Math.ceil(ITEMS[id].price/2):ITEMS[id].price;
-async function boardIntro(){const gt=NODE(BOARD.bids[0]);await panTo(gt.x,gt.y,1,.9);await say(`ここは ${BD.gate}。 通行料 ${TOLL}コインで 近道できるよ。`);
+async function boardIntro(){G.bridge=false;const gt=NODE(BOARD.bids[0]);await panTo(gt.x,gt.y,1,.9);await say(`ここは ${BD.gate}。 通行料 ${TOLL}コインで 近道できるよ。`);
  if(BOARD.spec.length){const sn=NODE(BOARD.spec[0]);await panTo(sn.x,sn.y,1,.9)}
  if(BD.id==='island')await say('オレンジの 火山マスに 止まると 火山が ふんか！ 西がわの 青マスと 赤マスが 入れかわるよ。');
  if(BD.id==='park')await say('コースターマスに 止まると ジェットコースターで 一気に 先へ すすめるよ。 それに 3ターンごとに 昼と夜が 入れかわって、夜は ?マスが チャンスマスに、ショップが はんがくに なるんだ。');
+ if(BD.id==='desert')await say('茶色の りゅうさマスに 止まると すなに しずんで 4マス もどされる！ それに 3ターンごとに すなあらしが きて、スターが べつの 場所へ にげちゃうよ。');
+ if(BD.id==='sky')await say('にじの はしは 1ターンおきにしか かからない！ かかっていない ターンは 通れないよ。 水色の 風マスに 止まると、ほかの みんなが 3マス うしろへ ふきとばされる！');
  if(BD.id==='snow')await say('なだれマスに 止まると なだれが おきて、山の上に いる人は ふもとまで 流されちゃう。 それに スターの ねだんが 2ターンごとに かわるよ。');
  const bt=BOARD.nodes.find(n=>n.type==='battle');if(bt){await panTo(bt.x,bt.y,1,.8)}
  await say('赤むらさきの バトルマスは 全員で コインの うばいあい、灰色の けっとうマスは 1対1の 勝負だよ！')}
 async function boardTurnHook(){
+ if(BD.id==='desert'&&G.turn>1&&(G.turn-1)%3===0)await sandstorm();
+ if(BD.id==='sky'){if(G.turn>1){const gt=NODE(BOARD.bids[0]);await panTo(gt.x,gt.y,.9,.7);sfx(G.bridge?'star':'back');await banner(G.bridge?'にじの はしが かかった！':'にじの はしが きえた…',{col:G.bridge?'#e05ab0':'#5a7fa8',dur:1.3})}}
  if(BD.id==='park'&&G.turn>1&&(G.turn-1)%3===0){G.night=!G.night;STATS.night++;overview();sfx(G.night?'evil':'fanfare');await banner(G.night?'夜に なった！':'朝に なった！',{col:G.night?'#2a2f6b':C.orange,dur:1.4});
   await say(G.night?'夜の あいだは ?マスが チャンスマスに、ショップが はんがくに なるよ！':'朝だ！ 遊園地が いつもの ようすに もどったよ。')}
  if(BD.id==='snow'&&G.turn>1&&G.turn%2===1){const old=SP();G.starPrice=pick([10,15,20,25,30,40].filter(v=>v!==old));overview();sfx('star');
@@ -798,8 +853,20 @@ async function avalancheEvent(p){const b=NODE(BOARD.base);STATS.aval++;await pan
  for(const q of hit){burst(q.wx,q.wy-20,14,['#fff','#cfe3f7'],{world:true});q.node=BOARD.base;q.wx=b.x;q.wy=b.y;q.sad=1.5}
  if(hit.length){sfx('lose');overview();await wait(.6);await say(`${hit.map(pname).join('、')}が ふもとまで 流された！`,{owner:p.i})}else await say('…山の上には だれも いなかった！',{owner:p.i});
  followPlayer(p);await wait(.3)}
+// すなじまピラミッド
+async function sandstorm(){overview();G.shake=1;sfx('boom');for(let k=0;k<6;k++)burst(rand(200,1600),rand(200,900),16,['#e9c98a','#d9b066','#fff2d0'],{world:true,max:300,g:0,life:1.4});
+ await banner('すなあらし！',{col:'#b07a2a',dur:1.3});await say('すなあらしで スターが どこかへ とばされた！');await moveStar(null)}
+function backNode(id){const nd=NODE(id);if(!nd.branch)return(id-1+BOARD.N)%BOARD.N;const k=BOARD.bids.indexOf(id);return k>0?BOARD.bids[k-1]:BOARD.J}
+async function quicksandEvent(p){sfx('lose');p.sad=1.5;await say('りゅうさだ！ すなに しずんで うしろへ ながされる…',{owner:p.i});
+ for(let k=0;k<4;k++){let b=backNode(p.node);if(isPass(NODE(b)))b=backNode(b);p.node=b;await wait(.18);sfx('step')}await say('4マス もどされた…',{owner:p.i})}
+// くもの上の にじ島
+async function windEvent(p){overview();sfx('whistle');for(let k=0;k<5;k++)burst(rand(200,1600),rand(150,950),10,['#fff','#dff3ff'],{world:true,max:420,g:0,life:1.2});
+ await say('風マス！ ビューーン！ ほかの みんなが 3マス うしろへ ふきとばされる！',{owner:p.i});const others=G.players.filter(q=>q!==p);
+ for(let k=0;k<3;k++){for(const q of others){let b=backNode(q.node);if(isPass(NODE(b)))b=backNode(b);q.node=b}sfx('hop');await wait(.25)}for(const q of others)q.sad=1;followPlayer(p);await wait(.3)}
 async function boardHappening(p){if(BD.id==='island'){await say('ハプニング！ 地面が ゆれてる… 火山の ようすが へんだ！',{owner:p.i});await eruption(p)}
  else if(BD.id==='park'){await say('ハプニング！ ゆうえんちの パレードに まきこまれた！ 先へ 運ばれるよ！',{owner:p.i});await coasterEvent(p)}
+ else if(BD.id==='desert'){await say('ハプニング！ すなあらしが やってきた！',{owner:p.i});await sandstorm()}
+ else if(BD.id==='sky'){await say('ハプニング！ 強い 風が ふいてきた！',{owner:p.i});await windEvent(p)}
  else{await say('ハプニング！ 山の上で 大きな音が…！',{owner:p.i});await avalancheEvent(p)}}
 async function playMG(key,mode,teams){mgRemember(key);await fadeTo(1,.35);const w=await runMinigame(key,mode,teams);G.talk=-1;BGM.play('board');overview();await fadeTo(0,.35);return w}
 const MG_HIST_KEY='kk_mghist_v1';
@@ -867,7 +934,7 @@ async function landEvent(p){const n=NODE(p.node);
  if(t==='blue'){p.color='blue';changeCoins(p,3*G.coinMul);p.happy=1;await wait(.7)}
  else if(t==='red'){p.color='red';changeCoins(p,-3*G.coinMul);p.sad=1;await wait(.7)}
  else{p.color='green';if(t==='happening'){p.haps++;await happeningEvent(p)}else if(t==='item')await itemSpace(p);else if(t==='lucky')await luckySpace(p);else if(t==='chance')await chanceTime(p);else if(t==='pinch')await pinchEvent(p);
-  else if(t==='volcano')await eruption(p);else if(t==='coaster')await coasterEvent(p);else if(t==='avalanche')await avalancheEvent(p);else if(t==='battle')await battleEvent(p);else if(t==='duel')await duelEvent(p)}}
+  else if(t==='volcano')await eruption(p);else if(t==='coaster')await coasterEvent(p);else if(t==='avalanche')await avalancheEvent(p);else if(t==='quicksand')await quicksandEvent(p);else if(t==='wind')await windEvent(p);else if(t==='battle')await battleEvent(p);else if(t==='duel')await duelEvent(p)}}
 const ITEMPOOL=['double','double','double','triple','custom','mini','mini','warp','steal_coin','steal_coin','curse','trap','trap','steal_star','pipe'];
 async function itemSpace(p){const id=pick(ITEMPOOL);sfx('ok');if(p.items.length>=3){
   const k=await choose(`アイテムマス！ ${ITEMS[id].name}（${ITEMS[id].desc}）を もらえる！ でも もちものが いっぱい。どれと こうかんする？`,p.items.map(x=>ITEMS[x].name+'を すてる').concat(['こうかんしない']),{owner:p.i,cancel:true,cpu:()=>{const val=x=>({steal_star:5,custom:4,triple:3,steal_coin:2,double:1}[x]||0);let w=0;p.items.forEach((x,j)=>{if(val(x)<val(p.items[w]))w=j});return val(id)>val(p.items[w])?w:3}});
@@ -950,11 +1017,11 @@ async function customDie(p){const u={p,v:5};G.customUI=u;let target=clamp(stepsT
 async function hopTo(p,to){const a=NODE(p.node),b=NODE(to);p.hop={fx:p.wx,fy:p.wy,tx:b.x,ty:b.y,t:0,d:G.fastHop?.1:.25};p.face=Math.sign(b.x-a.x)||p.face||1;sfx('step');
  await until(()=>{p.hop.t+=DT/p.hop.d;return p.hop.t>=1});p.hop=null;p.node=to;p.wx=b.x;p.wy=b.y}
 async function movePlayer(p,steps){G.stepsLeft=steps;
- while(G.stepsLeft>0){const node=NODE(p.node);let nx=node.next[0];if(node.next.length>1)nx=await chooseDirection(p,node);
+ while(G.stepsLeft>0){const node=NODE(p.node);const nxs=nextOf(node);let nx=nxs[0];if(nxs.length>1)nx=await chooseDirection(p,node);
   await hopTo(p,nx);const nn=NODE(nx);if(isPass(nn))await passEvent(p,nn);else G.stepsLeft--}G.stepsLeft=0}
 const TOLL=10;
 const isToll=(from,to)=>from===BOARD.J&&to===BOARD.bids[0];
-async function chooseDirection(p,node){const opts=node.next.slice();G.junc={node:node.id,opts,sel:0};
+async function chooseDirection(p,node){const opts=nextOf(node).slice();G.junc={node:node.id,opts,sel:0};
  // 分かれ道の 先に 何があるか（★までの マス数と、8マス先までの お店など）
  G.junc.info=opts.map(o=>{const star=G.starNode>=0?(isPass(NODE(o))?0:1)+stepsBetween(o,G.starNode):99;const seen=[];let cur=o;for(let k=0;k<8;k++){const nd=NODE(cur);const ty=nd.id===G.starNode?'star':nd.type;
    const lab={shop:'ショップ',lucky:'ラッキー',pinch:'ピンチ',item:'アイテム',chance:'チャンス',star:''}[ty];if(lab&&!seen.includes(lab))seen.push(lab);if(G.traps[cur]!=null&&G.traps[cur]!==p.i&&!seen.includes('わな'))seen.push('わな');cur=nd.next[0];if(cur==null)break}return{star,seen:seen.slice(0,3)}});
