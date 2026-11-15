@@ -113,13 +113,14 @@
 
 ## あそび大全（asobi.html、2026-11-16 新規）
 - ゲームは `GAMES.push({key,name,min,max,hidden,desc,rules,thumb,create(n)})`。create は g を返す：`turn`・`tryMove(m)`（正しくなければ false）・`human(s)`（その席の入力から手を返す／null）・`ai(lv)`・`update(dt)`・`busy()`・`draw(c)`・`done`・`ranking()`（[[1位の席…],[2位…]]）・`score(s)`（結果に出す文字）。
-- いまのゲーム：reversi／four（四目並べ）／dots（ドット＆ボックス、2〜4人）／daifugo（大富豪、2〜4人、8切り・革命・ジョーカー、3回戦、2回戦から自動でカード交換）。
+- いまのゲーム（7つ）：reversi／four（四目並べ）／dots（ドット＆ボックス、2〜4人）／daifugo（大富豪、2〜4人、8切り・革命・ジョーカー、3回戦、2回戦から自動でカード交換）／ludo（ルドー、2〜4人、コマ2こ/4こ、6で出る・6でもう1回・★とスタートは安全、1人がゴールした時点で終わり。動かせるコマが1つなら自動 `phase:'auto'`）／yacht（ヨット、12役、上の合計63で+35、キープは「ふる」手 `{r:mask}` に入れて送る）／diamond（ダイヤモンドゲーム＝チャイニーズチェッカー、121穴、10こ、2人=向かい合わせ・3人=1つおき・4人=2組、連続ジャンプ可、居すわり対策：向かいの三角が全部うまって自分のコマが1つでもあれば勝ち、手数上限 110×人数）。
+- ゲームごとの設定は `opts:[{k,name,vals,labels,def}]` → create(n,o)。設定画面の行・部屋のボタン（`m/o`）に自動で出る。
 - 運（配る・サイコロ）は必ず `R()`／`Rint`／`Rshuffle`（種 `SEED` つき乱数）を使う。`Math.random` は COM の考え（ホストだけが動かす）と見た目だけ。
-- 手は「n手目」の記録。`doMove(m)` が tryMove して、オンラインなら `np/asobi/r/{code}/mv/{gid}/{n}` に `{s,m:JSON文字列}` を書く。全端末が同じ順にあてはめる（`busy()` の間は待つ）。COM の手はホストだけが決める。ぬけた人の席は COM になる（ホストが動かす）。
+- 手は「n手目」の記録。`doMove(m)` が tryMove して、オンラインなら `np/asobi/r/{code}/mv/{gid}/{n}` に `{s,m:JSON文字列}` を書く。全端末が同じ順にあてはめる（`busy()` の間は待つ）。COM の手はホストだけが決める。ぬけた人の席は COM になる：ホストが4秒いないのを確かめて `m/drop/{席}` に書き、全員がそれを見て COM にする（各自が勝手に判断しない）。2台が同じ手番に書いてしまったら、残った記録に合わせて最初から早送りでやり直す（`netCheck`／`resync`）。
 - 部屋：`r/{code}/m`（host,hostName,st=lobby/play,g,n,lv,gid,seed,seats[pid か ''],names）、`p/{pid}`。部屋一覧は共通の np/lobby/（netdb.js の GAMES に asobi を追加）。招待 `?room=XXXX`。オンラインは1台1人、自分の席の dev は 'any'（その端末の全入力）、他の端末の人は 'net'。
 - 手札を隠すゲーム（`hidden:true`）：見る人は `PLAY.viewer`（オンライン＝自分の席、1台で人が1人＝その人）。1台で人が2人以上なら番が変わるたび「○○に わたしてね」画面（`PLAY.curtain`）。
 - 1台のとき：設定画面で席を「人（この端末）」にするか、コントローラーの A で空いた席にすわる。
-- テスト：`__ab.start(key,n,lv,seed)` を `__ab.step` で回す。`window.__abAuto=1` で人の席も自動で打つ（オンラインの2ページテスト用）。
+- テスト：`__ab.start(key,n,lv,seed)` を `__ab.step` で回す。`window.__abAuto=1` でその端末の人の席も自動で打つ（オンラインの2ページテスト用）。注意：`?np=local`（BroadcastChannel）は同時に書くと2ページで値がずれたままになる（Firebase は収束する）。テストで比べるときは同じ瞬間に両方を読む。
 
 ## テスト方法（この作業環境から外部には通信できない）
 - `python3 -m http.server` で配信し、Playwright の同じブラウザコンテキストで2ページ開く。
