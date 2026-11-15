@@ -274,7 +274,7 @@ GAMES.push({key:'daifugo',name:'大富豪',min:2,max:4,hidden:true,desc:'前の�
   const g={n,O,lock:null,jback:false,turn:0,round:1,ROUNDS:3,pts:new Array(n).fill(0),hands:[],field:null,lastBy:-1,passed:[],out:[],rev:false,phase:'play',t:0,flash:null,msg:'',msgT:0,sel:new Set(),cur:0,done:false,prev:null,ex:null,exT:0,last:{}};
   const TITLES={2:['大富豪','大貧民'],3:['大富豪','平民','大貧民'],4:['大富豪','富豪','貧民','大貧民']}[n];g.TITLES=TITLES;
   const sortH=a=>a.sort((p,q)=>cStr(p)-cStr(q)||p-q);
-  const deal=()=>{const d=Rshuffle([...Array(53).keys()]);g.hands=[...Array(n)].map(()=>[]);d.forEach((id,i)=>g.hands[i%n].push(id));g.hands.forEach(sortH);g.field=null;g.lastBy=-1;g.passed=[];g.out=[];g.rev=false;g.last={};g.sel=new Set();g.cur=0};
+  const deal=()=>{const d=Rshuffle([...Array(53).keys()]);g.hands=[...Array(n)].map(()=>[]);d.forEach((id,i)=>g.hands[i%n].push(id));g.hands.forEach(sortH);g.field=null;g.lastBy=-1;g.passed=[];g.out=[];g.rev=false;g.lock=null;g.jback=false;g.last={};g.sel=new Set();g.cur=0};
   const active=()=>[...Array(n).keys()].filter(s=>!g.out.includes(s));
   const nextA=s=>{for(let k=1;k<=n;k++){const q=(s+k)%n;if(!g.out.includes(q))return q}return s};
   deal();g.turn=g.hands.findIndex(h=>h.includes(26));// ♦3 を 持っている人から
@@ -293,9 +293,9 @@ GAMES.push({key:'daifugo',name:'大富豪',min:2,max:4,hidden:true,desc:'前の�
    return{t:'seq',str:lo,top:hi,cnt:cards.length,eight:lo<=5&&hi>=5,jb:lo<=8&&hi>=8,suits:String(suitOf(nj[0])),full:nj.length===cards.length}};
   const R=()=>g.rev!==g.jback;
   const beats=(p,f)=>{if(!f)return true;if(p.t!==f.t||p.cnt!==f.cnt)return false;
-   if(g.lock&&p.suits.split('').some(q=>!g.lock.includes(q)))return false;
+   if(f&&g.lock&&p.suits.split('').some(q=>!g.lock.includes(q)))return false;
    if(f.str===13)return !!(O.s3&&p.sp3);if(p.str===13)return true;return R()?p.str<f.str:p.str>f.str};
-  g.check=cards=>{const p=play(cards);if(!p)return O.kai?'同じ 数字か、同じ マークの 階段（3まい以上）で 出してね':'同じ 数字の カードを えらんでね';if(g.field&&(p.cnt!==g.field.cnt||p.t!==g.field.t))return`場と 同じ 出し方（${g.field.t==='seq'?'階段 ':''}${g.field.cnt}まい）で 出してね`;if(g.lock&&p.suits.split('').some(q=>!g.lock.includes(q)))return`しばり中：${g.lock.split('').map(q=>SUIT[q]).join('')} だけ 出せるよ`;if(!beats(p,g.field))return'場の カードより 強く ないと 出せないよ';return''};
+  g.check=cards=>{const p=play(cards);if(!p)return O.kai?'同じ 数字か、同じ マークの 階段（3まい以上）で 出してね':'同じ 数字の カードを えらんでね';if(g.field&&(p.cnt!==g.field.cnt||p.t!==g.field.t))return`場と 同じ 出し方（${g.field.t==='seq'?'階段 ':''}${g.field.cnt}まい）で 出してね`;if(g.field&&g.lock&&p.suits.split('').some(q=>!g.lock.includes(q)))return`しばり中：${g.lock.split('').map(q=>SUIT[q]).join('')} だけ 出せるよ`;if(!beats(p,g.field))return'場の カードより 強く ないと 出せないよ';return''};
   const say=(s,m)=>{g.msg=m;g.msgT=1.6};
   const clearField=leader=>{g.field=null;g.passed=[];g.turn=leader;g.last={};g.lock=null;g.jback=false};
   const endRound=()=>{g.out.forEach((s,i)=>g.pts[s]+=n-1-i);g.prev=g.out.slice();g.phase='roundEnd';g.t=4.2;sfx('win')};
