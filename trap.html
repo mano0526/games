@@ -166,7 +166,7 @@ const rp=x=>'r/'+S.code+(x?'/'+x:'');
 function owns(pid){return!!S.local[pid]||(S.host&&pid[0]==='c');}
 function offAll(){for(const f of S.L)try{f();}catch(e){}S.L=[];}
 function openRoom(db,code,asHost){offAll();S.db=db;S.code=code;S.host=asHost;S.meta=null;S.players={};S.picks={};S.places={};S.states={};S.buf={};S.local={};S.seenMeta=false;S.online=db.kind!=='mem';
-  if(asHost){db.set(rp('m'),{host:DEV,hostName:S.name,st:'lobby',stage:0,target:15,cpu:S.online?0:2,scores:{},t:db.now()});db.dis(rp('m'));db.dis(rp('pk'));db.dis(rp('pl'));db.dis(rp('s'));
+  if(asHost){if(S.online)NetDB.hub.report('trap',code);db.set(rp('m'),{host:DEV,hostName:S.name,st:'lobby',stage:0,target:15,cpu:S.online?0:2,scores:{},t:db.now()});db.dis(rp('m'));db.dis(rp('pk'));db.dis(rp('pl'));db.dis(rp('s'));
     if(S.online)S.pub=NetDB.lobby.publish('trap',code,{host:S.name,n:0,st:'lobby'});}
   S.L.push(db.on(rp('m'),'value',(k,v)=>onMeta(v)));
   S.L.push(db.on(rp('p'),'value',(k,v)=>{S.players=v||{};if(S.host&&S.pub)S.pub.update({n:Object.values(S.players).filter(p=>!p.cpu).length});if(scr==='lobby')lobbyScreen();}));
@@ -615,7 +615,7 @@ function endScreen(){scr='end';const m=S.meta;const ord=m.order.slice().sort((a,
   const a=ui.querySelector('[data-a=again]');if(a)a.onclick=()=>{for(const pid in S.players){if(S.players[pid].cpu)S.db.remove(rp('p/'+pid));else S.db.update(rp('p/'+pid),{ok:false});}S.db.update(rp('m'),{st:'lobby',rd:null,last:null,win:null});if(S.pub)S.pub.update({st:'lobby'});};
   ui.querySelector('[data-back]').onclick=()=>leaveRoom('');}
 function pauseMenu(){G.menu=true;scr='pause';for(const k in devs){devs[k].pst=false;devs[k].pb=false;devs[k].pa=false;}h(`<div class="wrap" style="max-width:420px"><h2>メニュー</h2><p class="hint">メニュー中もゲームは止まりません。</p><div class="menu"><button class="btn big" data-nav data-back>つづける</button><button class="btn big" data-nav data-a="q">${S.online?'部屋を出る':'タイトルへ'}</button><button class="btn" data-nav data-a="home">ゲーム一覧（ホーム）へ</button></div></div>`);
-  ui.querySelector('[data-back]').onclick=()=>{G.menu=false;scr='game';ui.hidden=true;ui.innerHTML='';};ui.querySelector('[data-a=q]').onclick=()=>{G.menu=false;leaveRoom('');};ui.querySelector('[data-a=home]').onclick=()=>{try{leaveRoom('')}catch(e){}location.href='index.html'};}
+  ui.querySelector('[data-back]').onclick=()=>{G.menu=false;scr='game';ui.hidden=true;ui.innerHTML='';};ui.querySelector('[data-a=q]').onclick=()=>{G.menu=false;leaveRoom('');};ui.querySelector('[data-a=home]').onclick=()=>{try{leaveRoom('')}catch(e){}location.href=(window.NetDB?NetDB.hub.home():'index.html')};}
 // ============ ステージづくり ============
 const ED={grid:null,start:[1,17],goal:[44,14],lava:0,theme:0,name:'',id:'',tool:'g',msg:'',ver:0,built:-1,down:false};
 function loadCustom(){try{const a=JSON.parse(localStorage.getItem('wn_custom')||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
@@ -672,7 +672,7 @@ function frame1(ts){const dt=Math.min(.1,(ts-lastTs)/1000||0);lastTs=ts;readDevs
   if(scr==='lobby')lobbyInput();
   if(scr!=='game')navStep();
   render(t,dt);}
-resize();titleScreen();if(QS.get('room'))onlineScreen();requestAnimationFrame(frame);
+resize();titleScreen();if(QS.get('room'))onlineScreen();else if(NetDB.hub.isHost&&NetDB.hub.code)setTimeout(()=>{onlineScreen();const b=ui.querySelector('[data-a=make]');if(b)b.click()},300);requestAnimationFrame(frame);
 window.__w={S,G,openRoom,dbTree,hostStart,STAGES,ITEMS,get scr(){return scr;},canPlace,rp};
 </script>
 </body></html>

@@ -140,6 +140,12 @@
 - 1台のとき：設定画面で席を「人（この端末）」にするか、コントローラーの A で空いた席にすわる。
 - テスト：`__ab.start(key,n,lv,seed)` を `__ab.step` で回す。`window.__abAuto=1` でその端末の人の席も自動で打つ（オンラインの2ページテスト用）。注意：`?np=local`（BroadcastChannel）は同時に書くと2ページで値がずれたままになる（Firebase は収束する）。テストで比べるときは同じ瞬間に両方を読む。
 
+## みんなの部屋（ホームで合流、2026-11-16）
+- index.html の「みんなの部屋」：Firebase `np/hub/r/{code}/m`＝{host,t,go:{g,n,t,by,code}}、`p/{pid}`＝{name,t,j}（20秒ごとに t 更新、60秒来なければ「ゲーム中」）。pid は タブごと（sessionStorage `hub_pid`）。
+- ホストがゲームを押す → `go`（code:null）を書いて `ゲーム.html?hub=CODE&hh=1` へ。ゲーム側は `hh=1` なら自動で部屋をつくり `NetDB.hub.report(game,code)` で go.code を入れる → メンバーは `NetDB.lobby.joinUrl(...)&hub=CODE` へ自動移動（45秒より古い go は無視、見た go は sessionStorage `hub_seen`）。パーティ・キッチン（netplay.js）は `?join=` で hub があれば自動で「参加する」を押す。
+- `NetDB.hub`（netdb.js）：code（?hub= か sessionStorage `gm_hub`）、isHost（hh=1）、home()（index.html?hub=CODE）、report()、leave()。`a[href=index.html]` のクリックは自動で home() に書きかえ。
+- テスト（?np=local）は 全ページが移動すると BroadcastChannel のデータが消えるので、index.html?np=local をもう1枚 開いたままにする。テスト：/tmp/claude-0/sp/hub.py・hub2.py。
+
 ## テスト方法（この作業環境から外部には通信できない）
 - `python3 -m http.server` で配信し、Playwright の同じブラウザコンテキストで2ページ開く。
 - URL に `?np=local` を付けると Firebase の代わりに同じブラウザ内の仕組み（netplay は BroadcastChannel、fakeroom は localStorage）でつながる。

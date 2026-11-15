@@ -123,5 +123,16 @@
     set: function (v) { ls('gm_vol', String(Math.max(0, Math.min(1, +v || 0)))); }
   };
 
-  window.NetDB = { LOCAL: LOCAL, FB_CFG: FB_CFG, open: open, mem: function () { return treeDB(null); }, lobby: lobby, name: name, vol: vol };
+  // ---- みんなの部屋（ホームで合流）：?hub=XXXX で来たページは「ホームへ」がその部屋に戻る ----
+  var HUBC = (QS.get('hub') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  try { if (HUBC) sessionStorage.setItem('gm_hub', HUBC); else HUBC = sessionStorage.getItem('gm_hub') || ''; } catch (e) {}
+  var hub = {
+    code: HUBC, isHost: QS.get('hh') === '1',
+    home: function () { var q = []; if (hub.code) q.push('hub=' + hub.code); if (LOCAL) q.push('np=local'); return 'index.html' + (q.length ? '?' + q.join('&') : ''); },
+    // ゲームの部屋が できたら、みんなの部屋に コードを 知らせる（ほかの人は それを 見て 自動で 参加する）
+    report: function (game, code) { if (!hub.code || !hub.isHost) return; var db = open('hub'); if (db) db.update('r/' + hub.code + '/m/go', { g: game, code: code }); },
+    leave: function () { hub.code = ''; try { sessionStorage.removeItem('gm_hub'); } catch (e) {} }
+  };
+  document.addEventListener('click', function (e) { var a = e.target && e.target.closest ? e.target.closest('a[href]') : null; if (a && /(^|\/)index\.html(\?.*)?$/.test(a.getAttribute('href') || '')) a.setAttribute('href', hub.home()); }, true);
+  window.NetDB = { LOCAL: LOCAL, FB_CFG: FB_CFG, open: open, mem: function () { return treeDB(null); }, lobby: lobby, name: name, vol: vol, hub: hub };
 })();

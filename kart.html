@@ -1446,7 +1446,7 @@ function launch(o){ensureMeshes();audioInit();app.paused=false;startRace({course
 
 function pauseMenu(){app.paused=true;engineStopSoft();ui.hidden=false;ui.classList.add('overlay');touchEl.hidden=true;
   h(`<div class="wrap" style="max-width:420px"><h2>ポーズ</h2><div class="menu"><button class="btn big" data-nav data-a="r">つづける</button><button class="btn big" data-nav data-a="x">やり直す</button><button class="btn big" data-nav data-a="q">やめる</button><button class="btn" data-nav data-a="home">ゲーム一覧（ホーム）へ</button></div></div>`);
-  bindMenu(1,resume);ui.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='home'){location.href='index.html';return}if(a==='r')resume();else if(a==='x'){launch({course:race.cfg.course,arena:race.cfg.arena,grid:race.cfg.grid,noIntro:true});}else titleScreen();});}
+  bindMenu(1,resume);ui.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='home'){location.href=(window.NetDB?NetDB.hub.home():'index.html');return}if(a==='r')resume();else if(a==='x'){launch({course:race.cfg.course,arena:race.cfg.arena,grid:race.cfg.grid,noIntro:true});}else titleScreen();});}
 function resume(){app.paused=false;ui.hidden=true;ui.innerHTML='';menu.items=[];touchEl.hidden=!app.players.some(p=>p.dev==='touch');}
 function engineStopSoft(){for(let i=0;i<AU.engines.length;i++)engineSet(i,0,false,false,0);}
 
@@ -1496,7 +1496,7 @@ function roomPath(x){return'r/'+NET.code+(x?'/'+x:'');}
 function newCode(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<4;i++)s+=A[Math.floor(Math.random()*A.length)];return s;}
 
 // --- entering / leaving rooms ---
-function netJoin(code,asHost){const db=dbOpen();if(!db){onlineScreen();return;}netOff();NET.code=code;NET.host=asHost;NET.meta=null;NET.seenMeta=false;NET.players={};NET.pts={};NET.lastRaceId='';NET.me.ok=false;
+function netJoin(code,asHost){const db=dbOpen();if(!db){onlineScreen();return;}if(asHost)setTimeout(()=>NetDB.hub.report('kart',code),300);netOff();NET.code=code;NET.host=asHost;NET.meta=null;NET.seenMeta=false;NET.players={};NET.pts={};NET.lastRaceId='';NET.me.ok=false;
   const pp=roomPath('p/'+NET.pid);db.set(pp,{name:NET.name,char:NET.me.char,frame:NET.me.frame,ok:false,t:db.now()});db.dis(pp);
   if(asHost){const m={host:NET.pid,hostName:NET.name,st:'lobby',course:app.course||0,cc:1,cpu:app.cpuLv+1,t:db.now(),pts:{},mode:0};db.set(roomPath('m'),m);db.dis(roomPath('m'));db.dis(roomPath('e'));db.dis(roomPath('s'));
     NET.pub=NetDB.lobby.publish('kart',code,{host:NET.name,n:1,st:'lobby'});}
@@ -1633,7 +1633,7 @@ function netEvent(key,ev){const rn=race&&race.net;if(!rn||!ev||ev.f===NET.pid||r
   else if(ev.ty==='hit'){const k=byRid(ev.v);if(k&&!k.remote)hitKart(k,ev.kind);}}
 function netPauseMenu(){app.netMenu=true;ui.hidden=false;ui.classList.add('overlay');
   h(`<div class="wrap" style="max-width:420px"><h2>メニュー</h2><p class="hint">オンライン中はレースは止まりません。</p><div class="menu"><button class="btn big" data-nav data-a="r">つづける</button><button class="btn big" data-nav data-a="q">部屋を出る</button><button class="btn" data-nav data-a="home">ゲーム一覧（ホーム）へ</button></div></div>`);
-  bindMenu(1,netResume);ui.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{if(b.dataset.a==='r')netResume();else if(b.dataset.a==='home'){try{netLeave('')}catch(e){}location.href='index.html'}else netLeave('');});}
+  bindMenu(1,netResume);ui.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{if(b.dataset.a==='r')netResume();else if(b.dataset.a==='home'){try{netLeave('')}catch(e){}location.href=(window.NetDB?NetDB.hub.home():'index.html')}else netLeave('');});}
 function netResume(){app.netMenu=false;ui.hidden=true;ui.innerHTML='';menu.items=[];}
 function netResults(){const r=race,rn=r.net,order=r.order;const db=NET.db;const m=NET.meta||{};const gp=rn.gp;
   const label=k=>k.netHuman||k.human?(k.human?NET.name:k.netName):k.ch.name;const idOf=k=>k.human?NET.pid:k.rid;
@@ -1671,7 +1671,7 @@ function frame(now){requestAnimationFrame(frame);let dt=(now-lastT)/1000;lastT=n
 document.fonts&&document.fonts.ready.then(()=>{});
 addEventListener('gamepadconnected',()=>{if(app.screen==='title')titleScreen();});
 AU.onInit=()=>{if(app.screen==='title'&&AU.on)music.start(4);};
-titleScreen();if(new URLSearchParams(location.search).get('room'))onlineScreen();requestAnimationFrame(frame);
+titleScreen();if(new URLSearchParams(location.search).get('room'))onlineScreen();else if(NetDB.hub.isHost&&NetDB.hub.code)setTimeout(()=>{onlineScreen();const b=ui.querySelector('[data-a=make]');if(b)b.click()},300);requestAnimationFrame(frame);
 window.__g={app,get race(){return race;},startRace,launch,stepRace,COURSES,CHARS,NET,netJoin,netStartRace,onlineScreen};
 </script>
 

@@ -276,7 +276,7 @@ const COARSE=!!(window.matchMedia&&matchMedia('(pointer: coarse)').matches);
  pad.querySelectorAll('button').forEach(b=>{const k=b.dataset.k;const on=e=>{e.preventDefault();Input.touch[k]=1;b.classList.add('on');initAudio()};const off=e=>{e.preventDefault();Input.touch[k]=0;b.classList.remove('on')};
   b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('pointerleave',off)})})();
 cv.addEventListener('pointerdown',e=>{try{cv.focus()}catch(_){}initAudio();
- if(typeof paused!=='undefined'&&paused){const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,y=(e.clientY-r.top)/r.height*H;for(let i=0;i<3;i++){const yy=H/2-20+i*60;if(Math.abs(x-W/2)<170&&Math.abs(y-yy)<26){pauseSel=i;sfx('ok');if(i===0)paused=false;else if(i===2)location.href='index.html';else{paused=false;goTitle()}return}}return}
+ if(typeof paused!=='undefined'&&paused){const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,y=(e.clientY-r.top)/r.height*H;for(let i=0;i<3;i++){const yy=H/2-20+i*60;if(Math.abs(x-W/2)<170&&Math.abs(y-yy)<26){pauseSel=i;sfx('ok');if(i===0)paused=false;else if(i===2)location.href=(window.NetDB?NetDB.hub.home():'index.html');else{paused=false;goTitle()}return}}return}
  // 自分の番メニューは 項目を 直接 タップで えらべる（マウスでも）
  const u=G.tmenu;if(u&&u.rects){const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,y=(e.clientY-r.top)/r.height*H;const hit=u.rects.find(q=>x>=q.x&&x<=q.x+q.w&&y>=q.y&&y<=q.y+q.h);
   if(hit){if(hit.k==='sub'){u.isel=hit.j}else if(hit.k==='back'){u.tapB=true}else{u.sel=hit.j}u.tapA=hit.k!=='back';return}}
@@ -3029,7 +3029,7 @@ const TITLE={sel:0,opts(){const o=[['party','パーティ'],['free','ミニゲ�
  update(dt){const o=this.opts();if(this.sel>=o.length)this.sel=0;
   if(Input.IDS.some(id=>Input.rep(id,'left')||Input.rep(id,'up'))){this.sel=(this.sel+o.length-1)%o.length;sfx('blip')}
   else if(Input.IDS.some(id=>Input.rep(id,'right')||Input.rep(id,'down'))){this.sel=(this.sel+1)%o.length;sfx('blip')}
-  if(Input.anyPressed('a')){initAudio();sfx('ok');const k=o[this.sel][0];if(k==='home'){location.href='index.html';return}if(k==='help'){HELP.page=0;HELP.t=0;scene=HELP;return}if(k==='online'){if(window.__NP&&__NP.UI)__NP.UI.show();return}if(k==='resume'){const d=loadSave();if(d){resumeGame(d);return}}SETUP.reset(['free','cup','surv'].includes(k)?k:'party');scene=SETUP}},
+  if(Input.anyPressed('a')){initAudio();sfx('ok');const k=o[this.sel][0];if(k==='home'){location.href=(window.NetDB?NetDB.hub.home():'index.html');return}if(k==='help'){HELP.page=0;HELP.t=0;scene=HELP;return}if(k==='online'){if(window.__NP&&__NP.UI)__NP.UI.show();return}if(k==='resume'){const d=loadSave();if(d){resumeGame(d);return}}SETUP.reset(['free','cup','surv'].includes(k)?k:'party');scene=SETUP}},
  draw(c){mgBG(c,'#4fb7e8','#1f72ad');
  c.save();c.translate(W/2,-60);c.fillStyle='rgba(255,255,255,.08)';for(let i=0;i<16;i++){c.rotate(Math.PI/8);c.beginPath();c.moveTo(0,0);c.lineTo(1500,-80);c.lineTo(1500,80);c.closePath();c.fill()}c.restore();
  c.fillStyle='#fdfbf3';ell(c,W/2,690,760,140);c.fill();c.fillStyle=C.sand;ell(c,W/2,700,720,124);c.fill();c.fillStyle=C.grass;ell(c,W/2,730,620,110);c.fill();
@@ -3213,7 +3213,7 @@ function isFF(){return canFF()&&G.players.some(p=>p.human&&Input.down(p.dev,'b')
 /* ================= ポーズ ================= */
 let paused=false,pauseSel=0;
 function pauseUpdate(){if(['down','right'].some(k=>ownerRep(-1,k)||Input.rep('kb1',k))){pauseSel=(pauseSel+1)%3;sfx('blip')}if(['up','left'].some(k=>ownerRep(-1,k)||Input.rep('kb1',k))){pauseSel=(pauseSel+2)%3;sfx('blip')}
- if(Input.anyPressed('a')){sfx('ok');if(pauseSel===0)paused=false;else if(pauseSel===2)location.href='index.html';else goTitle()}if(Input.anyPressed('b')){paused=false}}
+ if(Input.anyPressed('a')){sfx('ok');if(pauseSel===0)paused=false;else if(pauseSel===2)location.href=(window.NetDB?NetDB.hub.home():'index.html');else goTitle()}if(Input.anyPressed('b')){paused=false}}
 function drawPause(c){c.fillStyle='rgba(15,10,30,.7)';c.fillRect(0,0,W,H);rr(c,W/2-220,H/2-150,440,330,26);c.fillStyle=C.paper;c.fill();c.lineWidth=5;c.strokeStyle=C.ink;c.stroke();
  txt(c,'ポーズ',W/2,H/2-90,{s:44,f:FD,w:400});['つづける','タイトルに もどる','ゲーム一覧（ホーム）へ'].forEach((s,i)=>{const y=H/2-20+i*60;if(i===pauseSel){rr(c,W/2-170,y-24,340,48,16);c.fillStyle='#ffe7a1';c.fill()}txt(c,s,W/2,y,{s:26,col:i===1?C.redD:C.ink})})}
 

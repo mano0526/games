@@ -758,7 +758,8 @@
       ['pointermove', 'pointerdown', 'touchstart'].forEach(function (t) { window.addEventListener(t, wake, { passive: true }); });
       wake();
       var j = (QS.get('join') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
-      if (j.length === 4) this.show(j);
+      if (j.length === 4) { this.show(j); if (window.NetDB && NetDB.hub && NetDB.hub.code) { var me = this; setTimeout(function () { var jb = me.modal && me.modal.querySelector('[data-npa=join]'); if (jb) jb.click(); }, 300); } }
+      else if (QS.get('hh') === '1' && window.NetDB && NetDB.hub && NetDB.hub.code) { var self = this; setTimeout(function () { self.show(); var hb = self.modal && self.modal.querySelector('[data-npa=host]'); if (hb) hb.click(); }, 400); }
     },
     close: function () { if (this.roomsOff) { this.roomsOff(); this.roomsOff = null; } if (this.modal) { this.modal.remove(); this.modal = null; } this.open = false; },
     card: function (html) {
@@ -791,7 +792,7 @@
       c.querySelector('[data-npa=x]').onclick = function () { UI.close(); };
       c.querySelector('[data-npa=host]').onclick = function () {
         var b = this; b.disabled = true; note.className = 'np-note'; note.textContent = '部屋を作っています…';
-        Host.start().then(function () { UI.mode = 'host'; UI.fab.classList.add('on'); UI.hostCard(); })
+        Host.start().then(function () { UI.mode = 'host'; UI.fab.classList.add('on'); UI.hostCard(); if (window.NetDB && NetDB.hub && Host.room) NetDB.hub.report(GAME, Host.room.code); })
           .catch(function (e) { b.disabled = false; note.className = 'np-note np-err'; note.textContent = errText(e); });
       };
       function go() {

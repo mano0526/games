@@ -56,6 +56,26 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
 .pad .btns span{min-width:26px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:0 4px;font-variant-numeric:tabular-nums}
 .pad .btns span.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 .warn{color:var(--acc);font-weight:800;font-size:13px;margin:0}
+/* みんなの部屋 */
+.hub{border:2px solid var(--acc);background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 10%,var(--card)),var(--card))}
+.hub h2{font-family:var(--f-d);font-weight:400;font-size:24px}
+.hub .code{font-family:var(--f-d);font-size:34px;letter-spacing:.12em;color:var(--acc)}
+.hrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hin{font:inherit;font-weight:800;font-size:17px;border:2px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--bg);color:var(--ink);min-width:0}
+.hbtn{font:inherit;font-weight:800;font-size:16px;border:none;border-radius:10px;padding:10px 16px;cursor:pointer;background:var(--acc);color:#fff}
+.hbtn.sub{background:var(--bg);color:var(--ink);border:2px solid var(--line)}
+.hbtn:disabled{opacity:.45;cursor:default}
+.hbtn:focus-visible,.hg:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.mem{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.mem li{border:2px solid var(--line);border-radius:999px;padding:4px 12px;font-weight:800;display:flex;gap:6px;align-items:center}
+.mem li small{color:var(--mute);font-weight:500}
+.mem .me{border-color:var(--acc)}
+.hgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.hg{font:inherit;font-weight:800;text-align:left;border:none;border-radius:12px;padding:12px;cursor:pointer;color:#fff;background:var(--c);display:flex;flex-direction:column;gap:2px}
+.hg small{font-weight:500;opacity:.9}
+.hg:disabled{opacity:.55;cursor:default}
+.hmsg{font-weight:800;margin:0}
+.hmsg.err{color:var(--acc)}
 
 .how h2{font-size:18px;margin:0 0 8px}
 .how ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px}
@@ -71,6 +91,7 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
     <h1>友達と遊ぶゲーム棚</h1>
     <p class="lead">どれもブラウザで開くだけ。アカウント登録はいりません。オンラインで遊ぶときは、1人が部屋を作って、4文字のコードか招待リンクを友達に送ります。</p>
   </header>
+  <section class="box hub" id="hub" aria-live="polite"></section>
   <section class="box" aria-live="polite">
     <h2>いま開いている部屋</h2>
     <ul class="rooms" id="rooms"></ul>
@@ -110,7 +131,7 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
       <label for="nm">なまえ</label><input type="text" id="nm" maxlength="10" placeholder="オンラインで表示される名前">
       <label for="vol">音量</label><div style="display:flex;gap:10px;align-items:center"><input type="range" id="vol" min="0" max="100" step="5"><button class="btn2" id="beep" type="button">テスト音</button></div>
     </div>
-    <p class="empty">5つのゲームすべてに使われます。ゲームの中の音量設定は、この音量に掛け算されます。</p>
+    <p class="empty">すべてのゲームに使われます。ゲームの中の音量設定は、この音量に掛け算されます。</p>
   </section>
   <section class="box">
     <h2>コントローラー確認</h2>
@@ -120,14 +141,60 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
   <section class="how">
     <h2>オンラインは2つの方式があります</h2>
     <ol>
-      <li><b>各自の端末で動かす方式</b>（ターボカートGP・ワナワナ・ラン）：それぞれが自分の端末でゲームを動かし、位置だけを送り合います。全員が全画面でなめらかに遊べて、つながりにくい回線でも遊べます。</li>
+      <li><b>各自の端末で動かす方式</b>（ターボカートGP・ワナワナ・ラン・あそび大全）：それぞれが自分の端末でゲームを動かし、位置だけを送り合います。全員が全画面でなめらかに遊べて、つながりにくい回線でも遊べます。</li>
       <li><b>リモートプレイ方式</b>（コロコロ島パーティ・てんやわんやキッチン）：ホストの端末だけがゲームを動かし、友達には画面と音が映像で届きます。ホストはPCがおすすめです。学校・会社のWi-Fiや一部のスマホ回線どうしだと、つながらないことがあります（25秒たつと理由が表示されます）。</li>
     </ol>
-    <p><small>部屋のつくり方：ゲームの「オンライン」→「部屋をつくる」。出てきた4文字のコードか招待リンクを送るか、友達がこのページの「いま開いている部屋」から押せば参加できます。</small></p>
+    <p><small>いちばん かんたんなのは 上の「みんなの部屋」：ここで集まれば、ホストがゲームを えらぶだけで 全員がそのゲームの同じ部屋に入り、終わったら「ゲーム一覧（ホーム）へ」で ここに もどれます。<br>ゲームごとに部屋をつくる場合：ゲームの「オンライン」→「部屋をつくる」。出てきた4文字のコードか招待リンクを送るか、友達がこのページの「いま開いている部屋」から押せば参加できます。</small></p>
   </section>
 </main>
 <script>
 'use strict';
+// ---- みんなの部屋：ホームで集まって、ホストが えらんだ ゲームへ 全員で 移動する ----
+(function(){const box=document.getElementById('hub');const DB=NetDB.open('hub');const G=NetDB.lobby.GAMES;const LOCAL=NetDB.LOCAL;
+  const COL={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)',bomber:'#d6453a',fall:'#7a4fd0'};
+  const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  let pid='';try{pid=sessionStorage.getItem('hub_pid')||'';if(!pid){pid='h'+Math.random().toString(36).slice(2,10);sessionStorage.setItem('hub_pid',pid)}}catch(e){pid='h'+Math.random().toString(36).slice(2,10)}
+  const S={code:'',m:null,p:{},offs:[],beat:0,err:'',msg:'',got:false};
+  const rp=x=>'r/'+S.code+(x?'/'+x:'');
+  const newCode=()=>{const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let c='';for(let i=0;i<4;i++)c+=A[Math.floor(Math.random()*A.length)];return c};
+  const seen=n=>{try{return sessionStorage.getItem('hub_seen')===String(n)}catch(e){return false}},markSeen=n=>{try{sessionStorage.setItem('hub_seen',String(n))}catch(e){}};
+  const present=q=>q&&DB&&DB.now()-(q.t||0)<60000;
+  function hostId(){const m=S.m;if(!m)return'';if(S.p[m.host]&&present(S.p[m.host]))return m.host;const ids=Object.keys(S.p).filter(k=>present(S.p[k])).sort((a,b)=>(S.p[a].j||0)-(S.p[b].j||0));return ids[0]||m.host}
+  function leave(){if(!S.code)return;const amHost=hostId()===pid;DB.remove(rp('p/'+pid));if(amHost){const o=Object.keys(S.p).filter(k=>k!==pid&&present(S.p[k]));if(o.length)DB.update(rp('m'),{host:o[0]})}
+   S.offs.forEach(f=>f());S.offs=[];clearInterval(S.beat);S.code='';S.m=null;S.p={};NetDB.hub.leave();history.replaceState(null,'',location.pathname+(LOCAL?'?np=local':''));draw()}
+  function enter(code,asHost){if(!DB){S.err='通信の 部品を 読みこめませんでした。ネットに つながっているか 確かめてください。';draw();return}
+   const name=NetDB.name.get();if(!name){S.err='先に なまえを 入れてね';draw();const i=box.querySelector('#hnm');if(i)i.focus();return}
+   S.code=code;S.err='';S.got=false;NetDB.hub.code=code;try{sessionStorage.setItem('gm_hub',code)}catch(e){}
+   history.replaceState(null,'','?hub='+code+(LOCAL?'&np=local':''));
+   if(asHost)DB.set(rp('m'),{host:pid,t:DB.now(),go:null});
+   const meP={name,t:DB.now(),j:DB.now()};DB.update(rp('p/'+pid),meP);S.beat=setInterval(()=>{if(S.code)DB.update(rp('p/'+pid),{t:DB.now(),name:NetDB.name.get()})},20000);
+   let first=true;
+   S.offs.push(DB.on(rp('m'),'value',(k,v)=>{if(!S.code)return;if(!v&&!asHost&&!S.got){if(first){first=false;setTimeout(()=>{if(S.code===code&&!S.got){S.err=`部屋「${code}」が 見つかりませんでした`;leave()}},3000)}return}first=false;S.got=true;S.m=v;
+    const go=v&&v.go;if(go&&!seen(go.n)){if(DB.now()-(go.t||0)>45000){markSeen(go.n)}else if(go.by!==pid&&go.code){markSeen(go.n);S.msg=`${esc(G[go.g]?G[go.g].name:'')} へ 移動します…`;draw();setTimeout(()=>{location.href=NetDB.lobby.joinUrl({g:go.g,code:go.code})+'&hub='+code},400);return}else if(go.by!==pid){S.msg=`ホストが ${esc(G[go.g]?G[go.g].name:'')} の 部屋を つくっています…`}}
+    draw()}));
+   S.offs.push(DB.on(rp('p'),'value',(k,v)=>{S.p=v||{};draw()}));draw()}
+  function start(g){if(hostId()!==pid)return;const n=Date.now();markSeen(n);DB.update(rp('m'),{go:{g,n,t:DB.now(),by:pid,code:null},host:pid});S.msg=`${esc(G[g].name)} を ひらいています…`;draw();
+   setTimeout(()=>{location.href=G[g].url+'?hub='+S.code+'&hh=1'+(LOCAL?'&np=local':'')},300)}
+  function draw(){const name=NetDB.name.get();
+   if(!S.code){box.innerHTML=`<h2>みんなの部屋</h2><p class="empty">ここで 友だちと 集まってから、ホストが えらんだ ゲームへ 全員で 移動できます。ゲームが おわったら また ここに もどれます。</p>
+    <div class="hrow"><label for="hnm" style="font-weight:800">なまえ</label><input class="hin" id="hnm" maxlength="10" placeholder="自分の なまえ" value="${esc(name)}" style="flex:1"></div>
+    <div class="hrow"><button class="hbtn" id="hmk" type="button">部屋を つくる</button><span style="color:var(--mute)">または</span><input class="hin" id="hcd" maxlength="4" placeholder="コード" style="width:6.5em;text-transform:uppercase;letter-spacing:.1em"><button class="hbtn sub" id="hjn" type="button">入る</button></div>
+    ${S.err?`<p class="hmsg err">${esc(S.err)}</p>`:''}`;
+    const nm=box.querySelector('#hnm');const save=()=>{nm.value=NetDB.name.set(nm.value);const o=document.getElementById('nm');if(o)o.value=nm.value};nm.addEventListener('change',save);
+    box.querySelector('#hmk').onclick=()=>{save();enter(newCode(),true)};
+    const jn=()=>{save();const c=(box.querySelector('#hcd').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==4){S.err='コードは 4文字です';draw();return}enter(c,false)};box.querySelector('#hjn').onclick=jn;box.querySelector('#hcd').addEventListener('keydown',e=>{if(e.key==='Enter')jn()});return}
+   const host=hostId(),amHost=host===pid,url=location.origin+location.pathname+'?hub='+S.code+(LOCAL?'&np=local':'');
+   const mem=Object.entries(S.p).filter(([k,q])=>q&&DB.now()-(q.t||0)<3*3600e3).sort((a,b)=>(a[1].j||0)-(b[1].j||0));
+   box.innerHTML=`<div class="hrow" style="justify-content:space-between"><h2>みんなの部屋 <span class="code">${esc(S.code)}</span></h2><button class="hbtn sub" id="hlv" type="button">部屋を 出る</button></div>
+    <div class="hrow"><button class="hbtn sub" id="hcp" type="button">招待リンクを コピー</button><a class="hbtn sub" style="text-decoration:none" target="_blank" rel="noopener" href="https://line.me/R/msg/text/?${encodeURIComponent('いっしょに あそぼう！ '+url)}">LINEで 送る</a><span id="hcpm" style="color:var(--mute)"></span></div>
+    <ul class="mem">${mem.map(([k,q])=>`<li class="${k===pid?'me':''}">${esc(q.name)}${k===host?' <small>ホスト</small>':''}${k===pid?' <small>あなた</small>':''}${present(q)?'':' <small>ゲーム中</small>'}</li>`).join('')}</ul>
+    ${S.msg?`<p class="hmsg">${S.msg}</p>`:''}
+    <p class="empty">${amHost?'ゲームを えらぶと、部屋の 全員が そのゲームの 同じ 部屋へ 移動します。':'ホストが ゲームを えらぶと、自動で 移動します。'}</p>
+    <div class="hgs">${Object.keys(G).map(g=>`<button class="hg" type="button" data-g="${g}" style="--c:${COL[g]||'#666'}" ${amHost?'':'disabled'}>${esc(G[g].name)}<small>${amHost?'押すと 全員で 移動':'ホストが えらびます'}</small></button>`).join('')}</div>`;
+   box.querySelector('#hlv').onclick=leave;box.querySelector('#hcp').onclick=()=>{const done=()=>{box.querySelector('#hcpm').textContent='コピーしました'};try{navigator.clipboard.writeText(url).then(done,()=>prompt('この リンクを 送ってね',url))}catch(e){prompt('この リンクを 送ってね',url)}};
+   box.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>start(b.dataset.g))}
+  draw();if(NetDB.hub.code)enter(NetDB.hub.code,false);
+  setInterval(()=>{if(S.code)draw()},15000);})();
 // ---- open rooms (all games) ----
 (function(){const ul=document.getElementById('rooms'),em=document.getElementById('roomsEmpty');const G=NetDB.lobby.GAMES;const C={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)'};
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
