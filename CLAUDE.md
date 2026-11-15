@@ -12,6 +12,7 @@
 | kitchen.html | てんやわんやキッチン（オーバークック風）。元は js/*.js 分割だったのを1ファイルに統合済み |
 | trap.html | ワナワナ・ラン（アルチキ風パーティ足場ゲーム、2D canvas、最大4人＋CPU）。オンラインは自前（各自の端末で動かす方式） |
 | asobi.html | あそび大全（テーブルゲーム集、2〜4人＋COM、1枚の canvas 1280×720＋オンライン用の HTML `#ui`）。オンラインは自前（各自の端末で動かす方式）。netplay.js は使わない |
+| bomber.html | ドッカン・ひろば（ボンバーマン風、2〜4人＋COM）。オンラインは自前（各自の端末で動かす方式） |
 | netplay.js | パーティ・キッチン用のオンライン部品（リモートプレイ方式）。カートとワナワナは使っていない |
 | netdb.js | 共通部品：各自の端末で動かす方式のDB（`NetDB.open(game)`／`NetDB.mem()`）、全ゲーム共通の部屋一覧 `NetDB.lobby`（np/lobby/）、共通の名前 `NetDB.name` と音量 `NetDB.vol`。カート・ワナワナ・一覧ページ・netplay.js が使う |
 
@@ -145,6 +146,15 @@
 - ホストがゲームを押す → `go`（code:null）を書いて `ゲーム.html?hub=CODE&hh=1` へ。ゲーム側は `hh=1` なら自動で部屋をつくり `NetDB.hub.report(game,code)` で go.code を入れる → メンバーは `NetDB.lobby.joinUrl(...)&hub=CODE` へ自動移動（45秒より古い go は無視、見た go は sessionStorage `hub_seen`）。パーティ・キッチン（netplay.js）は `?join=` で hub があれば自動で「参加する」を押す。
 - `NetDB.hub`（netdb.js）：code（?hub= か sessionStorage `gm_hub`）、isHost（hh=1）、home()（index.html?hub=CODE）、report()、leave()。`a[href=index.html]` のクリックは自動で home() に書きかえ。
 - テスト（?np=local）は 全ページが移動すると BroadcastChannel のデータが消えるので、index.html?np=local をもう1枚 開いたままにする。テスト：/tmp/claude-0/sp/hub.py・hub2.py。
+
+## ドッカン・ひろば（bomber.html、2026-11-16 新規）
+- ボンバーマン風（名前・絵はオリジナル、キャラはワナワナ・ランと同じ6匹の drawChar）。15×13マス、2〜4人＋COM、ラウンド制（勝ちぬけ 1/2/3/5回）、2:00、のこり32秒から外がわから かべ（`SPIRAL`、`SD_TK`）。
+- ステージ `STAGES` 5つ（はらっぱ／まんなか広場 open／ワープ通路 warps／ゆきのとりで walls／ボムまつり rich=火力3・ボム3）＋ランダム。マップは `buildMap(stage,seed)`（種で全端末同じ）。アイテム `IT`（fire/bomb/speed/kick/pierce/max）。
+- 盤面は全端末で同じ計算：20ms の tick（`simStep`）。できごと `e/{n}/{id}` = b ボム・t なげボム・k キック・g アイテム取得・d やられた（{k,pid,tk,...}）。tk と id の順に適用。遅れて届いたら スナップショット（25tickごと `G.snaps`）から計算しなおし（`addEv`）。キックしたボムは ブロック・ボム・アイテムでだけ止まる（人では止まらない＝全端末で同じになるように）。
+- キャラは自分の端末で動かす（`stepMe`／`moveAxis`：角のすべりこみ、足元のボムはすりぬけ `p.pass`）。やられたかは その端末が決めて d を送る（たおした人は 火の持ち主 `fo`）。位置は `s/{pid}` 14回/秒、相手は130ms遅れで補間。
+- ホストが進行（`hostStep`：のこり1人以下で1.3秒後に結果 `rd.ph='res'`、4.2秒後に次のラウンド、ぬけた人は d を書く）。COM（pid が c）はホストの端末が `cpuInput`（危険マップ `dangerMap`＋BFS で にげ道を確かめてからボム）。
+- やられた後（`m.ghost`）：外わくを歩いて 中へボムをなげる（`stepGhost`、4秒に1回、火力2）。
+- テスト：/tmp/claude-0/sp/bb1.py（1台・COM）、bbnet.py（2ページ。スナップショットのハッシュを比べる＝一致を確認済み）、bbmv.py（キー操作）、bbph.py（スマホ）、bbgh.py（なげボム）。`window.__bAuto=1` でその端末の人もCOMの考えで動く。
 
 ## テスト方法（この作業環境から外部には通信できない）
 - `python3 -m http.server` で配信し、Playwright の同じブラウザコンテキストで2ページ開く。

@@ -11,7 +11,7 @@
 /* Layout: one column shelf of four game cards; each card = color band + name + how online works */
 :root{
   --bg:#f4f1fb; --ink:#211a33; --mute:#615a75; --card:#ffffff; --line:#d9d2ea; --acc:#ff5a3c;
-  --party:#2fa3d8; --kart:#2048c8; --kitchen:#ef6b3a; --trap:#c9881a; --asobi:#2f8a57; 
+  --party:#2fa3d8; --kart:#2048c8; --kitchen:#ef6b3a; --trap:#c9881a; --asobi:#2f8a57; --bomber:#d6453a; 
   --f-d:"Dela Gothic One","M PLUS Rounded 1c","Hiragino Sans",sans-serif;
   --f-b:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
 }
@@ -123,6 +123,11 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
       <p>大富豪・7ならべ・神経衰弱・リバーシ・五目ならべ・マンカラ・ルドー・ヨット・チャイニーズチェッカー・チェッカー・ヘックスなど21ゲーム。2〜4人で遊べるテーブルゲーム集。手札は自分の端末にだけ見えます。</p>
       <div class="meta"><span class="chip">2〜4人</span><span class="chip">各自の端末で動かす方式</span><span class="chip">1台でもOK</span></div>
       <a class="play" href="asobi.html">遊ぶ</a></div></li>
+    <li class="game" style="--c:var(--bomber)"><div class="band"></div><div class="body">
+      <h2>ドッカン・ひろば</h2>
+      <p>ボムでブロックをこわして、アイテムでパワーアップ。さいごまで残った人の勝ち。やられた後も外からボムを投げて参加できます。</p>
+      <div class="meta"><span class="chip">2〜4人</span><span class="chip">各自の端末で動かす方式</span><span class="chip">1台でもOK</span></div>
+      <a class="play" href="bomber.html">遊ぶ</a></div></li>
     
   </ul>
   <section class="box">
@@ -141,7 +146,7 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
   <section class="how">
     <h2>オンラインは2つの方式があります</h2>
     <ol>
-      <li><b>各自の端末で動かす方式</b>（ターボカートGP・ワナワナ・ラン・あそび大全）：それぞれが自分の端末でゲームを動かし、位置だけを送り合います。全員が全画面でなめらかに遊べて、つながりにくい回線でも遊べます。</li>
+      <li><b>各自の端末で動かす方式</b>（ターボカートGP・ワナワナ・ラン・あそび大全・ドッカン・ひろば）：それぞれが自分の端末でゲームを動かし、位置だけを送り合います。全員が全画面でなめらかに遊べて、つながりにくい回線でも遊べます。</li>
       <li><b>リモートプレイ方式</b>（コロコロ島パーティ・てんやわんやキッチン）：ホストの端末だけがゲームを動かし、友達には画面と音が映像で届きます。ホストはPCがおすすめです。学校・会社のWi-Fiや一部のスマホ回線どうしだと、つながらないことがあります（25秒たつと理由が表示されます）。</li>
     </ol>
     <p><small>いちばん かんたんなのは 上の「みんなの部屋」：ここで集まれば、ホストがゲームを えらぶだけで 全員がそのゲームの同じ部屋に入り、終わったら「ゲーム一覧（ホーム）へ」で ここに もどれます。<br>ゲームごとに部屋をつくる場合：ゲームの「オンライン」→「部屋をつくる」。出てきた4文字のコードか招待リンクを送るか、友達がこのページの「いま開いている部屋」から押せば参加できます。</small></p>
@@ -151,7 +156,7 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
 'use strict';
 // ---- みんなの部屋：ホームで集まって、ホストが えらんだ ゲームへ 全員で 移動する ----
 (function(){const box=document.getElementById('hub');const DB=NetDB.open('hub');const G=NetDB.lobby.GAMES;const LOCAL=NetDB.LOCAL;
-  const COL={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)',bomber:'#d6453a',fall:'#7a4fd0'};
+  const COL={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)',bomber:'var(--bomber)',fall:'#7a4fd0'};
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   let pid='';try{pid=sessionStorage.getItem('hub_pid')||'';if(!pid){pid='h'+Math.random().toString(36).slice(2,10);sessionStorage.setItem('hub_pid',pid)}}catch(e){pid='h'+Math.random().toString(36).slice(2,10)}
   const S={code:'',m:null,p:{},offs:[],beat:0,err:'',msg:'',got:false};
@@ -196,7 +201,7 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
   draw();if(NetDB.hub.code)enter(NetDB.hub.code,false);
   setInterval(()=>{if(S.code)draw()},15000);})();
 // ---- open rooms (all games) ----
-(function(){const ul=document.getElementById('rooms'),em=document.getElementById('roomsEmpty');const G=NetDB.lobby.GAMES;const C={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)'};
+(function(){const ul=document.getElementById('rooms'),em=document.getElementById('roomsEmpty');const G=NetDB.lobby.GAMES;const C={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)',bomber:'var(--bomber)'};
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   NetDB.lobby.watch(list=>{em.hidden=list.length>0;ul.innerHTML=list.slice(0,12).map(r=>{const full=(r.n||0)>=(r.max||4),busy=r.st&&r.st!=='lobby';
     return`<li style="--c:${C[r.g]}"><span class="dot"></span><span class="t"><b>${esc(G[r.g].name)}</b><small>${esc(r.host||'')}さんの部屋・${r.n||1}/${r.max||4}人・コード ${esc(r.code)}</small></span>${full?'<span class="busy">満員</span>':busy&&(r.g==='kart'||r.g==='trap'||r.g==='asobi')?'<span class="busy">ゲーム中</span>':`<a href="${NetDB.lobby.joinUrl(r)}">参加</a>`}</li>`;}).join('');});})();

@@ -84,7 +84,8 @@
     kart: { name: 'ターボカートGP', url: 'kart.html', join: 'room' },
     kitchen: { name: 'てんやわんやキッチン', url: 'kitchen.html', join: 'join' },
     trap: { name: 'ワナワナ・ラン', url: 'trap.html', join: 'room' },
-    asobi: { name: 'あそび大全', url: 'asobi.html', join: 'room' }
+    asobi: { name: 'あそび大全', url: 'asobi.html', join: 'room' },
+    bomber: { name: 'ドッカン・ひろば', url: 'bomber.html', join: 'room' }
   };
   var lobby = {
     GAMES: GAMES,
