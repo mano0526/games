@@ -56,6 +56,7 @@ table.sc td{padding:6px 4px;border-bottom:2px solid #eadfcf}
 #touch .d{left:86px;bottom:max(14px,env(safe-area-inset-bottom))}
 #touch .l{left:14px;bottom:calc(max(14px,env(safe-area-inset-bottom)) + 70px)}
 #touch .r{left:158px;bottom:calc(max(14px,env(safe-area-inset-bottom)) + 70px)}
+#touch .b{right:132px;bottom:calc(max(14px,env(safe-area-inset-bottom)) + 20px);width:70px;height:70px;border-radius:50%;background:rgba(143,211,255,.9);font-size:20px}
 #touch .a{right:18px;bottom:calc(max(14px,env(safe-area-inset-bottom)) + 40px);width:104px;height:104px;border-radius:50%;background:rgba(255,122,60,.9);font-size:20px}
 #touch .m{top:max(10px,env(safe-area-inset-top));right:10px;width:48px;height:48px;font-size:20px;border-radius:10px}
 #touch button.p{transform:scale(.92);background:var(--sun)}
@@ -64,7 +65,7 @@ table.sc td{padding:6px 4px;border-bottom:2px solid #eadfcf}
 <body>
 <canvas id="c"></canvas>
 <div id="ui"></div>
-<div id="touch" hidden><button class="u" data-k="u">▲</button><button class="l" data-k="l">◀</button><button class="r" data-k="r">▶</button><button class="d" data-k="d">▼</button><button class="a" data-k="a">ボム</button><button class="m" data-k="m">≡</button></div>
+<div id="touch" hidden><button class="u" data-k="u">▲</button><button class="l" data-k="l">◀</button><button class="r" data-k="r">▶</button><button class="d" data-k="d">▼</button><button class="a" data-k="a">ボム</button><button class="b" data-k="b">B</button><button class="m" data-k="m">≡</button></div>
 <script>
 'use strict';
 // ============ きほん ============
@@ -86,12 +87,15 @@ function sfx(n){if(!AU.ctx)return;({ui:()=>tone(660,.05,'square',.07),ok:()=>{to
   kick:()=>tone(240,.08,'square',.14,500),die:()=>{tone(520,.5,'sawtooth',.16,70);},count:()=>tone(660,.12,'square',.12),go:()=>{tone(880,.25,'square',.14);},
   win:()=>{[523,659,784,1046].forEach((f,i)=>tone(f,.18,'square',.12,0,i*.12));},press:()=>tone(110,.08,'square',.12,70),throw:()=>tone(500,.15,'triangle',.12,900),warp:()=>tone(300,.25,'sine',.15,1200)}[n]||(()=>{}))();}
 // ============ データ ============
-const W=15,H=13,TICK=20,FUSE=125,FLAME=24,KSTEP=4,ROUND_S=120,SD_S=88,SD_STEP=9;
-const ROUND_TK=ROUND_S*1000/TICK,SD_TK=SD_S*1000/TICK;
+const W=15,H=13,TICK=20,FUSE=125,FLAME=24,KSTEP=4,SD_STEP=9;
+let ROUND_S=120,SD_S=88,ROUND_TK=ROUND_S*1000/TICK,SD_TK=SD_S*1000/TICK;
+function setTime(min){ROUND_S=(min||2)*60;SD_S=ROUND_S-32;ROUND_TK=ROUND_S*1000/TICK;SD_TK=SD_S*1000/TICK;}
 const T_HARD=1,T_SOFT=2,T_PRESS=3,T_BURN=4;
 const DX=[0,0,1,0,-1],DY=[0,-1,0,1,0];// 1上 2右 3下 4左
-const IT={fire:1,bomb:2,speed:3,kick:4,pierce:5,max:6};
-const IT_NAME={1:'ひのこ（火力＋1）',2:'ボム（ボム＋1）',3:'くつ（はやく）',4:'キック',5:'つらぬきボム',6:'フルパワー'};
+const IT={fire:1,bomb:2,speed:3,kick:4,pierce:5,max:6,glove:7,remote:8,line:9,skull:10};
+const IT_NAME={1:'ひのこ（火力＋1）',2:'ボム（ボム＋1）',3:'くつ（はやく）',4:'キック',5:'つらぬきボム',6:'フルパワー',7:'パンチ',8:'リモコン',9:'ラインボム',10:'ドクロ'};
+const ITBG={1:'#ff9d4a',2:'#5a6cff',3:'#3ec1d3',4:'#7ad04c',5:'#d0457f',6:'#ffcf3a',7:'#f2b84b',8:'#3d8be0',9:'#9a6ae0',10:'#5a5368'};
+const CURSE=['足が おそくなる','足が はやすぎる','ボムが かってに出る','ボムが 置けない','操作が さかさま','火力が 1になる'];
 const CHARS=[
   {name:'ポンタ',kind:'tanuki',c:'#b98a5a',c2:'#5b4130',acc:'#f3e2c4'},
   {name:'ミミ',kind:'rabbit',c:'#f4f0ea',c2:'#e89aa8',acc:'#ffffff'},
@@ -108,7 +112,7 @@ const STAGES=[
   {name:'ワープ通路',desc:'ワープ穴で 反対がわへ',fl:['#a99bd6','#9f90cf'],hard:['#5b5480','#423b63'],soft:'crystal',dens:.7,warps:[[3,6,11,6],[7,1,7,11]]},
   {name:'ゆきのとりで',desc:'かべが多くて せまい',fl:['#e6f1fa','#dbe9f5'],hard:['#8fb6d6','#5f8db5'],soft:'snow',dens:.66,walls:[[4,3],[10,3],[4,9],[10,9],[3,6],[11,6],[7,4],[7,8]]},
   {name:'ボムまつり',desc:'さいしょから 火力3・ボム3',fl:['#f0b48a','#eaa97c'],hard:['#8a5a8c','#653f68'],soft:'brick',dens:.5,rich:1}];
-const ITEM_W=[[IT.fire,30],[IT.bomb,30],[IT.speed,20],[IT.kick,9],[IT.pierce,5],[IT.max,4]];
+const ITEM_W=[[IT.fire,30],[IT.bomb,30],[IT.speed,20],[IT.kick,9],[IT.pierce,5],[IT.max,4],[IT.glove,6],[IT.remote,4],[IT.line,5],[IT.skull,6]];
 function spiralCells(){const out=[];let x0=1,y0=1,x1=W-2,y1=H-2;while(x0<=x1&&y0<=y1){for(let x=x0;x<=x1;x++)out.push(y0*W+x);for(let y=y0+1;y<=y1;y++)out.push(y*W+x1);if(y1>y0)for(let x=x1-1;x>=x0;x--)out.push(y1*W+x);if(x1>x0)for(let y=y1-1;y>y0;y--)out.push(y*W+x0);x0++;y0++;x1--;y1--;}return out;}
 const SPIRAL=spiralCells();
 function buildMap(si,seed){const st=STAGES[si]||STAGES[0];const R=rng(seed);const g=new Uint8Array(W*H),it=new Uint8Array(W*H);const keep=new Uint8Array(W*H);
@@ -131,21 +135,21 @@ addEventListener('keyup',e=>{keys[e.code]=false;});addEventListener('blur',()=>{
 addEventListener('pointerdown',()=>audioInit());
 touchEl.querySelectorAll('button').forEach(b=>{const k=b.dataset.k;const on=e=>{e.preventDefault();audioInit();if(k==='m'){if(G.active&&!G.menu&&S.meta&&S.meta.st==='game')pauseMenu();return;}touchK[k]=1;touchHit[k]=1;b.classList.add('p');},off=e=>{e.preventDefault();touchK[k]=0;b.classList.remove('p');};
   b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('pointerleave',off);});
-const KB={kb1:{l:['KeyA'],r:['KeyD'],u:['KeyW'],d:['KeyS'],a:['Space','KeyF'],st:['Escape','KeyP']},
-  kb2:{l:['ArrowLeft'],r:['ArrowRight'],u:['ArrowUp'],d:['ArrowDown'],a:['Enter','Slash','Numpad0','ShiftRight'],st:['Backspace']}};
-const DEVNAME={kb1:'キーボード左（WASD・Space）',kb2:'キーボード右（矢印・Enter）',touch:'タッチ',any:'この端末'};
+const KB={kb1:{l:['KeyA'],r:['KeyD'],u:['KeyW'],d:['KeyS'],a:['Space'],b:['KeyF','ShiftLeft','KeyE'],st:['Escape','KeyP']},
+  kb2:{l:['ArrowLeft'],r:['ArrowRight'],u:['ArrowUp'],d:['ArrowDown'],a:['Enter','Slash','Numpad0'],b:['ShiftRight','Period','Numpad1'],st:['Backspace']}};
+const DEVNAME={kb1:'キーボード左（WASD・Space ボム・F パンチなど）',kb2:'キーボード右（矢印・Enter ボム・右Shift パンチなど）',touch:'タッチ',any:'この端末'};
 let devs={},devPrev={};
 // 1人だけキーボードのときは WASD と 矢印の どちらでも動ける
 function kbMerged(){return G.active&&!Object.values(S.local).some(l=>l.dev==='kb2');}
 function readDevs(){const out={};const any=k=>k.some(c=>keys[c]||keyHit[c]);const hit=k=>k.some(c=>keyHit[c]);const mg=kbMerged();
-  for(const id in KB){let m=KB[id];if(id==='kb1'&&mg){const m2=KB.kb2;m={l:m.l.concat(m2.l),r:m.r.concat(m2.r),u:m.u.concat(m2.u),d:m.d.concat(m2.d),a:m.a.concat(m2.a),st:m.st.concat(m2.st)};}
-    out[id]={x:(any(m.r)?1:0)-(any(m.l)?1:0),y:(any(m.d)?1:0)-(any(m.u)?1:0),a:any(m.a),st:any(m.st),ha:hit(m.a),hst:hit(m.st),lr:m};}
+  for(const id in KB){let m=KB[id];if(id==='kb1'&&mg){const m2=KB.kb2;m={l:m.l.concat(m2.l),r:m.r.concat(m2.r),u:m.u.concat(m2.u),d:m.d.concat(m2.d),a:m.a.concat(m2.a),b:m.b.concat(m2.b),st:m.st.concat(m2.st)};}
+    out[id]={x:(any(m.r)?1:0)-(any(m.l)?1:0),y:(any(m.d)?1:0)-(any(m.u)?1:0),a:any(m.a),b:any(m.b),st:any(m.st),ha:hit(m.a),hb:hit(m.b),hst:hit(m.st),lr:m};}
   const pads=navigator.getGamepads?navigator.getGamepads():[];for(const p of pads){if(!p||!p.connected)continue;const ax=Math.abs(p.axes[0])>.4?p.axes[0]:0,ay=Math.abs(p.axes[1])>.4?p.axes[1]:0;const B=i=>p.buttons[i]&&p.buttons[i].pressed;
     let x=clamp((B(15)?1:0)-(B(14)?1:0),-1,1),y=clamp((B(13)?1:0)-(B(12)?1:0),-1,1);if(!x&&!y){if(Math.abs(ax)>Math.abs(ay))x=Math.sign(ax);else if(ay)y=Math.sign(ay);}
-    out['gp'+p.index]={x,y,a:B(0)||B(1),b:B(2)||B(3),st:B(9)};}
-  out.touch={x:(touchK.r||touchHit.r?1:0)-(touchK.l||touchHit.l?1:0),y:(touchK.d||touchHit.d?1:0)-(touchK.u||touchHit.u?1:0),a:!!(touchK.a||touchHit.a),ha:!!touchHit.a,st:false};
-  const all=Object.values(out);out.any={x:clamp(all.reduce((s,d)=>s+d.x,0),-1,1),y:clamp(all.reduce((s,d)=>s+d.y,0),-1,1),a:all.some(d=>d.a),st:all.some(d=>d.st),ha:all.some(d=>d.ha),hst:all.some(d=>d.hst)};
-  for(const id in out){const d=out[id],p=devPrev[id]||{};if(d.ha&&p.a)p.a=false;if(d.hst&&p.st)p.st=false;d.pa=d.a&&!p.a;d.pst=d.st&&!p.st;
+    out['gp'+p.index]={x,y,a:B(0),b:B(1)||B(2)||B(3),st:B(9)};}
+  out.touch={x:(touchK.r||touchHit.r?1:0)-(touchK.l||touchHit.l?1:0),y:(touchK.d||touchHit.d?1:0)-(touchK.u||touchHit.u?1:0),a:!!(touchK.a||touchHit.a),ha:!!touchHit.a,b:!!(touchK.b||touchHit.b),hb:!!touchHit.b,st:false};
+  const all=Object.values(out);out.any={x:clamp(all.reduce((s,d)=>s+d.x,0),-1,1),y:clamp(all.reduce((s,d)=>s+d.y,0),-1,1),a:all.some(d=>d.a),b:all.some(d=>d.b),st:all.some(d=>d.st),ha:all.some(d=>d.ha),hb:all.some(d=>d.hb),hst:all.some(d=>d.hst)};
+  for(const id in out){const d=out[id],p=devPrev[id]||{};if(d.ha&&p.a)p.a=false;if(d.hb&&p.b)p.b=false;if(d.hst&&p.st)p.st=false;d.pa=d.a&&!p.a;d.pbb=!!d.b&&!p.b;d.pst=d.st&&!p.st;
     // 最後に押した向きを優先（ななめ押しで 曲がり角を 曲がりやすく）
     d.lx=d.x;d.ly=d.y;if(d.x&&d.y){d.pref=(p.x!==d.x)?'x':(p.y!==d.y)?'y':(p.pref||'x');}else d.pref=d.x?'x':'y';
     const rep=(k,v)=>{const t=(p[k+'T']||0);if(v===0){d[k+'T']=0;return 0;}if(Math.sign(v)!==Math.sign(p[k]||0)){d[k+'T']=.28;return v;}d[k+'T']=t-1/60;if(d[k+'T']<=0){d[k+'T']=.07;return v;}return 0;};
@@ -184,11 +188,11 @@ function onMeta(v){S.meta=v;if(v)S.seenMeta=true;
     if(!G.active){G.active=true;scr='game';ui.hidden=true;ui.innerHTML='';touchEl.hidden=!Object.values(S.local).some(l=>l.dev==='touch'||(l.dev==='any'&&matchMedia('(pointer:coarse)').matches));resize();}
     if(v.rd&&v.rd.ph==='res'&&(!G.res||G.res.n!==v.rd.n)){G.res={n:v.rd.n,w:v.rd.w,t:performance.now()};if(v.rd.w&&owns(v.rd.w))sfx('win');}
     if(v.st==='end'&&scr!=='end')endScreen();}}
-function startRound(v){const rd=v.rd;G.n=rd.n;G.t0=rd.t0;G.seed=rd.seed;G.map=buildMap(v.stage,rd.seed);G.stage=v.stage;G.bg=null;G.res=null;
+function startRound(v){const rd=v.rd;setTime(v.time||2);G.n=rd.n;G.t0=rd.t0;G.seed=rd.seed;G.map=buildMap(v.stage,rd.seed);G.stage=v.stage;G.bg=null;G.res=null;
   G.EV=[];G.EVID=new Set();G.sim=newSim(G.map);G.snaps=[snap(G.sim)];G.boomed=new Set();G.dead={};G.parts=[];G.fx=[];G.seq=0;G.cnt=-1;G.endAt=0;G.order=v.order.slice();
   G.oidx={};v.order.forEach((p,i)=>G.oidx[p]=i);S.buf={};S.states={};
   G.me={};const rich=STAGES[v.stage]&&STAGES[v.stage].rich;v.order.forEach((pid,i)=>{if(!owns(pid))return;const[sx,sy]=SPAWN[v.order.length===2&&i===1?1:i];
-    G.me[pid]={x:sx,y:sy,al:1,gh:0,fire:rich?3:2,cap:rich?3:1,spd:0,kick:0,pc:0,dir:3,an:0,mv:0,pass:new Set(),wcd:0,sent:'',cpu:pid[0]==='c'?{t:0,path:null,goal:null,lv:v.lv}:null,gp:0,gcd:0,kills:0};});
+    G.me[pid]={x:sx,y:sy,al:1,gh:0,base:rich?3:2,bcap:rich?3:1,fire:rich?3:2,cap:rich?3:1,spd:0,kick:0,pc:0,glove:0,remote:0,line:0,curse:null,inv:0,dir:3,an:0,mv:0,pass:new Set(),wcd:0,sent:'',cpu:pid[0]==='c'?{t:0,path:null,goal:null,lv:v.lv}:null,gp:0,gcd:0,kills:0};});
   if(G.evOff)G.evOff();G.evOff=S.db.on(rp('e/'+rd.n),'child_added',(k,e)=>{if(e&&!G.EVID.has(k)){e.id=k;addEv(e);}});
   if(S.host&&rd.n>1)S.db.remove(rp('e/'+(rd.n-1)));}
 function curTick(){return Math.floor((S.db.now()-G.t0)/TICK);}
@@ -198,20 +202,32 @@ function newSim(map){return{tick:0,g:map.g.slice(),it:map.it.slice(),fl:new Int3
 function snap(s){return{tick:s.tick,g:s.g.slice(),it:s.it.slice(),fl:s.fl.slice(),fo:s.fo.slice(),burn:s.burn.slice(),bombs:s.bombs.map(b=>Object.assign({},b)),ei:s.ei};}
 function restore(sn){return{tick:sn.tick,g:sn.g.slice(),it:sn.it.slice(),fl:sn.fl.slice(),fo:sn.fo.slice(),burn:sn.burn.slice(),bombs:sn.bombs.map(b=>Object.assign({},b)),ei:sn.ei};}
 function evCmp(a,b){return a.tk-b.tk||(a.id<b.id?-1:a.id>b.id?1:0);}
-function addEv(e){if(G.EVID.has(e.id))return;G.EVID.add(e.id);if(e.k==='d'){if(!G.dead[e.pid]){G.dead[e.pid]={tk:e.tk,by:e.by||''};if(!owns(e.pid))deathFx(e.pid);}return;}
+function addEv(e){if(G.EVID.has(e.id))return;G.EVID.add(e.id);
+  if(e.k==='v'){delete G.dead[e.pid];return;}
+  if(e.k==='d'){if(!G.dead[e.pid]){G.dead[e.pid]={tk:e.tk,by:e.by||''};if(!owns(e.pid))deathFx(e.pid);
+      // みそボン：外から なげたボムで たおしたら 復活
+      const gp=G.me[e.by];if(gp&&gp.gh&&S.meta&&S.meta.ghost&&S.meta.rd&&S.meta.rd.ph==='play'&&e.x!=null)setTimeout(()=>revive(e.by,gp,e.x,e.y),0);}return;}
   let i=G.EV.length;while(i>0&&evCmp(G.EV[i-1],e)>0)i--;G.EV.splice(i,0,e);
   const s=G.sim;if(e.tk<s.tick){// 遅れて届いた → 少し前の状態から計算しなおす
     let sn=G.snaps[0];for(const q of G.snaps)if(q.tick<=e.tk)sn=q;const target=s.tick;const ns=restore(sn);let ei=0;while(ei<G.EV.length&&G.EV[ei].tk<ns.tick)ei++;ns.ei=ei;G.sim=ns;G.replay=true;while(G.sim.tick<target)simStep(G.sim);G.replay=false;
     G.snaps=G.snaps.filter(q=>q.tick<=sn.tick);}
   else{// 同じ tick より後ろに入れたので ei はそのままでよいが、ei より前に入った場合は ずらす
     if(i<s.ei)s.ei++;}}
-function bombAt(s,c){for(const b of s.bombs)if(b.y*W+b.x===c)return b;return null;}
+function bombAt(s,c){for(const b of s.bombs)if(!b.air&&b.y*W+b.x===c)return b;return null;}
+const wrapX=x=>1+(((x-1)%(W-2))+(W-2))%(W-2),wrapY=y=>1+(((y-1)%(H-2))+(H-2))%(H-2);
 function activeOf(s,pid){let n=0;for(const b of s.bombs)if(b.pid===pid&&!b.gh)n++;return n;}
 function bombBlocked(s,x,y){if(x<0||y<0||x>=W||y>=H)return true;const c=y*W+x;return s.g[c]!==0||s.it[c]&&s.g[c]===0||!!bombAt(s,c);}
 function applyEv(s,e,t){const c=e.y*W+e.x;
   if(e.k==='b'||e.k==='t'){if(e.x<1||e.y<1||e.x>W-2||e.y>H-2)return;if(s.g[c]!==0||bombAt(s,c))return;if(e.k==='b'&&activeOf(s,e.pid)>=(e.cap||1))return;
-    const oi=G.oidx[e.pid]!=null?G.oidx[e.pid]:-1;s.bombs.push({id:e.id,pid:e.pid,x:e.x,y:e.y,px:e.x,py:e.y,f:e.f||2,pc:e.pc?1:0,tk:t+(e.k==='t'?FUSE-25:FUSE),mv:0,mt:t,oi,gh:e.k==='t'?1:0,born:t});if(s.it[c])s.it[c]=0;}
-  else if(e.k==='k'){const b=s.bombs.find(q=>q.id===e.bid);if(b&&!b.mv&&b.x===e.x&&b.y===e.y){b.mv=e.dir;b.mt=t;}}
+    const oi=G.oidx[e.pid]!=null?G.oidx[e.pid]:-1;s.bombs.push({id:e.id,pid:e.pid,x:e.x,y:e.y,px:e.x,py:e.y,f:e.f||2,pc:e.pc?1:0,tk:t+(e.k==='t'?FUSE-25:e.rc?500:FUSE),rc:e.rc?1:0,mv:0,mt:t,oi,gh:e.k==='t'?1:0,born:t,air:0});if(s.it[c])s.it[c]=0;}
+  else if(e.k==='k'){const b=s.bombs.find(q=>q.id===e.bid);if(b&&!b.air&&!b.mv&&b.x===e.x&&b.y===e.y){b.mv=e.dir;b.mt=t;b.kp=e.pid;}}
+  else if(e.k==='s'){const b=s.bombs.find(q=>q.id===e.bid);if(b&&b.mv&&b.kp===e.pid){b.mv=0;b.mt=t;}}
+  else if(e.k==='r'){const b=s.bombs.find(q=>q.id===e.bid);if(b&&b.pid===e.pid&&b.rc&&!b.air&&b.tk>t)b.tk=t;}
+  else if(e.k==='p'){// パンチ：3マス先へ とんでいく（はしは 反対がわへ）
+    const b=s.bombs.find(q=>q.id===e.bid);if(b&&!b.air&&b.x===e.x&&b.y===e.y){b.fx=b.x;b.fy=b.y;b.x=wrapX(b.x+DX[e.dir]*3);b.y=wrapY(b.y+DY[e.dir]*3);b.pdir=e.dir;b.mv=0;b.at0=t;b.air=t+20;if(b.tk<t+45)b.tk=t+45;}}
+  else if(e.k==='x'){// やられた人の アイテムが ちらばる
+    const R0=rng(e.sd||1);const cand=[];for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const c2=y*W+x;if(s.g[c2]===0&&!s.it[c2]&&!bombAt(s,c2)&&s.fl[c2]<=t)cand.push(c2);}
+    for(const k of(e.its||[])){if(!cand.length)break;const j=Math.floor(R0()*cand.length);s.it[cand[j]]=k;cand.splice(j,1);}}
   else if(e.k==='g'){if(s.g[c]===0&&s.it[c])s.it[c]=0;}}
 function setFlame(s,c,t,oi){if(s.fl[c]<t+FLAME)s.fl[c]=t+FLAME;s.fo[c]=oi;}
 function explode(s,b,t){const i=s.bombs.indexOf(b);if(i>=0)s.bombs.splice(i,1);const c0=b.y*W+b.x;setFlame(s,c0,t,b.oi);const cells=[c0];
@@ -227,15 +243,16 @@ function simStep(s){const t=s.tick;
   while(s.ei<G.EV.length&&G.EV[s.ei].tk<=t){applyEv(s,G.EV[s.ei],t);s.ei++;}
   for(const b of s.bombs){if(!b.mv||t-b.mt<KSTEP)continue;const nx=b.x+DX[b.mv],ny=b.y+DY[b.mv];b.px=b.x;b.py=b.y;
     if(bombBlocked(s,nx,ny)){b.mv=0;b.mt=t;continue;}b.x=nx;b.y=ny;b.mt=t;}
-  for(const b of s.bombs){const c=b.y*W+b.x;if(s.fl[c]>t&&b.tk>t)b.tk=t;}
-  const due=s.bombs.filter(b=>b.tk<=t).sort((a,b)=>a.id<b.id?-1:1);for(const b of due)explode(s,b,t);
+  for(const b of s.bombs){if(!b.air||t<b.air)continue;const c=b.y*W+b.x;if(s.g[c]!==0||bombAt(s,c)){b.fx=b.x;b.fy=b.y;b.x=wrapX(b.x+DX[b.pdir]);b.y=wrapY(b.y+DY[b.pdir]);b.at0=t;b.air=t+6;if(b.tk<t+12)b.tk=t+12;}else{b.air=0;if(s.it[c])s.it[c]=0;if(!G.replay)sfx('place');}}
+  for(const b of s.bombs){if(b.air)continue;const c=b.y*W+b.x;if(s.fl[c]>t&&b.tk>t)b.tk=t;}
+  const due=s.bombs.filter(b=>!b.air&&b.tk<=t).sort((a,b)=>a.id<b.id?-1:1);for(const b of due)explode(s,b,t);
   for(let c=0;c<W*H;c++)if(s.g[c]===T_BURN&&s.burn[c]<=t)s.g[c]=0;
   if(t>=SD_TK&&(t-SD_TK)%SD_STEP===0){const k=(t-SD_TK)/SD_STEP;if(k<SPIRAL.length){const c=SPIRAL[k];if(s.g[c]!==T_HARD){s.g[c]=T_PRESS;s.it[c]=0;s.fl[c]=-1;s.bombs=s.bombs.filter(b=>b.y*W+b.x!==c);if(!G.replay){sfx('press');G.fx.push({k:'press',c,t:performance.now()});}}}}
   s.tick=t+1;if(s.tick%25===0){G.snaps.push(snap(s));if(G.snaps.length>40)G.snaps.splice(1,1);}}
 // ============ 自分のキャラ（この端末で動かす） ============
 const solidAt=(s,x,y)=>x<0||y<0||x>=W||y>=H||s.g[y*W+x]!==0;
 function blocksMe(s,p,x,y){if(solidAt(s,x,y))return true;const b=bombAt(s,y*W+x);return!!(b&&!p.pass.has(b.id));}
-function speedOf(p){return 3.4+p.spd*.55;}
+function speedOf(p){if(p.curse){if(p.curse.k===0)return 2;if(p.curse.k===1)return 7.5;}return 3.4+p.spd*.55;}
 function cellOf(p){return{x:Math.round(p.x),y:Math.round(p.y)};}
 // 方向ごとに1マスずつ進む。曲がり角は 少しずれていても すべりこめる
 function moveAxis(s,p,ax,dir,v,pid){const ox=ax==='x'?'y':'x';const cxp=Math.round(p[ax]),cop=Math.round(p[ox]);const off=p[ox]-cop;
@@ -249,7 +266,9 @@ function moveAxis(s,p,ax,dir,v,pid){const ox=ax==='x'?'y':'x';const cxp=Math.rou
   // キック
   if(p.kick&&Math.abs(p[ax]-cxp)<.12){const b=bombAt(s,ny*W+nx);if(b&&!b.mv&&!b.kickSent){b.kickSent=1;sendEv({k:'k',bid:b.id,dir:ax==='x'?(dir>0?2:4):(dir>0?3:1),x:b.x,y:b.y});sfx('kick');}}
   p[ax]=dir>0?Math.min(p[ax],cxp):Math.max(p[ax],cxp);return false;}
-function stepMe(pid,p,inp,dt){const s=G.sim;if(!p.al)return;const v=speedOf(p)*dt;
+function stepMe(pid,p,inp,dt){const s=G.sim;if(!p.al)return;
+  if(p.inv>0)p.inv-=dt;if(p.curse){p.curse.t-=dt;if(p.curse.t<=0)p.curse=null;else if(p.curse.k===4)inp={x:-inp.x,y:-inp.y,pref:inp.pref,bomb:inp.bomb,b:inp.b};}
+  const v=speedOf(p)*dt;
   // 足元のボムは すりぬけ可。はなれたら かたくなる
   for(const b of s.bombs){if(Math.abs(p.x-b.x)<.9&&Math.abs(p.y-b.y)<.9){p.pass.add(b.id);}}
   for(const id of[...p.pass]){const b=s.bombs.find(q=>q.id===id);if(!b||Math.abs(p.x-b.x)>=.9||Math.abs(p.y-b.y)>=.9)p.pass.delete(id);}
@@ -268,14 +287,30 @@ function stepMe(pid,p,inp,dt){const s=G.sim;if(!p.al)return;const v=speedOf(p)*d
   // アイテム
   if(s.g[c]===0&&s.it[c]){const k=s.it[c];s.it[c]=0;sendEv({k:'g',x:cc.x,y:cc.y});giveItem(p,k);if(S.local[pid])sfx('item');G.fx.push({k:'get',x:cc.x,y:cc.y,it:k,t:performance.now()});}
   // ボム
-  if(inp.bomb){if(s.g[c]===0&&!bombAt(s,c)&&activeOf(s,pid)<p.cap&&s.fl[c]<=s.tick){sendEv({k:'b',x:cc.x,y:cc.y,f:p.fire,pc:p.pc,cap:p.cap},pid);p.pass.add(lastBombId);sfx('place');}}
+  const cu=p.curse?p.curse.k:-1;const fire=cu===5?1:p.fire;if(cu===2)inp.bomb=true;if(cu===3)inp.bomb=false;
+  if(inp.bomb){const here=bombAt(s,c);
+    if(here&&here.pid===pid&&p.line&&!p.cpu){// ラインボム：向いている方向に ならべて置く
+      let left=p.cap-activeOf(s,pid)-(G.pendB[pid]||0);let x0=cc.x,y0=cc.y,n=0;while(left>0){x0+=DX[p.dir];y0+=DY[p.dir];const c2=y0*W+x0;if(solidAt(s,x0,y0)||bombAt(s,c2)||s.it[c2])break;sendEv({k:'b',x:x0,y:y0,f:fire,pc:p.pc,cap:p.cap,rc:p.remote?1:0},pid);left--;n++;}if(n)sfx('place');}
+    else if(s.g[c]===0&&!here&&activeOf(s,pid)<p.cap&&s.fl[c]<=s.tick){sendEv({k:'b',x:cc.x,y:cc.y,f:fire,pc:p.pc,cap:p.cap,rc:p.remote&&!p.cpu?1:0},pid);p.pass.add(lastBombId);sfx('place');}}
+  // Bボタン：リモコンで ばくはつ → パンチ → けったボムを止める
+  if(inp.b){const mine=s.bombs.filter(b=>b.pid===pid&&b.rc&&!b.air).sort((a,b)=>a.born-b.born);
+    if(mine.length)sendEv({k:'r',bid:mine[0].id},pid);
+    else{const fx=cc.x+DX[p.dir],fy=cc.y+DY[p.dir];const fb=p.glove?bombAt(s,fy*W+fx)||bombAt(s,c):null;
+      if(fb&&!fb.mv){sendEv({k:'p',bid:fb.id,dir:p.dir,x:fb.x,y:fb.y},pid);sfx('kick');}
+      else{const kb=s.bombs.find(b=>b.mv&&b.kp===pid);if(kb)sendEv({k:'s',bid:kb.id},pid);}}}
   // やられたか（この端末が決める）
-  const fl=s.fl[c]>s.tick-1;const pr=s.g[c]===T_PRESS;if(fl||pr){const oi=s.fo[c];const by=fl&&oi>=0?G.order[oi]||'':'';die(pid,p,by);}}
-function giveItem(p,k){if(k===IT.fire)p.fire=Math.min(8,p.fire+1);else if(k===IT.bomb)p.cap=Math.min(8,p.cap+1);else if(k===IT.speed)p.spd=Math.min(5,p.spd+1);else if(k===IT.kick)p.kick=1;else if(k===IT.pierce)p.pc=1;else if(k===IT.max)p.fire=8;}
-let lastBombId='';
+  const fl=s.fl[c]>s.tick-1;const pr=s.g[c]===T_PRESS;if((fl&&!(p.inv>0))||pr){const oi=s.fo[c];const by=fl&&oi>=0?G.order[oi]||'':'';die(pid,p,by);}}
+function giveItem(p,k){if(k===IT.skull){p.curse={k:Math.floor(Math.random()*CURSE.length),t:10};p.msg={t:CURSE[p.curse.k],a:2};return;}if(k===IT.glove)p.glove=1;else if(k===IT.remote){if(!p.cpu)p.remote=1;}else if(k===IT.line)p.line=1;else if(k===IT.fire)p.fire=Math.min(8,p.fire+1);else if(k===IT.bomb)p.cap=Math.min(8,p.cap+1);else if(k===IT.speed)p.spd=Math.min(5,p.spd+1);else if(k===IT.kick)p.kick=1;else if(k===IT.pierce)p.pc=1;else if(k===IT.max)p.fire=8;}
+let lastBombId='';G.pendB={};
 function sendEv(e,pid){const s=G.sim;const owner=pid||e.pid||G.curPid;e.pid=owner;e.tk=Math.max(s.tick,curTick()+1);const id=owner.replace(/[^A-Za-z0-9-]/g,'')+'_'+(G.seq++)+Math.random().toString(36).slice(2,5);if(e.k==='b'||e.k==='t')lastBombId=id;
   const w=Object.assign({},e);S.db.set(rp('e/'+G.n+'/'+id),w);e.id=id;addEv(e);}
-function die(pid,p,by){if(!p.al)return;p.al=0;p.dt=performance.now();sendEv({k:'d',by:by===pid?'':by},pid);G.dead[pid]={tk:G.sim.tick,by};deathFx(pid);if(S.meta&&S.meta.ghost){p.gh=1;p.gp=perimIndex(p);p.gcd=2.5;}}
+function die(pid,p,by){if(!p.al)return;p.al=0;p.dt=performance.now();const cc=cellOf(p);
+  // もっていた アイテムを ちらばらせる
+  const its=[];for(let i=p.base;i<p.fire&&i<8;i++)its.push(IT.fire);for(let i=p.bcap;i<p.cap;i++)its.push(IT.bomb);for(let i=0;i<p.spd;i++)its.push(IT.speed);if(p.kick)its.push(IT.kick);if(p.pc)its.push(IT.pierce);if(p.glove)its.push(IT.glove);if(p.remote)its.push(IT.remote);if(p.line)its.push(IT.line);
+  if(its.length)sendEv({k:'x',its:its.slice(0,10),sd:Math.floor(Math.random()*1e9)},pid);
+  sendEv({k:'d',by:by===pid?'':by,x:cc.x,y:cc.y},pid);G.dead[pid]={tk:G.sim.tick,by};deathFx(pid);if(S.meta&&S.meta.ghost){p.gh=1;p.gp=perimIndex(p);p.gcd=2.5;}}
+function revive(pid,p,x,y){if(p.al||!p.gh)return;p.al=1;p.gh=0;p.x=x;p.y=y;p.fire=p.base;p.cap=p.bcap;p.spd=0;p.kick=p.pc=p.glove=p.remote=p.line=0;p.curse=null;p.inv=2;p.pass=new Set();
+  sendEv({k:'v'},pid);burst(x,y,'#ffe27a',30);sfx('win');p.msg={t:'ふっかつ！',a:2};}
 function deathFx(pid){const v=viewOf(pid);if(v)burst(v.x,v.y,PCOL[G.oidx[pid]]||'#fff',26);sfx('die');}
 // ============ やられた後：外から ボムを なげる ============
 const PERIM=(()=>{const a=[];for(let x=1;x<W-1;x++)a.push([x,0,3]);for(let y=1;y<H-1;y++)a.push([W-1,y,4]);for(let x=W-2;x>=1;x--)a.push([x,H-1,1]);for(let y=H-2;y>=1;y--)a.push([0,y,2]);return a;})();
@@ -289,7 +324,7 @@ function stepGhost(pid,p,inp,dt){if(!p.gh)return;p.gcd-=dt;const n=PERIM.length;
   if(inp.bomb&&p.gcd<=0){const tg=throwTarget(p);if(tg){p.gcd=4;sendEv({k:'t',x:tg.x,y:tg.y,f:2},pid);sfx('throw');G.fx.push({k:'arc',x0:q.x,y0:q.y,x1:tg.x,y1:tg.y,t:performance.now()});}}}
 // ============ CPU ============
 function dangerMap(s,extra){const D=new Int32Array(W*H).fill(1e9);const t=s.tick;for(let c=0;c<W*H;c++)if(s.fl[c]>=t)D[c]=t;
-  const bs=s.bombs.map(b=>({x:b.x,y:b.y,f:b.f,pc:b.pc,tk:b.mv?t+8:b.tk}));if(extra)bs.push(extra);bs.sort((a,b)=>a.tk-b.tk);
+  const bs=s.bombs.map(b=>({x:b.x,y:b.y,f:b.f,pc:b.pc,tk:b.mv?t+8:b.rc?Math.min(b.tk,t+40):b.tk}));if(extra)bs.push(extra);bs.sort((a,b)=>a.tk-b.tk);
   for(let i=0;i<bs.length;i++){const b=bs[i];const T=b.tk;const mark=c=>{if(D[c]>T)D[c]=T;};mark(b.y*W+b.x);
     for(let d=1;d<=4;d++)for(let r=1;r<=b.f;r++){const x=b.x+DX[d]*r,y=b.y+DY[d]*r;const c=y*W+x;const g=s.g[c];if(g===T_HARD||g===T_PRESS)break;mark(c);
       const j=bs.findIndex((q,k)=>k>i&&q.x===x&&q.y===y);if(j>=0){if(bs[j].tk>T+1){bs[j].tk=T+1;bs.sort((a,b)=>a.tk-b.tk);}break;}if((g===T_SOFT||g===T_BURN)&&!b.pc)break;}}
@@ -347,21 +382,21 @@ function gameTick(dt){const m=S.meta;if(!G.sim||!m||!m.rd)return;const db=S.db;c
   acc+=dt;let k=0;while(acc>=1/120&&k<12){acc-=1/120;k++;
     for(const pid in G.me){const p=G.me[pid];if(!playing)continue;G.curPid=pid;let inp;if(window.__bAuto&&!p.cpu)p.cpu={t:0,path:null,lv:2,auto:1};
       if(p.cpu){inp=p.al?cpuInput(pid,p,1/120):cpuGhost(pid,p,1/120);}
-      else{const d=devOf(pid);inp=d&&!G.menu?{x:d.x,y:d.y,pref:d.pref,bomb:d.pa}:{x:0,y:0,bomb:false};if(d)d.pa=false;}
+      else{const d=devOf(pid);inp=d&&!G.menu?{x:d.x,y:d.y,pref:d.pref,bomb:d.pa,b:d.pbb}:{x:0,y:0,bomb:false};if(d){d.pa=false;d.pbb=false;}}
       if(p.al)stepMe(pid,p,inp,1/120);else stepGhost(pid,p,inp,1/120);}}
-  G.sendT=(G.sendT||0)-dt;if(G.sendT<=0){G.sendT=1/14;const r2=v=>Math.round(v*100)/100;for(const pid in G.me){const p=G.me[pid];const q=p.gh?ghostPos(p):p;const key=r2(q.x)+'|'+r2(q.y)+'|'+p.al+'|'+p.gh+'|'+p.dir;if(key===p.sent&&!p.mv)continue;p.sent=key;
-      db.set(rp('s/'+pid),{n:G.n,t:db.now(),x:r2(q.x),y:r2(q.y),d:p.dir,m:p.mv?1:0,al:p.al,gh:p.gh?1:0});}}
+  G.sendT=(G.sendT||0)-dt;if(G.sendT<=0){G.sendT=1/14;const r2=v=>Math.round(v*100)/100;for(const pid in G.me){const p=G.me[pid];const q=p.gh?ghostPos(p):p;const key=r2(q.x)+'|'+r2(q.y)+'|'+p.al+'|'+p.gh+'|'+p.dir+'|'+(p.curse?1:0)+'|'+(p.inv>0?1:0);if(key===p.sent&&!p.mv)continue;p.sent=key;
+      db.set(rp('s/'+pid),{n:G.n,t:db.now(),x:r2(q.x),y:r2(q.y),d:p.dir,m:p.mv?1:0,al:p.al,gh:p.gh?1:0,cu:p.curse?1:0,iv:p.inv>0?1:0});}}
   if(S.host)hostStep();}
 function devOf(pid){const l=S.local[pid];if(!l)return null;return devs[l.dev]||null;}
 function charOf(pid){const p=S.players[pid];return p?(p.char||0)%CHARS.length:0;}
 function colorOf(pid){const i=G.oidx&&G.oidx[pid]!=null?G.oidx[pid]:(S.meta&&S.meta.order||[]).indexOf(pid);return PCOL[i<0?5:i];}
 function nameOf(pid){const p=S.players[pid];return p?p.name:'?';}
-function viewOf(pid){const p=G.me[pid];if(p){if(p.gh){const q=ghostPos(p);return{x:q.x,y:q.y,d:p.dir,m:p.mv,al:0,gh:1,an:p.an};}return{x:p.x,y:p.y,d:p.dir,m:p.mv,al:p.al,gh:0,an:p.an};}
+function viewOf(pid){const p=G.me[pid];if(p){if(p.gh){const q=ghostPos(p);return{x:q.x,y:q.y,d:p.dir,m:p.mv,al:0,gh:1,an:p.an};}return{x:p.x,y:p.y,d:p.dir,m:p.mv,al:p.al,gh:0,an:p.an,cu:p.curse?1:0,iv:p.inv>0?1:0};}
   const B=S.buf[pid];if(!B||!B.length){const i=G.oidx[pid];if(i==null)return null;const sp=spawnOf(i,G.order.length);return{x:sp[0],y:sp[1],d:3,m:0,al:G.dead[pid]?0:1,gh:0,an:0};}
   const rt=S.db.now()-130;let a=B[0],b=B[B.length-1];for(let i=0;i<B.length-1;i++)if(B[i].t<=rt&&B[i+1].t>=rt){a=B[i];b=B[i+1];break;}
   if(b.n!==G.n){const i=G.oidx[pid];if(i==null)return null;const sp=spawnOf(i,G.order.length);return{x:sp[0],y:sp[1],d:3,m:0,al:1,gh:0,an:0};}
   const u=b.t>a.t?clamp((rt-a.t)/(b.t-a.t),0,1):1;const jump=Math.abs(a.x-b.x)+Math.abs(a.y-b.y)>2;
-  return{x:jump?b.x:lerp(a.x,b.x,u),y:jump?b.y:lerp(a.y,b.y,u),d:b.d,m:b.m,al:G.dead[pid]?0:b.al,gh:b.gh,an:b.m?S.db.now()/1000*4:0};}
+  return{x:jump?b.x:lerp(a.x,b.x,u),y:jump?b.y:lerp(a.y,b.y,u),d:b.d,m:b.m,cu:b.cu,iv:b.iv,al:G.dead[pid]?0:b.al,gh:b.gh,an:b.m?S.db.now()/1000*4:0};}
 // ============ ホスト：進行役 ============
 function hostStart(){const db=S.db,m=S.meta;const humans=Object.entries(S.players).filter(([,p])=>!p.cpu).sort((a,b)=>(a[1].t||0)-(b[1].t||0)).slice(0,4);
   const cpuN=clamp(m.cpu,0,4-humans.length);const used=new Set(humans.map(([,p])=>p.char));const order=humans.map(([pid])=>pid);
@@ -448,7 +483,7 @@ function drawSoft(c,x,y,st,burnU){const[X,Y]=cellXY(x,y);const lw=Math.max(1,CS*
   else{rr(c,X+lw/2,Y+lw/2,CS-lw,CS-lw,CS*.3);fs(c,'#ffffff',lw);c.fillStyle='#d6e6f5';c.beginPath();c.ellipse(X+CS*.5,Y+CS*.78,CS*.38,CS*.14,0,0,7);c.fill();c.fillStyle='#fff';c.beginPath();c.arc(X+CS*.36,Y+CS*.35,CS*.12,0,7);c.fill();}
   c.restore();}
 function drawItem(c,x,y,k,t){const[X,Y]=cellXY(x,y);const lw=Math.max(1,CS*.05);const bob=Math.sin(t*4+x+y)*CS*.03;const cx0=X+CS/2,cy0=Y+CS/2+bob;
-  const bgc={1:'#ff9d4a',2:'#5a6cff',3:'#3ec1d3',4:'#7ad04c',5:'#d0457f',6:'#ffcf3a'}[k];rr(c,X+CS*.1,Y+CS*.1+bob,CS*.8,CS*.8,CS*.18);fs(c,bgc,lw);
+  const bgc=ITBG[k];rr(c,X+CS*.1,Y+CS*.1+bob,CS*.8,CS*.8,CS*.18);fs(c,bgc,lw);
   c.fillStyle='rgba(255,255,255,.35)';rr(c,X+CS*.16,Y+CS*.15+bob,CS*.68,CS*.18,CS*.08);c.fill();drawIcon(c,k,cx0,cy0,CS*.6);}
 function drawIcon(c,k,x,y,s){const lw=Math.max(1,s*.07);c.save();c.lineJoin='round';
   const flame=(fx,fy,sz)=>{c.beginPath();c.moveTo(fx,fy-sz*.5);c.bezierCurveTo(fx+sz*.45,fy-sz*.1,fx+sz*.35,fy+sz*.45,fx,fy+sz*.45);c.bezierCurveTo(fx-sz*.35,fy+sz*.45,fx-sz*.45,fy-sz*.05,fx-sz*.1,fy-sz*.2);c.closePath();fs(c,'#ff5a2a',lw);c.beginPath();c.ellipse(fx,fy+sz*.18,sz*.15,sz*.2,0,0,7);fs(c,'#ffe066',0);};
@@ -461,11 +496,24 @@ function drawIcon(c,k,x,y,s){const lw=Math.max(1,s*.07);c.save();c.lineJoin='rou
     c.fillStyle='#2b2e45';c.beginPath();c.arc(x+s*.42,y+s*.18,s*.12,0,7);c.fill();}
   else if(k===5){bomb(x,y,s);c.fillStyle='#ff3b3b';c.strokeStyle=INK;c.lineWidth=lw*.7;c.beginPath();c.moveTo(x-s*.5,y+s*.08);c.lineTo(x-s*.25,y-s*.02);c.lineTo(x-s*.25,y+s*.18);c.closePath();c.fill();c.stroke();c.beginPath();c.moveTo(x+s*.52,y+s*.08);c.lineTo(x+s*.27,y-s*.02);c.lineTo(x+s*.27,y+s*.18);c.closePath();c.fill();c.stroke();}
   else if(k===6){flame(x,y-s*.06,s*.95);txt(c,'MAX',x,y+s*.36,Math.max(8,s*.3),'#fff','center');}
+  else if(k===7){// パンチ：てぶくろ
+    rr(c,x-s*.32,y-s*.18,s*.56,s*.46,s*.18);fs(c,'#fff',lw);rr(c,x-s*.42,y-s*.06,s*.18,s*.3,s*.08);fs(c,'#fff',lw);c.fillStyle='#e2483b';c.fillRect(x-s*.32,y+s*.2,s*.56,s*.1);
+    c.strokeStyle='#fff';c.lineWidth=lw;c.beginPath();for(const yy of[-.12,0,.12]){c.moveTo(x+s*.34,y+s*yy);c.lineTo(x+s*.52,y+s*yy);}c.stroke();}
+  else if(k===8){// リモコン
+    rr(c,x-s*.22,y-s*.2,s*.44,s*.56,s*.08);fs(c,'#e8e4f0',lw);c.beginPath();c.arc(x,y+s*.05,s*.11,0,7);fs(c,'#e2483b',lw*.6);c.strokeStyle=INK;c.lineWidth=lw;c.beginPath();c.moveTo(x+s*.12,y-s*.2);c.lineTo(x+s*.2,y-s*.46);c.stroke();c.fillStyle='#ffd23a';c.beginPath();c.arc(x+s*.2,y-s*.48,s*.06,0,7);c.fill();}
+  else if(k===9){// ラインボム：ならんだ ボム
+    for(const dx of[-.3,0,.3]){c.beginPath();c.arc(x+dx*s,y+s*.06,s*.15,0,7);fs(c,'#2b2e45',lw*.7);}c.fillStyle='#fff';c.beginPath();c.moveTo(x+s*.45,y-s*.28);c.lineTo(x+s*.25,y-s*.38);c.lineTo(x+s*.25,y-s*.18);c.closePath();c.fill();c.fillRect(x-s*.45,y-s*.3,s*.7,s*.04);}
+  else if(k===10){// ドクロ
+    c.beginPath();c.arc(x,y-s*.06,s*.3,Math.PI*.85,Math.PI*2.15);c.lineTo(x+s*.2,y+s*.32);c.lineTo(x-s*.2,y+s*.32);c.closePath();fs(c,'#f4f0ea',lw);
+    c.fillStyle=INK;for(const dx of[-.12,.12]){c.beginPath();c.ellipse(x+dx*s,y-s*.04,s*.08,s*.09,0,0,7);c.fill();}c.fillRect(x-s*.015,y+s*.12,s*.03,s*.1);}
   c.restore();}
-function drawBomb(c,b,t,s){const u=b.mv?clamp((s.tick-b.mt)/KSTEP,0,1):1;const bx=b.mv?lerp(b.px,b.x,u):b.x,by=b.mv?lerp(b.py,b.y,u):b.y;const[X,Y]=cellXY(bx,by);const lw=Math.max(1,CS*.05);
+function drawBomb(c,b,t,s){const u=b.mv?clamp((s.tick-b.mt)/KSTEP,0,1):1;let bx=b.mv?lerp(b.px,b.x,u):b.x,by=b.mv?lerp(b.py,b.y,u):b.y;let lift=0;
+  if(b.air){const k=clamp((s.tick-b.at0)/Math.max(1,b.air-b.at0),0,1);const wrap=Math.abs(b.x-b.fx)>3||Math.abs(b.y-b.fy)>3;if(!wrap){bx=lerp(b.fx,b.x,k);by=lerp(b.fy,b.y,k);}lift=Math.sin(k*Math.PI)*CS*1.4;}
+  const[X0,Y0]=cellXY(bx,by);const X=X0,Y=Y0-lift;const lw=Math.max(1,CS*.05);
   const left=(b.tk-s.tick)/FUSE;const pulse=1+Math.sin(t*(left<.3?22:10))*.05;const r=CS*.36*pulse;const cx0=X+CS/2,cy0=Y+CS*.54;
   c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(cx0+CS*.06,Y+CS*.86,r*.9,r*.32,0,0,7);c.fill();
   c.beginPath();c.arc(cx0,cy0,r,0,7);fs(c,b.gh?'#5a3f6e':(left<.25&&Math.sin(t*30)>0?'#7a2a2a':'#2b2e45'),lw);
+  if(b.rc){c.fillStyle=Math.sin(t*8)>0?'#ff3b3b':'#7a1a1a';c.beginPath();c.arc(cx0,cy0-r*.05,r*.22,0,7);c.fill();}
   if(b.pc){c.strokeStyle='#ff5a5a';c.lineWidth=lw*1.4;c.beginPath();c.arc(cx0,cy0,r*.7,0,7);c.stroke();}
   c.fillStyle='rgba(255,255,255,.55)';c.beginPath();c.ellipse(cx0-r*.35,cy0-r*.35,r*.22,r*.15,-.6,0,7);c.fill();
   c.fillStyle=PCOL[b.oi]||'#888';c.beginPath();c.arc(cx0,cy0+r*.25,r*.16,0,7);c.fill();
@@ -490,14 +538,18 @@ function render(t,dt){const c=cx;c.setTransform(1,0,0,1,0,0);
     for(let x=0;x<W;x++){const cc=y*W+x,g=s.g[cc];if(g===T_SOFT)drawSoft(c,x,y,st);else if(g===T_BURN)drawSoft(c,x,y,st,1-(s.burn[cc]-s.tick)/FLAME);else if(g===T_PRESS){const f=G.fx.find(q=>q.k==='press'&&q.c===cc);const u=f?clamp((nowP-f.t)/250,0,1):1;c.save();c.translate(0,-(1-u)*CS*2);drawHard(c,x,y,st,'#8e5a46');c.restore();}
       else if(g===0&&s.it[cc])drawItem(c,x,y,s.it[cc],t);}
     if(y===0)continue;
-    for(const b of s.bombs)if(Math.round(b.mv?lerp(b.py,b.y,clamp((s.tick-b.mt)/KSTEP,0,1)):b.y)===y)drawBomb(c,b,t,s);}
+    for(const b of s.bombs)if(!b.air&&Math.round(b.mv?lerp(b.py,b.y,clamp((s.tick-b.mt)/KSTEP,0,1)):b.y)===y)drawBomb(c,b,t,s);}
   drawFlames(c,s,t);
+  for(const b of s.bombs)if(b.air)drawBomb(c,b,t,s);
   // キャラ（y順）
   const list=G.order.filter(p=>views[p]).sort((a,b)=>views[a].y-views[b].y);
   for(const pid of list){const v=views[pid];const ch=CHARS[charOf(pid)];const[X,Y]=cellXY(v.x,v.y);const dead=!v.al&&!v.gh;
     if(dead){const p=G.me[pid];const since=p&&p.dt?(nowP-p.dt)/1000:2;if(since<1.2){c.save();c.globalAlpha=1-since/1.2;drawChar(c,ch,X+CS/2,Y+CS*.86-since*CS*.6,CS*.92,1,0,false,0);c.restore();}continue;}
     if(v.gh){drawChar(c,ch,X+CS/2,Y+CS*.86,CS*.8,v.d===4?-1:1,v.an||0,!!v.m,0,colorOf(pid),null,.55);continue;}
     c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(X+CS/2,Y+CS*.86,CS*.3,CS*.1,0,0,7);c.fill();
+    if(v.iv&&Math.sin(nowP/60)>0)continue;
+    if(v.cu){c.fillStyle=`rgba(90,60,120,${.35+.25*Math.sin(nowP/90)})`;c.beginPath();c.arc(X+CS/2,Y+CS*.45,CS*.55,0,7);c.fill();drawIcon(c,IT.skull,X+CS/2,Y-CS*.55,CS*.45);}
+    const pm=G.me[pid];if(pm&&pm.msg&&S.local[pid]){pm.msg.a-=1/60;if(pm.msg.a<=0)pm.msg=null;else txt(c,pm.msg.t,X+CS/2,Y-CS*.9,Math.max(12,CS*.4),'#ffe27a');}
     const mine=!!S.local[pid];drawChar(c,ch,X+CS/2,Y+CS*.88,CS*.95,v.d===4?-1:1,v.an||0,!!v.m,0,colorOf(pid),mine&&Object.keys(S.local).length>1||mine&&G.order.length>2?shortN(nameOf(pid)):null);}
   // 演出
   G.fx=G.fx.filter(f=>nowP-f.t<900);
@@ -567,12 +619,12 @@ function helpScreen(){scr='help';const ic=k=>`<canvas width="44" height="44" dat
   h(`<div class="wrap" style="max-width:720px"><h2>あそびかた</h2><div class="panel">
   <p><b>ルール</b>：ボムを置くと 少したってから 十字に 火が出ます。火に当たると アウト。<b>さいごまで のこった人が そのラウンドの勝ち</b>。先に きめた回数（1〜5回）勝った人が 優勝です。</p>
   <p><b>ブロック</b>：茶色などの ブロックは 火で こわせます（灰色の かたいブロックは こわれません）。こわすと アイテムが 出ることがあります。</p>
-  <p><b>アイテム</b>：${ic(1)} 火力＋1　${ic(2)} ボムを おける数＋1　${ic(3)} はやく 歩ける　${ic(4)} キック（ボムに ぶつかると けとばす）　${ic(5)} つらぬきボム（火が ブロックを つきぬける）　${ic(6)} 火力さいだい。アイテムも 火に当たると 消えます。</p>
-  <p><b>のこり 32秒</b>になると、外がわから かべが せまってきます。</p>
-  <p><b>やられた後</b>：部屋の設定で「なげる」にすると、外わくを 歩いて 中へ ボムを なげこめます（4秒に1回）。</p>
-  <p><b>操作</b><br>キーボード左：WASD 移動・Space ボム<br>キーボード右：矢印 移動・Enter ボム（1人だけなら 矢印でも WASD でも）<br>コントローラー：十字キー/スティック 移動・A ボム・START メニュー<br>スマホ：画面のボタン</p></div>
+  <p><b>アイテム</b>：${ic(1)} 火力＋1　${ic(2)} ボムを おける数＋1　${ic(3)} はやく 歩ける　${ic(4)} キック（ボムに ぶつかると けとばす）　${ic(5)} つらぬきボム（火が ブロックを つきぬける）　${ic(6)} 火力さいだい　${ic(7)} パンチ（Bボタンで 前のボムを 3マス先へ なげとばす）　${ic(8)} リモコン（ボムが かってに ばくはつしない。Bボタンで 古い順に ばくはつ）　${ic(9)} ラインボム（自分のボムの上で もう一度 ボムボタン → 前に ならべて置く）　${ic(10)} ドクロ（10秒間 わるいことが おきる：足が おそい・はやすぎる・ボムが かってに出る・置けない・操作が さかさま・火力1）。<br>アイテムも 火に当たると 消えます。やられた人の アイテムは フィールドに ちらばります。キックしたボムは Bボタンで 止められます。</p>
+  <p><b>時間</b>は 1〜3分（部屋の設定）。<b>のこり 32秒</b>になると、外がわから かべが せまってきます。</p>
+  <p><b>やられた後</b>：部屋の設定で「なげる」にすると、外わくを 歩いて 中へ ボムを なげこめます（4秒に1回）。<b>そのボムで だれかを たおすと、その場所で 復活</b>します（アイテムは さいしょに もどります）。</p>
+  <p><b>操作</b><br>キーボード左：WASD 移動・Space ボム・F（または 左Shift）B<br>キーボード右：矢印 移動・Enter ボム・右Shift（または .）B（1人だけなら どちらのキーでも）<br>コントローラー：十字キー/スティック 移動・A ボム・B/X/Y で B・START メニュー<br>スマホ：画面のボタン（ボム・B）</p></div>
   <div class="row"><button class="btn ghost" data-nav data-back>もどる</button></div></div>`);
-  ui.querySelectorAll('[data-ic]').forEach(cvs=>{const c=cvs.getContext('2d');const k=+cvs.dataset.ic;c.clearRect(0,0,44,44);const bgc={1:'#ff9d4a',2:'#5a6cff',3:'#3ec1d3',4:'#7ad04c',5:'#d0457f',6:'#ffcf3a'}[k];rr(c,2,2,40,40,9);fs(c,bgc,2);drawIcon(c,k,22,22,28);});
+  ui.querySelectorAll('[data-ic]').forEach(cvs=>{const c=cvs.getContext('2d');const k=+cvs.dataset.ic;c.clearRect(0,0,44,44);const bgc=ITBG[k];rr(c,2,2,40,40,9);fs(c,bgc,2);drawIcon(c,k,22,22,28);});
   ui.querySelector('[data-back]').onclick=titleScreen;}
 function onlineScreen(){scr='online';G.active=false;touchEl.hidden=true;const db=dbOnline();const q=QS.get('room');
   if(!db&&!S.err)S.err='通信の部品を読み込めませんでした。ネットにつながっているか確認して、ページを開き直してください。';
@@ -610,7 +662,8 @@ function lobbyScreen(){scr='lobby';G.active=false;touchEl.hidden=true;const m=S.
     <div class="row opt"><b>ステージ</b>${STAGES.map((s,i)=>`<button class="btn${stg===i&&!(m&&m.rand)?' on':''}" data-nav data-st="${i}" ${dis}>${s.name}<small>${s.desc}</small></button>`).join('')}<button class="btn${m&&m.rand?' on':''}" data-nav data-st="-1" ${dis}>ランダム<small>毎回かわる</small></button></div>
     <div class="row opt" style="margin-top:10px"><b>勝ちぬけ</b>${[1,2,3,5].map(v=>`<button class="btn${m&&m.target===v?' on':''}" data-nav data-tg="${v}" ${dis}>${v}回</button>`).join('')}</div>
     <div class="row opt" style="margin-top:10px"><b>COM</b>${[0,1,2,3].map(v=>`<button class="btn${m&&m.cpu===v?' on':''}" data-nav data-cpu="${v}" ${dis}>${v}人</button>`).join('')}<b style="width:auto;margin-left:10px">強さ</b>${['よわい','ふつう','つよい'].map((v,i)=>`<button class="btn${m&&(m.lv||0)===i?' on':''}" data-nav data-lv="${i}" ${dis}>${v}</button>`).join('')}</div>
-    <div class="row opt" style="margin-top:10px"><b>やられた後</b>${[[1,'外から ボムを なげる'],[0,'みているだけ']].map(([v,l])=>`<button class="btn${m&&(m.ghost?1:0)===v?' on':''}" data-nav data-gh="${v}" ${dis}>${l}</button>`).join('')}</div></div>
+    <div class="row opt" style="margin-top:10px"><b>時間</b>${[1,2,3].map(v=>`<button class="btn${m&&(m.time||2)===v?' on':''}" data-nav data-tm="${v}" ${dis}>${v}分</button>`).join('')}</div>
+    <div class="row opt" style="margin-top:10px"><b>やられた後</b>${[[1,'外から なげる（当てたら復活）'],[0,'みているだけ']].map(([v,l])=>`<button class="btn${m&&(m.ghost?1:0)===v?' on':''}" data-nav data-gh="${v}" ${dis}>${l}</button>`).join('')}</div></div>
    ${m&&m.st!=='lobby'?`<p class="hint" style="color:var(--sun)">いまゲーム中です。終わると次から参加できます。</p>`:''}
    <div class="row">${host?`<button class="btn big${canGo?' on':''}" data-nav data-a="go" ${canGo?'':'disabled'}>${canGo?'スタート！':total<2?'2人以上（COMをふくむ）で始められます':ps.length?'全員の準備OKを待っています':'まず だれか 参加してね'}</button>`:`<span class="hint">ホストがスタートすると始まります。</span>`}
     <button class="btn ghost" data-nav data-back>${S.online?'部屋を出る':'タイトルへ'}</button></div></div>`);
@@ -622,6 +675,7 @@ function lobbyScreen(){scr='lobby';G.active=false;touchEl.hidden=true;const m=S.
   ui.querySelectorAll('[data-tg]').forEach(b=>b.onclick=()=>{if(host)db.update(rp('m'),{target:+b.dataset.tg});});
   ui.querySelectorAll('[data-cpu]').forEach(b=>b.onclick=()=>{if(host)db.update(rp('m'),{cpu:+b.dataset.cpu});});
   ui.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{if(host)db.update(rp('m'),{lv:+b.dataset.lv});});
+  ui.querySelectorAll('[data-tm]').forEach(b=>b.onclick=()=>{if(host)db.update(rp('m'),{time:+b.dataset.tm});});
   ui.querySelectorAll('[data-gh]').forEach(b=>b.onclick=()=>{if(host)db.update(rp('m'),{ghost:+b.dataset.gh});});
   ui.querySelector('[data-a=join]').onclick=()=>{audioInit();addLocal(touch?'touch':'kb1');};
   const go=ui.querySelector('[data-a=go]');if(go)go.onclick=()=>{if(canGo){sfx('ok');for(const pid in S.players)if(S.players[pid].cpu)db.remove(rp('p/'+pid));hostStart();}};
@@ -656,6 +710,6 @@ function frame1(ts){const dt=Math.min(.1,(ts-lastTs)/1000||0);lastTs=ts;readDevs
   if(scr!=='game')navStep();
   render(t,dt);}
 resize();titleScreen();if(QS.get('room'))onlineScreen();else if(NetDB.hub.isHost&&NetDB.hub.code)setTimeout(()=>{onlineScreen();const b=ui.querySelector('[data-a=make]');if(b)b.click()},300);requestAnimationFrame(frame);
-window.__b={S,G,openRoom,dbTree,hostStart,STAGES,get scr(){return scr;},rp,buildMap,curTick,simStep,frame1};
+window.__b={addEv,S,G,openRoom,dbTree,hostStart,STAGES,get scr(){return scr;},rp,buildMap,curTick,simStep,frame1};
 </script>
 </body></html>
