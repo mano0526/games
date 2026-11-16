@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="netdb.js"></script>
+<script src="lobby.js"></script>
 <style>
 /* 画面：ステージ全体を1枚のキャンバスに表示。メニューは上に重ねるHTML */
 :root{--bg:#f6d27a;--ink:#1d1a24;--paper:#fffaf0;--red:#e2483b;--teal:#2aa59a;--sun:#ffc93c;--muted:#6b6478;
@@ -528,14 +529,16 @@ let scr='title';const nav={i:0};
 function h(html){ui.hidden=false;ui.classList.toggle('dim',G.active);ui.innerHTML=html;nav.i=Math.min(nav.i,Math.max(0,navEls().length-1));markNav();}
 function navEls(){return[...ui.querySelectorAll('[data-nav]')].filter(e=>!e.disabled&&e.offsetParent!==null);}
 function markNav(){const els=navEls();els.forEach((e,i)=>e.classList.toggle('f',i===nav.i&&nav.show));}
-function navStep(){const els=navEls();if(!els.length)return;const d=devs.any;if(!d)return;
-  if(d.px||d.py){nav.show=true;const cur=els[nav.i]||els[0];const a=cur.getBoundingClientRect();let best=-1,bd=1e9;
+function navStep(){const els=navEls();if(!els.length)return;let d=devs.any;if(!d)return;
+  if(scr==='lobby'){const allow=new Set();for(const pid in S.local){const p=S.players[pid];if(p&&p.ok)allow.add(S.local[pid].dev);}const none=!Object.keys(S.local).length;if(none)for(const k in devs)if(k!=='any')allow.add(k);d=LK.navDev(devs,allow);if(none)d.pa=false;}
+  if(d.px&&!d.py&&nav.show&&LK.navSide(els[nav.i],d.px)){}
+  else if(d.px||d.py){nav.show=true;const cur=els[nav.i]||els[0];const a=cur.getBoundingClientRect();let best=-1,bd=1e9;
     els.forEach((e,i)=>{if(i===nav.i)return;const b=e.getBoundingClientRect();const dx=(b.left+b.width/2)-(a.left+a.width/2),dy=(b.top+b.height/2)-(a.top+a.height/2);
       if(d.px&&Math.sign(dx)!==d.px||d.py&&Math.sign(dy)!==d.py)return;if(d.px&&Math.abs(dx)<4||d.py&&Math.abs(dy)<4)return;const dist=d.px?Math.abs(dx)+Math.abs(dy)*2:Math.abs(dy)+Math.abs(dx)*2;if(dist<bd){bd=dist;best=i;}});
     if(best<0&&d.px){best=(nav.i+d.px+els.length)%els.length;}// 右に 何もなければ 次へ（左なら 前へ）
     if(best>=0){nav.i=best;sfx('ui');els[best].scrollIntoView({block:'nearest'});}markNav();}
   if(d.pa&&nav.show){const e=els[nav.i];if(e){sfx('ok');e.click();}}else if(d.pa){nav.show=true;markNav();}
-  if(d.pb||d.pst){const b=ui.querySelector('[data-back]');if(b){sfx('ui');b.click();}}}
+  if((d.pb||d.pst)&&!(scr==='lobby'&&Object.keys(S.local).length)){const b=ui.querySelector('[data-back]');if(b){sfx('ui');b.click();}}}
 function titleScreen(){S.testRun=false;scr='title';G.active=false;G.bg=null;edUI(false);touchEl.hidden=true;nav.i=0;
   h(`<div class="wrap" style="max-width:720px"><h1 class="logo">ワナワナ<span>・</span>ラン</h1>
    <p class="hint" style="font-size:16px">ワナと足場を置いてから、みんなでゴールをめざす。自分だけゴールして、友達はワナにはめよう。</p>
@@ -570,43 +573,45 @@ function onlineScreen(){scr='online';G.active=false;touchEl.hidden=true;const db
   ui.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){i.blur();if(i.id==='cd')ui.querySelector('[data-a=join]').click();}}));
   if(db&&!S.roomsOff){S.roomsOff=NetDB.lobby.watch(l=>{const prev=JSON.stringify(S.rooms);S.rooms=l.filter(r=>r.g==='trap');if(prev!==JSON.stringify(S.rooms)&&scr==='online'&&document.activeElement.tagName!=='INPUT')onlineScreen();});}
   if(q&&!onlineScreen.auto&&db){onlineScreen.auto=true;setTimeout(()=>{if(scr==='online')ui.querySelector('[data-a=join]').click();},400);}}
-function lobbyScreen(){scr='lobby';G.active=false;touchEl.hidden=true;const m=S.meta;const db=S.db;if(!db)return;const host=S.host;
-  const ps=Object.entries(S.players).filter(([,p])=>!p.cpu).sort((a,b)=>(a[1].t||0)-(b[1].t||0)).slice(0,4);const cpuN=m?clamp(m.cpu,0,4-ps.length):0;
-  const allOk=ps.length>0&&ps.every(([,p])=>p.ok);const total=ps.length+cpuN;const canGo=host&&allOk&&total>=2&&m&&m.st==='lobby';
+function lobbyInfo(){const m=S.meta;const ps=Object.entries(S.players).filter(([,p])=>!p.cpu).sort((a,b)=>(a[1].t||0)-(b[1].t||0)).slice(0,4);const cpuN=m?clamp(m.cpu,0,4-ps.length):0;
+  const allOk=ps.length>0&&ps.every(([,p])=>p.ok);const total=ps.length+cpuN;const can=S.host&&allOk&&total>=2&&m&&m.st==='lobby';
+  const why=!ps.length?'まず だれか 参加してね':total<2?'あと1人 参加してね（ルールで CPUを入れてもOK）':!allOk?'全員が「'+(S.online?'準備OK':'これで決定')+'」を押すと スタートできます':m&&m.st!=='lobby'?'いまゲーム中です':'';
+  return{ps,cpuN,allOk,total,can,why};}
+function lobbyGo(){const L=lobbyInfo();if(!L.can)return;sfx('ok');for(const pid in S.players)if(S.players[pid].cpu)S.db.remove(rp('p/'+pid));hostStart();}
+function lobbyScreen(){scr='lobby';G.active=false;touchEl.hidden=true;const m=S.meta;const db=S.db;if(!db)return;const host=S.host;const L=lobbyInfo();
   const url=location.origin+location.pathname+'?room='+S.code+(NET_LOCAL?'&np=local':'');const touch=matchMedia('(pointer:coarse)').matches;
-  const slots=[];for(let i=0;i<4;i++){const e=ps[i];if(e){const[pid,p]=e;const mine=!!S.local[pid];const ch=CHARS[(p.char||0)%CHARS.length];
-      slots.push(`<div class="slot" style="border-color:${PCOL[i]}"><b>${esc(p.name)}</b><span class="s">${mine?esc(DEVNAME[S.local[pid].dev]||'コントローラー'):'（ほかの端末）'}</span><canvas width="192" height="192" data-ch="${p.char||0}"></canvas><span>${ch.name}</span>
-        ${mine?`<div class="mini"><button data-c="${pid}" data-d="-1">◀</button><button data-c="${pid}" data-d="1">▶</button></div><div class="mini"><button data-ok="${pid}" style="${p.ok?'background:#2aa55a;color:#fff':''}">${p.ok?'準備OK！':'準備OK'}</button><button data-rm="${pid}">ぬける</button></div>`:`<span class="s">${p.ok?'準備OK！':'えらんでいます…'}</span>`}</div>`);}
-    else if(i-ps.length<cpuN)slots.push(`<div class="slot"><b>CPU${i-ps.length+1}</b><span class="s">コンピューター</span><canvas width="192" height="192" data-ch="${(i+2)%CHARS.length}" style="opacity:.6"></canvas></div>`);
-    else slots.push(`<div class="slot empty">あき<br><small>参加：Space／Enter／コントローラーA</small></div>`);}
-  const stg=m?m.stage:0;
-  h(`<div class="wrap"><h2>${S.online?`部屋 <span style="color:var(--sun);letter-spacing:.1em">${esc(S.code)}</span>`:'1台であそぶ'}</h2>
-   ${S.online?`<div class="row"><button class="btn" data-nav data-a="copy">招待リンクをコピー</button><a class="btn" data-nav target="_blank" rel="noopener" href="https://line.me/R/msg/text/?${encodeURIComponent('ワナワナ・ランで遊ぼう！ '+url)}">LINEで送る</a><span class="hint" id="cpm">${host?'あなたがホスト':'ホスト：'+esc(m?m.hostName:'')+'さん'}</span></div>`:''}
-   <div class="slots">${slots.join('')}</div>
-   <div class="row"><button class="btn" data-nav data-a="join">＋ ${touch?'この端末で参加':'マウスで参加（左キーボード）'}</button><span class="hint">キーボード左は Space、右は Enter、コントローラーは A で参加。参加したら ←→ でキャラ、もう一度押すと準備OK。</span></div>
-   <div class="panel"><div class="row"><b style="width:5em">ステージ</b>${STAGES.map((s,i)=>`<button class="btn${stg===i&&!(m&&m.rand)?' on':''}" data-nav data-st="${i}" ${host?'':'disabled'}>${s.name}</button>`).join('')}<button class="btn${m&&m.rand?' on':''}" data-nav data-st="-2" ${host?'':'disabled'}>ランダム</button>
-     ${host?loadCustom().map((c,i)=>`<button class="btn${stg===-1&&m.custom&&m.custom.id===c.id?' on':''}" data-nav data-cs="${i}">自作：${esc(c.name)}</button>`).join(''):(m&&m.stage===-1&&m.custom?`<button class="btn on" disabled>自作：${esc(m.custom.name)}</button>`:'')}</div>
-    <div class="row" style="margin-top:10px"><b style="width:5em">目標点</b>${[10,15,20].map(v=>`<button class="btn${m&&m.target===v?' on':''}" data-nav data-tg="${v}" ${host?'':'disabled'}>${v}点</button>`).join('')}
-    <b style="margin-left:12px">CPU</b>${[0,1,2,3].map(v=>`<button class="btn${m&&m.cpu===v?' on':''}" data-nav data-cpu="${v}" ${host?'':'disabled'}>${v}人</button>`).join('')}</div></div>
-   ${m&&m.st!=='lobby'?`<p class="hint" style="color:var(--sun)">いまゲーム中です。終わると次から参加できます。</p>`:''}
-   <div class="row">${host?`<button class="btn big${canGo?' on':''}" data-nav data-a="go" ${canGo?'':'disabled'}>${canGo?'スタート！':total<2?'2人以上（CPUをふくむ）で始められます':'全員の準備OKを待っています'}</button>`:`<span class="hint">ホストがスタートすると始まります。</span>`}
-    <button class="btn ghost" data-nav data-back>${S.online?'部屋を出る':'タイトルへ'}</button></div></div>`);
-  ui.querySelectorAll('[data-ch]').forEach(cvs=>{const c=cvs.getContext('2d');c.clearRect(0,0,192,192);drawChar(c,CHARS[(+cvs.dataset.ch)%CHARS.length],96,170,120,1,0,true,0);});
-  ui.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const pid=b.dataset.c;const p=S.players[pid];if(!p||p.ok)return;db.update(rp('p/'+pid),{char:((p.char||0)+(+b.dataset.d)+CHARS.length)%CHARS.length});sfx('ui');});
-  ui.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>{const pid=b.dataset.ok;const p=S.players[pid];if(p){db.update(rp('p/'+pid),{ok:!p.ok});sfx('ok');}});
-  ui.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>removeLocal(b.dataset.rm));
-  ui.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{if(!host)return;const v=+b.dataset.st;if(v===-2)db.update(rp('m'),{rand:true,stage:0,custom:null});else db.update(rp('m'),{stage:v,rand:false,custom:null});});
-  ui.querySelectorAll('[data-cs]').forEach(b=>b.onclick=()=>{if(!host)return;const c=loadCustom()[+b.dataset.cs];if(c)db.update(rp('m'),{stage:-1,rand:false,custom:c});});
-  ui.querySelectorAll('[data-tg]').forEach(b=>b.onclick=()=>{if(host)db.update(rp('m'),{target:+b.dataset.tg});});
-  ui.querySelectorAll('[data-cpu]').forEach(b=>b.onclick=()=>{if(host)db.update(rp('m'),{cpu:+b.dataset.cpu});});
-  ui.querySelector('[data-a=join]').onclick=()=>{audioInit();addLocal(touch?'touch':'kb1');};
-  const go=ui.querySelector('[data-a=go]');if(go)go.onclick=()=>{if(canGo){sfx('ok');for(const pid in S.players)if(S.players[pid].cpu)db.remove(rp('p/'+pid));hostStart();}};
+  const cards=[];for(let i=0;i<4;i++){const e=L.ps[i];if(e){const[pid,p]=e;const mine=!!S.local[pid];const ch=CHARS[(p.char||0)%CHARS.length];
+      cards.push({type:'p',pid,name:p.name,mine,ok:!!p.ok,online:S.online,color:PCOL[i],char:p.char||0,charName:ch.name,dev:mine?(DEVNAME[S.local[pid].dev]||'コントローラー'):'ほかの端末'});}
+    else if(i-L.ps.length<L.cpuN)cards.push({type:'cpu',badge:'CPU',name:'CPU'+(i-L.ps.length+1),sub:'コンピューター',color:'#8a8794',char:(i+2)%CHARS.length});
+    else cards.push({type:'empty',touch});}
+  // ステージ：ふつう（番号）・ランダム（-2）・自作（'c'+番号）
+  const cus=host?loadCustom():[];const sv=[...STAGES.map((x,i)=>i),-2,...cus.map((c,i)=>'c'+i)];const sl=[...STAGES.map(x=>x.name),'ランダム',...cus.map(c=>'自作：'+c.name)];
+  let cur=m?(m.rand?-2:m.stage===-1&&m.custom?(()=>{const k=cus.findIndex(c=>c.id===m.custom.id);return k>=0?'c'+k:-2;})():m.stage):0;
+  if(!host&&m&&m.stage===-1&&m.custom){sv.push('x');sl.push('自作：'+m.custom.name);cur='x';}
+  const settings=[
+    {k:'stage',label:'ステージ',vals:sv,labels:sl,cur,note:'自作ステージは「ステージをつくる」で作れます'},
+    {k:'target',label:'目標点',vals:[10,15,20],labels:['10点','15点','20点'],cur:m?m.target:10,note:'先に この点数に とどいたら 勝ち'},
+    {k:'cpu',label:'CPU',vals:[0,1,2,3],labels:['なし','1人','2人','3人'],cur:m?m.cpu:0}].map(s=>Object.assign(s,{dis:!host}));
+  const share=S.online?`<button class="btn" data-nav data-a="copy">招待リンクをコピー</button><a class="btn" data-nav target="_blank" rel="noopener" href="https://line.me/R/msg/text/?${encodeURIComponent('ワナワナ・ランで遊ぼう！ '+url)}">LINEで送る</a><span class="hint" id="cpm">${host?'あなたがホスト':'ホスト：'+esc(m?m.hostName:'')+'さん'}</span>`:'';
+  const o={title:S.online?`部屋 <span style="color:var(--sun);letter-spacing:.1em">${esc(S.code)}</span>`:'1台であそぶ',online:S.online,share,cards,settings,host,can:L.can,why:L.why,back:S.online?'部屋を出る':'タイトルへ',
+    note:m&&m.st!=='lobby'?'いまゲーム中です。終わると次から参加できます。':'',
+    drawCh:(c,ch)=>drawChar(c,CHARS[ch%CHARS.length],120,215,150,1,0,true,0),
+    on:{join:()=>{audioInit();const used=new Set(Object.values(S.local).map(l=>l.dev));addLocal(touch?'touch':used.has('kb1')?'kb2':'kb1');},
+      char:(pid,d)=>{const p=S.players[pid];if(!p||p.ok)return;db.update(rp('p/'+pid),{char:((p.char||0)+d+CHARS.length)%CHARS.length});sfx('ui');},
+      ok:pid=>{const p=S.players[pid];if(p){db.update(rp('p/'+pid),{ok:!p.ok});sfx('ok');}},rm:pid=>removeLocal(pid),
+      sel:(k,d)=>{if(!host)return;const s=settings.find(q=>q.k===k);const v=LK.step(s.vals,s.cur,d);sfx('ui');
+        if(k==='stage'){if(v===-2)db.update(rp('m'),{rand:true,stage:0,custom:null});else if(typeof v==='string'){const c=cus[+v.slice(1)];if(c)db.update(rp('m'),{stage:-1,rand:false,custom:c});}else db.update(rp('m'),{stage:v,rand:false,custom:null});}
+        else db.update(rp('m'),{[k]:v});},
+      go:lobbyGo}};
+  h(LK.html(o));LK.bind(ui,o);if(L.allOk&&L.can&&!lobbyScreen.wasAll){LK.focusGo(ui,navEls,nav);markNav();}lobbyScreen.wasAll=L.allOk&&L.can;
   const cp=ui.querySelector('[data-a=copy]');if(cp)cp.onclick=()=>{const done=()=>{const e=ui.querySelector('#cpm');if(e)e.textContent='コピーしました';};try{navigator.clipboard.writeText(url).then(done,()=>prompt('このリンクを送ってください',url));}catch(e){prompt('このリンクを送ってください',url);}};
   ui.querySelector('[data-back]').onclick=()=>leaveRoom('');}
 function lobbyInput(){if(!S.meta||S.meta.st!=='lobby')return;for(const id in devs){if(id==='any'||id==='touch')continue;const d=devs[id];const pid=Object.keys(S.local).find(p=>S.local[p].dev===id);
     if(!pid){if(d.pa){audioInit();addLocal(id);}continue;}const p=S.players[pid];if(!p)continue;
-    if(d.px&&!p.ok){S.db.update(rp('p/'+pid),{char:((p.char||0)+d.px+CHARS.length)%CHARS.length});sfx('ui');}
-    if(d.pa){S.db.update(rp('p/'+pid),{ok:!p.ok});sfx('ok');}if(d.pb){if(p.ok)S.db.update(rp('p/'+pid),{ok:false});else removeLocal(pid);}}}
+    if(id.startsWith('gp')&&d.pst&&S.host&&lobbyInfo().can){lobbyGo();return;}
+    if(p.ok){if(d.pb){S.db.update(rp('p/'+pid),{ok:false});sfx('ui');}continue;}
+    if(d.px){S.db.update(rp('p/'+pid),{char:((p.char||0)+d.px+CHARS.length)%CHARS.length});sfx('ui');}
+    if(d.pa){S.db.update(rp('p/'+pid),{ok:true});sfx('ok');}if(d.pb)removeLocal(pid);}}
 function endScreen(){scr='end';const m=S.meta;const ord=m.order.slice().sort((a,b)=>(m.scores[b]||0)-(m.scores[a]||0));
   h(`<div class="wrap" style="max-width:560px"><h2>${esc(nameOf(m.win))} の勝ち！</h2><div class="panel"><canvas width="240" height="200" id="wc" style="display:block;margin:0 auto;width:160px"></canvas>
    <table class="sc">${ord.map((p,i)=>`<tr><td>${i+1}</td><td style="color:${colorOf(p)}">${esc(nameOf(p))}</td><td style="text-align:right">${m.scores[p]||0}点</td></tr>`).join('')}</table></div>

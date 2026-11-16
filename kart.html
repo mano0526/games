@@ -101,6 +101,7 @@ kbd{font-family:var(--body);font-weight:800;border:2px solid var(--ink);border-b
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="netdb.js"></script>
+<script src="lobby.js"></script>
 
 <script>
 'use strict';
@@ -1267,7 +1268,7 @@ const CLS=['ライト','ミドル','ヘビー'];
 function h(html){ui.innerHTML=html;}
 function bindMenu(cols,onBack,focus){menu.items=[...ui.querySelectorAll('[data-nav]')];menu.cols=cols||1;menu.onBack=onBack||null;menu.custom=null;menu.focus=clamp(focus||0,0,Math.max(0,menu.items.length-1));
   menu.items.forEach((el,i)=>{el.addEventListener('mouseenter',()=>{menu.focus=i;paintFocus();});el.addEventListener('click',()=>{audioInit();});});paintFocus();}
-function paintFocus(){menu.items.forEach((el,i)=>el.classList.toggle('focus',i===menu.focus));}
+function paintFocus(){menu.items.forEach((el,i)=>{el.classList.toggle('focus',i===menu.focus);el.classList.toggle('f',i===menu.focus&&!!el.closest('.lk'));});}
 function menuStep(devs){if(menu.custom&&menu.custom(devs))return;if(!menu.items.length)return;
   for(const id in devs){const p=devs[id].pressed;if(id==='touch'||id==='any')continue;let mv=0;
     if(p.left)mv=-1;if(p.right)mv=1;if(p.up)mv=-menu.cols;if(p.down)mv=menu.cols;
@@ -1345,27 +1346,22 @@ function helpScreen(){app.screen='help';show();h(`<div class="wrap"><h2>あそ�
 
 // ---- join + character select (combined) ----
 function joinScreen(){app.screen='join';show();if(!app.keepPlayers)app.players=[];app.keepPlayers=false;const max=app.mode==='ta'?1:4;const modeName={gp:'グランプリ',vs:'VSレース',battle:'バトル',ta:'タイムアタック'}[app.mode];
-  const render=()=>{const sl=[];for(let i=0;i<4;i++){const p=app.players[i];if(i>=max){break;}
-      if(!p){sl.push(`<div class="slot empty"><div class="pn">P${i+1}</div><div class="dev">参加するデバイスで決定ボタン<br>（A／Space／Enter）</div>${i===0?'<button class="btn" data-touchjoin style="margin-top:auto">タッチで参加</button>':''}</div>`);continue;}
-      const c=CHARS[p.char];const st=c.st;
-      sl.push(`<div class="slot${p.ok?' ok':''}"><div class="row" style="justify-content:space-between"><span class="pn">P${i+1}</span><span class="dev">${devName(p.dev)}</span></div>
-       <canvas width="160" height="160" data-port="${i}"></canvas><div class="nm">${c.name}</div><div class="dev">${CLS[c.cls]}級</div>
-       <div class="arrows"><button data-fprev="${i}">▲</button><span style="flex:3;text-align:center;font-weight:800;font-size:13px;align-self:center">${FRAMES[p.frame||0].name}</span><button data-fnext="${i}">▼</button></div>
-       <div class="dev">${FRAMES[p.frame||0].desc}</div>
-       <div class="stats">${(s=>[['スピード',s.spd],['加速',s.acc],['曲がり',s.hnd],['重さ',s.wgt],['オフロード',s.off],['ミニターボ',s.mt]])(kartStats(p.char,p.frame)).map(([l,v])=>`<span>${l}</span><span class="bar"><i style="width:${v/5*100}%"></i></span>`).join('')}</div>
-       <div class="arrows"><button data-prev="${i}">◀</button><button data-ok="${i}">${p.ok?'取消':'決定'}</button><button data-next="${i}">▶</button></div>
-       <button class="assist" data-assist="${i}" aria-pressed="${p.assist?'true':'false'}">アシスト：${p.assist?'ON':'OFF'}</button></div>`);}
+  const render=()=>{const touch=matchMedia('(pointer:coarse)').matches;const cards=[];
+    for(let i=0;i<max;i++){const p=app.players[i];if(!p){cards.push({type:'empty',touch});continue;}const c=CHARS[p.char];
+      const stats=(s=>[['スピード',s.spd],['加速',s.acc],['曲がり',s.hnd],['重さ',s.wgt],['オフロード',s.off],['ミニターボ',s.mt]])(kartStats(p.char,p.frame)).map(([l,v])=>`<span>${l}</span><span class="bar"><i style="width:${v/5*100}%"></i></span>`).join('');
+      const extra=`<div class="dev">${CLS[c.cls]}級</div>${p.ok?`<div class="lk-chn" style="font-size:14px">${FRAMES[p.frame||0].name}</div>`:`<div class="lk-ch" style="gap:6px"><button class="lk-ar" style="height:38px;width:40px" data-fprev="${i}">▲</button><div style="flex:1;text-align:center"><b style="font-size:14px">車体：${FRAMES[p.frame||0].name}</b><div class="dev">${FRAMES[p.frame||0].desc}</div></div><button class="lk-ar" style="height:38px;width:40px" data-fnext="${i}">▼</button></div>`}
+        <div class="stats" style="width:100%">${stats}</div>${p.ok?'':`<button class="assist" data-assist="${i}" aria-pressed="${p.assist?'true':'false'}">アシスト：${p.assist?'ON（自動アクセル＋ハンドル補助）':'OFF'}</button>`}`;
+      cards.push({type:'p',pid:String(i),name:'P'+(i+1),mine:true,ok:!!p.ok,online:false,color:['#e2483b','#2f7fe0','#2aa55a','#e9a21b'][i],char:p.char,charName:c.name,dev:devName(p.dev),extra});}
     const allOk=app.players.length&&app.players.every(p=>p.ok);
-    h(`<div class="wrap"><h2>${modeName}：参加とキャラ選択</h2><div class="slots">${sl.join('')}</div>
-     <p class="hint">左右でキャラ、上下でカートの車体を変更。アイテムボタン（L／E／Enter）でアシスト（自動アクセル＋ハンドル補助）を切替。決定で確定、全員そろうと次へ。戻る：B／Q／Backspace</p>
-     <div class="row"><button class="btn${allOk?'':' ghost'}" data-nav data-go ${allOk?'':'disabled'}>${allOk?'次へ':'全員の確定を待っています'}</button><button class="btn ghost" data-nav data-back>タイトルへ</button></div></div>`);
-    ui.querySelectorAll('[data-port]').forEach(cv=>drawPortrait(cv,CHARS[app.players[+cv.dataset.port].char]));
-    const tj=ui.querySelector('[data-touchjoin]');if(tj)tj.onclick=()=>{join('touch');};
-    ui.querySelectorAll('[data-prev]').forEach(b=>b.onclick=()=>cycle(+b.dataset.prev,-1));ui.querySelectorAll('[data-next]').forEach(b=>b.onclick=()=>cycle(+b.dataset.next,1));
+    const o={wide:true,title:modeName+'：参加とキャラえらび',cards,settings:[],host:true,can:!!allOk,goLabel:'次へ',startKey:'決定ボタン（A／Space／Enter）でも 次へ',
+      why:!app.players.length?'参加したい人は 決定ボタン（A／Space／Enter）か 「＋」をクリック':'全員が「これで決定」を押すと 次へ進めます（左右でキャラ・上下で車体・アイテムボタンでアシスト）',back:'タイトルへ',
+      drawCh:(g,ch,cv)=>{cv.width=160;cv.height=160;drawPortrait(cv,CHARS[ch]);},
+      on:{join:()=>{join(touch?'touch':app.players.find(p=>p.dev==='kb1')?'kb2':'kb1');},char:(pid,d)=>cycle(+pid,d),ok:pid=>{const p=app.players[+pid];p.ok=!p.ok;sfx(p.ok?'ok':'back');render();},
+        rm:pid=>{app.players.splice(+pid,1);sfx('back');render();},sel:()=>{},go:()=>{if(app.players.every(p=>p.ok)&&app.players.length)afterJoin();}}};
+    h(LK.html(o));LK.bind(ui,o);
     ui.querySelectorAll('[data-fprev]').forEach(b=>b.onclick=()=>fcycle(+b.dataset.fprev,-1));ui.querySelectorAll('[data-fnext]').forEach(b=>b.onclick=()=>fcycle(+b.dataset.fnext,1));
     ui.querySelectorAll('[data-assist]').forEach(b=>b.onclick=()=>toggleAssist(+b.dataset.assist));
-    ui.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>{const p=app.players[+b.dataset.ok];p.ok=!p.ok;sfx(p.ok?'ok':'back');render();});
-    ui.querySelector('[data-back]').onclick=titleScreen;const go=ui.querySelector('[data-go]');go.onclick=()=>{if(app.players.every(p=>p.ok)&&app.players.length)afterJoin();};
+    ui.querySelector('[data-back]').onclick=titleScreen;
     menu.items=[];};
   const join=dev=>{if(app.players.length>=max||app.players.find(p=>p.dev===dev))return;const used=new Set(app.players.map(p=>p.char));let c=0;while(used.has(c))c++;app.players.push({dev,char:c,ok:false,assist:dev==='touch'});sfx('ok');render();};
   const fcycle=(i,d)=>{const p=app.players[i];if(!p||p.ok)return;p.frame=((p.frame||0)+d+FRAMES.length)%FRAMES.length;sfx('ui');render();};
@@ -1547,33 +1543,37 @@ function roomScreen(){const gpCup=NET.meta&&NET.meta.mode>0?CUPS[NET.meta.mode-1
   const url=location.origin+location.pathname+'?room='+NET.code+(NET_LOCAL?'&np=local':'');const host=m&&m.host===NET.pid;NET.host=host;
   const allOk=ps.length&&ps.every(([,p])=>p.ok);const pts=(m&&m.pts)||{};const course=m?m.course:0;
   const cpuTxt=['なし（人だけ）','CPU：よわい','CPU：ふつう','CPU：つよい'];
-  h(`<div class="wrap"><h2>部屋 <span style="font-family:var(--display);letter-spacing:.12em;color:var(--sun)">${NET.code}</span></h2><p class="hint" style="margin:-8px 0 0">${m?(host?'あなたがホストです':'ホスト：'+(m.hostName||'').replace(/</g,'')+'さん'):'つないでいます…'}</p>
-   <div class="row"><button class="btn" data-nav data-a="copy">招待リンクをコピー</button><a class="btn" data-nav href="https://line.me/R/msg/text/?${encodeURIComponent('ターボカートGPで一緒に走ろう！ '+url)}" target="_blank" rel="noopener" style="text-decoration:none">LINEで送る</a><span class="hint" id="cpmsg"></span></div>
-   <div class="slots">${[0,1,2,3].map(i=>{const e=ps[i];if(!e)return`<div class="slot empty"><div class="pn">${i+1}</div><div class="dev">あき</div></div>`;const[pid,p]=e;const c=CHARS[p.char||0];const me=pid===NET.pid;
-     return`<div class="slot${p.ok?' ok':''}"><div class="row" style="justify-content:space-between"><span class="pn" style="font-size:18px">${(p.name||'').replace(/</g,'')}</span><span class="dev">${m&&m.host===pid?'ホスト':''}${me?'（あなた）':''}</span></div>
-      <canvas width="160" height="160" data-port="${pid}"></canvas><div class="nm">${c.name}</div><div class="dev">${FRAMES[p.frame||0].name}　${pts[pid]?pts[pid]+'pt':''}</div>
-      ${me?`<div class="arrows"><button data-nav data-c="-1">◀</button><button data-nav data-c="1">▶</button><button data-nav data-fr="1">車体</button></div><button class="btn${p.ok?'':' big'}" data-nav data-a="ok" style="padding:8px">${p.ok?'取消':'準備OK'}</button>`:`<div class="dev">${p.ok?'準備OK':'えらんでいます…'}</div>`}</div>`;}).join('')}</div>
-   <div class="panel" style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center">
-     <canvas width="200" height="150" data-map="${gpCup?gpCup.courses[0]:course}" style="width:160px;height:120px;border:2px solid var(--ink);border-radius:4px"></canvas>
-     <div style="display:flex;flex-direction:column;gap:8px;min-width:0"><b style="font-size:18px">${gpCup?'グランプリ：'+gpCup.name:COURSES[course].name}</b><span style="font-size:13px;color:var(--muted)">${gpCup?gpCup.courses.map(i=>COURSES[i].name).join(' → '):COURSES[course].tag}</span>
-      ${host?`<div class="row" style="gap:8px"><button class="btn" data-nav data-s="mode">${gpCup?'グランプリ':'VSレース'} ▶</button>${gpCup?'':'<button class="btn" data-nav data-s="course">コース ▶</button>'}<button class="btn" data-nav data-s="cc">${CC[m.cc].name} ▶</button><button class="btn" data-nav data-s="cpu">${cpuTxt[m.cpu]} ▶</button></div>`
-        :`<span style="font-weight:800">${m?CC[m.cc].name+'・'+cpuTxt[m.cpu]:''}</span>`}</div></div>
-   <div class="row">${host?`<button class="btn big${allOk?'':' ghost'}" data-nav data-a="go" ${allOk?'':'disabled'}>${allOk?'スタート！':'全員の準備OKを待っています'}</button>`:`<span class="hint">ホストがスタートすると始まります。</span>`}<button class="btn ghost" data-nav data-a="leave">部屋を出る</button></div>
-   ${m&&m.st==='race'?'<p class="hint" style="color:var(--sun)">いまレース中です。終わると次のレースから参加できます。</p>':''}
-   <p class="hint">操作：キーボード（WASD／矢印）・コントローラー・タッチどれでもOK。相手のカートは少し遅れて見えます。</p></div>`);
-  ui.querySelectorAll('[data-port]').forEach(cv=>{const p=NET.players[cv.dataset.port];if(p)drawPortrait(cv,CHARS[p.char||0]);});
-  ui.querySelectorAll('[data-map]').forEach(cv=>drawCourseMap(cv,+cv.dataset.map));
-  const f=roomScreen._f;bindMenu(4,()=>netLeave(''),f!=null?f:0);roomScreen._f=null;
+  const touch=matchMedia('(pointer:coarse)').matches;const cards=[];
+  for(let i=0;i<4;i++){const e=ps[i];if(!e){cards.push({type:'empty',touch,netEmpty:1});continue;}const[pid,p]=e;const c=CHARS[p.char||0];const me=pid===NET.pid;
+    const extra=`<div class="dev">${FRAMES[p.frame||0].name}${pts[pid]?'　'+pts[pid]+'pt':''}${m&&m.host===pid?'　ホスト':''}</div>${me&&!p.ok?`<button class="assist" data-fr="1">車体をかえる（上下）</button>`:''}`;
+    cards.push({type:'p',pid,name:(p.name||''),mine:me,ok:!!p.ok,online:true,color:['#e2483b','#2f7fe0','#2aa55a','#e9a21b'][i],char:p.char||0,charName:c.name,dev:me?'あなた':'ほかの端末',extra});}
+  const modeVals=[0,...CUPS.map((c,k)=>k+1)],modeLab=['VSレース',...CUPS.map(c=>'GP：'+c.name)];
+  const settings=[{k:'mode',label:'あそびかた',vals:modeVals,labels:modeLab,cur:m?(m.mode||0):0,note:gpCup?gpCup.courses.map(i=>COURSES[i].name).join(' → '):''}];
+  if(!gpCup)settings.push({k:'course',label:'コース',vals:COURSES.map((c,k)=>k),labels:COURSES.map(c=>c.name),cur:course,note:COURSES[course].tag});
+  settings.push({k:'cc',label:'クラス',vals:CC.map((c,k)=>k),labels:CC.map(c=>c.name),cur:m?m.cc:1},{k:'cpu',label:'CPU',vals:[0,1,2,3],labels:['なし','よわい','ふつう','つよい'],cur:m?m.cpu:0});
+  settings.forEach(x=>x.dis=!host);
+  const why=!allOk?'全員が「準備OK」を押すと スタートできます':m&&m.st==='race'?'いまレース中です':'';
+  const share=`<button class="btn" data-nav data-a="copy">招待リンクをコピー</button><a class="btn" data-nav href="https://line.me/R/msg/text/?${encodeURIComponent('ターボカートGPで一緒に走ろう！ '+url)}" target="_blank" rel="noopener" style="text-decoration:none">LINEで送る</a><span class="hint" id="cpmsg">${m?(host?'あなたがホスト':'ホスト：'+(m.hostName||'').replace(/</g,'')+'さん'):'つないでいます…'}</span>`;
+  const o={title:`部屋 <span style="font-family:var(--display);letter-spacing:.12em;color:var(--sun)">${NET.code}</span>`,online:true,share,cards,settings,host,can:!!(host&&allOk&&!(m&&m.st==='race')),why,back:'部屋を出る',
+    note:m&&m.st==='race'?'いまレース中です。終わると次のレースから参加できます。':'',startKey:'準備OKの あと 決定ボタンでも 始まります',
+    drawCh:(g,ch,cv)=>{cv.width=160;cv.height=160;drawPortrait(cv,CHARS[ch]);},
+    on:{join:()=>{},char:(pid,d)=>{if(!meP||meP.ok)return;NET.me.char=((meP.char||0)+d+CHARS.length)%CHARS.length;sfx('ui');upd({char:NET.me.char});},ok:()=>{sfx('ok');upd({ok:!meP.ok});},rm:()=>netLeave(''),
+      sel:(k,d)=>{if(!host)return;keepF();const x=settings.find(q=>q.k===k);sfx('ui');db.update(roomPath('m'),{[k]:LK.step(x.vals,x.cur,d)});},go:()=>{if(allOk)netStartRace(0);}}};
   const keepF=()=>{roomScreen._f=menu.focus;};
-  const upd=o=>{keepF();if(meP)db.update(roomPath('p/'+NET.pid),o);};
-  ui.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{if(!meP||meP.ok)return;NET.me.char=((meP.char||0)+(+b.dataset.c)+CHARS.length)%CHARS.length;sfx('ui');upd({char:NET.me.char});});
+  const upd=q=>{keepF();if(meP)db.update(roomPath('p/'+NET.pid),q);};
+  h(LK.html(o));LK.bind(ui,o);{const side=ui.querySelector('.lk-set');if(side){const cv=document.createElement('canvas');cv.width=200;cv.height=150;cv.style.cssText='display:block;width:160px;height:120px;margin:6px auto 2px;border:2px solid var(--ink);border-radius:6px';side.appendChild(cv);drawCourseMap(cv,gpCup?gpCup.courses[0]:course);}}ui.querySelectorAll('.lk-card.empty').forEach(e=>{e.removeAttribute('data-nav');e.innerHTML='<div style="font-weight:800;font-size:16px">あき</div><div class="dv" style="color:#fff">招待リンクを送ると 入れます</div>';});
+  const f=roomScreen._f;bindMenu(1,()=>netLeave(''),f!=null?f:0);roomScreen._f=null;
+  const allNow=!!(host&&allOk);if(allNow&&!roomScreen._wasAll){const gi=menu.items.findIndex(e=>e.dataset.lkgo!=null);if(gi>=0)menu.focus=gi;}roomScreen._wasAll=allNow;paintFocus();
   ui.querySelectorAll('[data-fr]').forEach(b=>b.onclick=()=>{if(!meP||meP.ok)return;NET.me.frame=((meP.frame||0)+1)%FRAMES.length;sfx('ui');upd({frame:NET.me.frame});});
-  const okb=ui.querySelector('[data-a=ok]');if(okb)okb.onclick=()=>{sfx('ok');upd({ok:!meP.ok});};
-  ui.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{if(!host)return;keepF();const k=b.dataset.s;sfx('ui');
-    if(k==='mode')db.update(roomPath('m'),{mode:((m.mode||0)+1)%(CUPS.length+1)});else if(k==='course')db.update(roomPath('m'),{course:(m.course+1)%COURSES.length});else if(k==='cc')db.update(roomPath('m'),{cc:(m.cc+1)%CC.length});else db.update(roomPath('m'),{cpu:(m.cpu+1)%4});});
+  // コントローラー・キーボード：準備OKの前は 左右でキャラ・上下で車体・決定で準備OK
+  menu.custom=devs=>{if(!meP)return false;for(const id in devs){if(id==='touch'||id==='any')continue;const pr=devs[id].pressed;
+      if(!meP.ok){if(pr.left||pr.right){NET.me.char=((meP.char||0)+(pr.left?-1:1)+CHARS.length)%CHARS.length;sfx('ui');upd({char:NET.me.char});return true;}
+        if(pr.up||pr.down){NET.me.frame=((meP.frame||0)+(pr.up?-1:1)+FRAMES.length)%FRAMES.length;sfx('ui');upd({frame:NET.me.frame});return true;}
+        if(pr.confirm){sfx('ok');upd({ok:true});return true;}if(pr.back){sfx('back');netLeave('');return true;}}
+      else{const fe=menu.items[menu.focus];if(fe&&fe.dataset.lksel!=null&&(pr.left||pr.right)){LK.navSide(fe,pr.left?-1:1);return true;}
+        if(pr.back&&!(fe&&fe.dataset.lksel!=null)){sfx('back');upd({ok:false});return true;}}}return false;};
   ui.querySelector('[data-a=copy]').onclick=()=>{const done=()=>{const e=ui.querySelector('#cpmsg');if(e)e.textContent='コピーしました';};try{navigator.clipboard.writeText(url).then(done,()=>prompt('このリンクを送ってください',url));}catch(e){prompt('このリンクを送ってください',url);}};
-  const go=ui.querySelector('[data-a=go]');if(go)go.onclick=()=>{if(allOk)netStartRace(0);};
-  ui.querySelector('[data-a=leave]').onclick=()=>netLeave('');}
+  ui.querySelector('[data-back]').onclick=()=>netLeave('');}
 
 // --- host starts a race ---
 function netStartRace(gpi){const m=NET.meta,db=NET.db;const cup=m.mode>0?CUPS[m.mode-1]:null;gpi=gpi||0;if(cup&&gpi===0)db.update(roomPath('m'),{gpts:null,gpn:null});const gpts=cup&&gpi>0?(m.gpts||{}):{};const ps=Object.entries(NET.players).sort((a,b)=>(a[1].t||0)-(b[1].t||0)).slice(0,4);
