@@ -280,6 +280,14 @@ function drawPeers(world, cam) {
     drawHuman(world, MODELS['pl' + p.slot], p, x, y, z);
   }
 }
+// 自分の姿（うしろから／前から見るとき）
+const _self = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, walk: 0, walkAmp: 0, swingT: 0, sneaking: false, sleeping: false, held: 0, hurtT: 0, eating: false };
+function drawSelf(world, cam) {
+  const p = player, s = _self, h = p.held();
+  s.x = p.x; s.y = p.y; s.z = p.z; s.yaw = p.yaw; s.pitch = p.pitch; s.walk = p.bob * 1.9; s.walkAmp = p.bobAmp; s.swingT = p.swingT; s.sneaking = p.sneaking; s.sleeping = game.inBed;
+  s.held = h ? h.id : 0; s.hurtT = p.hurtT > 0 ? 1 : 0; s.eating = p.eating > 0;
+  drawHuman(world, MODELS.pl0, s, p.x - cam.x, p.y - cam.y, p.z - cam.z);
+}
 // 人の形を描く。p: {x,y,z,yaw,pitch,walk,walkAmp,swingT,sneaking,sleeping,held,hurtT,eating}
 function drawHuman(world, model, p, x, y, z) {
   const sc = 0.9 / 16;

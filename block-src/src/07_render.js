@@ -549,8 +549,10 @@ function addParticle(kind, x, y, z, vx, vy, vz, life, size, grav, layer, u, v, r
   PT.layer[i] = layer; PT.u[i] = u; PT.v[i] = v; PT.r[i] = r; PT.g[i] = g; PT.b[i] = b;
 }
 // kind 0: ブロックのかけら（絵つき） 1: 単色 2: 光る
+function fxAmount(n) { const k = settings.particles === 2 ? 1 : settings.particles === 1 ? 0.6 : 0.3; return k === 1 ? n : Math.max(1, Math.round(n * k)); }
 function fxBlockBits(x, y, z, id, n, spread) {
   const bl = BLOCKS[id]; if (!bl || !bl.tl) return;
+  n = fxAmount(n);
   for (let i = 0; i < n; i++) {
     const layer = id === 2 ? (Math.random() < 0.4 ? TEX.grass_top_0 : TEX.dirt) : bl.tl[(Math.random() * 6) | 0];
     addParticle(0, x + (Math.random() - 0.5) * spread, y + (Math.random() - 0.5) * spread, z + (Math.random() - 0.5) * spread,
@@ -560,6 +562,7 @@ function fxBlockBits(x, y, z, id, n, spread) {
 }
 function fxPuff(x, y, z, n, r, g, b, opts) {
   const o = opts || {};
+  n = fxAmount(n);
   for (let i = 0; i < n; i++) addParticle(o.glow ? 2 : 1, x + (Math.random() - 0.5) * (o.spread || 0.4), y + (Math.random() - 0.5) * (o.spread || 0.4), z + (Math.random() - 0.5) * (o.spread || 0.4),
     (Math.random() - 0.5) * (o.speed || 1), (o.up || 0.6) + Math.random() * (o.speed || 1) * 0.5, (Math.random() - 0.5) * (o.speed || 1), (o.life || 0.8) * (0.6 + Math.random() * 0.8), o.size || 0.09, o.grav === undefined ? -1 : o.grav, 0, 0, 0,
     r * (0.85 + Math.random() * 0.3), g * (0.85 + Math.random() * 0.3), b * (0.85 + Math.random() * 0.3));

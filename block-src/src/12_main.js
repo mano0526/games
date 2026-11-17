@@ -88,7 +88,7 @@ const storage = {
 const RULES = [{ k: 'keep', name: '力尽きても持ち物を落とさない' }, { k: 'mobs', name: '敵が出る' }, { k: 'day', name: 'ずっと昼' }, { k: 'grief', name: 'ボスがブロックをこわす' }, { k: 'pvp', name: '友だちへの攻撃' }];
 const game = {
   state: 'boot', world: null, isDemo: false, worldId: null, name: '', diff: 2, ach: {}, ended: false, boss: null,
-  rules: { keep: false, mobs: true, day: false, grief: true, pvp: false }, online: false, inBed: false, sessionT: 0, bossLost: 0,
+  rules: { keep: false, mobs: true, day: false, grief: true, pvp: false }, online: false, inBed: false, sessionT: 0, bossLost: 0, dynScale: 1, dynDist: 99,
   defaultRules(diff) { return { keep: diff < 2, mobs: true, day: false, grief: true, pvp: false }; },
   // ルールやむずかしさを変える。みんなの世界では全員に伝える
   setRule(k, v) {
@@ -416,13 +416,27 @@ const game = {
   },
   loop(now) {
     requestAnimationFrame((t) => this.loop(t));
+    if (settings.fpsCap && now - this.last < 1000 / settings.fpsCap - 3) return;   // コマ数の上限
     let dt = (now - this.last) / 1000; this.last = now;
     if (!(dt > 0)) dt = 0.016;
-    this.frames++; this.fpsT += Math.min(dt, 2); if (dt > 0.1) dt = 0.1;
+    this.frames++; this.fpsT += Math.min(dt, 2);
+    // 重いときは自動で軽くする：2秒ごとに様子を見て、画質→見える距離の順に下げる。軽くなったら少しずつもどす
+    if (settings.autoQ && this.state === 'playing') {
+      this.aqT = (this.aqT || 0) + Math.min(dt, 2); this.aqN = (this.aqN || 0) + 1;
+      if (this.aqT >= 2) {
+        const fps = this.aqN / this.aqT, lo = settings.fpsCap === 30 ? 20 : 24, hi = settings.fpsCap ? settings.fpsCap * 0.93 : 50; this.aqT = 0; this.aqN = 0;
+        const sc = Math.min(this.dynScale, settings.quality), vd0 = Math.min(this.dynDist, settings.viewDist);
+        if (fps < lo) { this.aqGood = 0; if (sc > 0.55) this.dynScale = Math.max(0.5, sc - 0.1); else if (vd0 > 4) this.dynDist = vd0 - 1; }
+        else if (fps > hi) { if ((this.aqGood = (this.aqGood || 0) + 1) >= 4) { this.aqGood = 0; if (this.dynDist < settings.viewDist) this.dynDist = vd0 + 1; else if (this.dynScale < settings.quality) this.dynScale = Math.min(settings.quality, sc + 0.1); } }
+        else this.aqGood = 0;
+        R.scale = Math.min(settings.quality, this.dynScale);
+      }
+    }
+    if (dt > 0.1) dt = 0.1;
     if (this.fpsT >= 0.5) { this.fps = Math.round(this.frames / this.fpsT); this.frames = 0; this.fpsT = 0; }
     R.time += dt;
     const w = this.world; if (!w || R.lost) return;
-    const cam = this.cam, vd = settings.viewDist;
+    const cam = this.cam, vd = Math.min(settings.viewDist, this.dynDist);
     if (this.state === 'title') {
       this.titleAng += dt * 0.045; w.time = (w.time + dt * 30) % 24000; if (w.time > 10500) w.time = 500;
       const tp = this.titlePos, tvd = Math.min(vd, 6);
@@ -469,6 +483,7 @@ const game = {
     const alpha = sim ? this.acc / 0.05 : 1;
     drawEntities(w, cam, alpha);
     if (net.on) drawPeers(w, cam);
+    if (settings.view && !player.dead && this.state !== 'loading') drawSelf(w, cam);
     drawParticles(w, cam);
     const t = player.target;
     if (t && this.state === 'playing' && !ui.screen && !player.dead) {
@@ -477,7 +492,7 @@ const game = {
       addBoxLines(dynLine, x0, y0, z0, x1, y1, z1, 0, 0, 0, 0.55);
       if (player.brk && player.brk.p > 0) addLayerBox(dynCrack, x0, y0, z0, x1, y1, z1, TEX['crack_' + clamp(Math.floor(player.brk.p * 8), 0, 7)], 1, 1, 1, 1);
     }
-    player.drawHand(w);
+    if (settings.handShow && !settings.view) player.drawHand(w);
     renderFrame(w, cam, vd, player.headIn, !player.dead && !this.inBed);
     ui.updateHud(dt);
     if (net.on) updTags(cam);

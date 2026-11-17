@@ -1,18 +1,79 @@
 // ===== 10_ui.js : 画面表示（体力・持ち物・メニュー）と入力（キーボード・マウス・タッチ） =====
 const $ = (id) => document.getElementById(id);
-const settings = { viewDist: 8, fov: 75, sens: 12, bright: 3, sfx: 7, music: 5, quality: 1, clouds: true, fancyLeaves: true, bobbing: true, autoJump: false, showInfo: true, touchInit: false, look: [0, 0, 0, 1, 0] };
-function loadSettings() { try { const s = JSON.parse(localStorage.getItem('kk_settings') || 'null'); if (s) Object.assign(settings, s); } catch (e) { } settings.look = parseLook(settings.look); }
+// 設定（この端末のブラウザに保存する）。初期の値は SET_DEF、キーの初期の割り当ては KEY_DEF
+const KEY_DEF = { fwd: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 'Space', sneak: 'ShiftLeft', sprint: 'KeyF', inv: 'KeyE', drop: 'KeyQ', view: 'F5', map: 'KeyM', info: 'KeyB',
+  hot1: 'Digit1', hot2: 'Digit2', hot3: 'Digit3', hot4: 'Digit4', hot5: 'Digit5', hot6: 'Digit6', hot7: 'Digit7', hot8: 'Digit8', hot9: 'Digit9' };
+const KEY_ACTS = [['fwd', '前へ進む'], ['back', '後ろへ下がる'], ['left', '左へ'], ['right', '右へ'], ['jump', 'ジャンプ（2回で飛ぶ／おりる）'], ['sneak', 'しゃがむ（飛んでいるときは下がる）'], ['sprint', '走る'], ['inv', '持ち物をひらく'], ['drop', '持っている物を1つ捨てる'],
+  ['view', '視点を切りかえる'], ['map', '地図'], ['info', '座標の表示を切りかえる'], ['hot1', '持ち物らん 1'], ['hot2', '持ち物らん 2'], ['hot3', '持ち物らん 3'], ['hot4', '持ち物らん 4'], ['hot5', '持ち物らん 5'], ['hot6', '持ち物らん 6'], ['hot7', '持ち物らん 7'], ['hot8', '持ち物らん 8'], ['hot9', '持ち物らん 9']];
+const SET_DEF = { viewDist: 8, quality: 1, fov: 75, bright: 3, autoQ: false, fpsCap: 0, clouds: true, fancyLeaves: true, particles: 2, bobbing: true, handShow: true, hudScale: 1, showInfo: true, showFps: false, nameTags: true, view: 0,
+  sens: 12, touchSens: 12, invertY: false, autoJump: false, sprintTap: true, sneakToggle: false, swapMouse: false, touchSize: 1, holdMs: 330,
+  master: 10, sfx: 7, music: 5, touchInit: false, look: [0, 0, 0, 1, 0] };
+const settings = Object.assign({}, SET_DEF, { look: SET_DEF.look.slice(), keys: Object.assign({}, KEY_DEF) });
+function loadSettings() {
+  try { const s = JSON.parse(localStorage.getItem('kk_settings') || 'null'); if (s) { const k = s.keys; delete s.keys; Object.assign(settings, s); if (k && typeof k === 'object') for (const a in KEY_DEF) if (typeof k[a] === 'string') settings.keys[a] = k[a]; } } catch (e) { }
+  settings.look = parseLook(settings.look);
+}
 function saveSettings() { try { localStorage.setItem('kk_settings', JSON.stringify(settings)); } catch (e) { } }
 function applySettings() {
+  game.dynScale = 1; game.dynDist = 99;   // 「自動で軽くする」のやり直し
   R.scale = settings.quality; R.clouds = settings.clouds; R.minLight = 0.02 + settings.bright * 0.012;
   if (meshOpts.fancyLeaves !== settings.fancyLeaves) { meshOpts.fancyLeaves = settings.fancyLeaves; if (game.world) for (const c of game.world.chunks.values()) c.dirty = 0xFF; }
+  const st = document.documentElement.style; st.setProperty('--hud', settings.hudScale); st.setProperty('--tb', settings.touchSize);
+  const nt = $('ntags'); if (nt) nt.style.display = settings.nameTags ? '' : 'none';
   if (typeof audio !== 'undefined') audio.setVolumes();
 }
+// キーの名前（画面に出す用）
+function keyName(c) {
+  if (!c) return 'なし';
+  const fixed = { Space: 'スペース', ShiftLeft: '左Shift', ShiftRight: '右Shift', ControlLeft: '左Ctrl', ControlRight: '右Ctrl', AltLeft: '左Alt', AltRight: '右Alt', Tab: 'Tab', Enter: 'Enter', Backspace: 'Backspace', CapsLock: 'CapsLock', Escape: 'Esc',
+    ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Backslash: '\\', Backquote: '`', IntlRo: 'ろ', IntlYen: '¥' };
+  if (fixed[c]) return fixed[c];
+  if (c.startsWith('Key')) return c.slice(3);
+  if (c.startsWith('Digit')) return c.slice(5);
+  if (c.startsWith('Numpad')) return 'テンキー' + c.slice(6);
+  return c;
+}
+// 設定画面の中身。t: range（つまみ）・tog（オン／オフ）・sel（えらぶ）・act（ボタン）
+const SET_TABS = [
+  { id: 'video', name: '画面', items: [
+    { k: 'viewDist', t: 'range', name: '見える距離', min: 3, max: 12, step: 1, fmt: v => v + '', desc: '1つ上げると16ブロック遠くまで見えます。大きいほど重くなります' },
+    { k: 'quality', t: 'range', name: '画質（細かさ）', min: 0.5, max: 1, step: 0.1, fmt: v => Math.round(v * 100) + '%' },
+    { k: 'autoQ', t: 'tog', name: '重いときは自動で軽くする', desc: '動きがカクカクするとき、画質と見える距離を自動で下げます' },
+    { k: 'fpsCap', t: 'sel', name: '1秒のコマ数の上限', opts: [[0, '制限なし'], [60, '60'], [30, '30']], desc: '下げると、電池と熱にやさしくなります' },
+    { k: 'fov', t: 'range', name: '視野の広さ', min: 55, max: 100, step: 1, fmt: v => v + '' },
+    { k: 'bright', t: 'range', name: '明るさ', min: 0, max: 10, step: 1, fmt: v => v + '' },
+    { k: 'clouds', t: 'tog', name: '雲' },
+    { k: 'fancyLeaves', t: 'tog', name: '葉のすき間' },
+    { k: 'particles', t: 'sel', name: 'かけら・けむり', opts: [[0, '少なめ'], [1, 'ふつう'], [2, '多め']] },
+    { k: 'bobbing', t: 'tog', name: '歩くときのゆれ' },
+    { k: 'view', t: 'sel', name: '視点', opts: [[0, '自分の目'], [1, 'うしろから'], [2, '前から']] },
+    { k: 'handShow', t: 'tog', name: '手と持ち物を表示' },
+    { k: 'hudScale', t: 'range', name: '持ち物らんの大きさ', min: 0.8, max: 1.3, step: 0.1, fmt: v => Math.round(v * 100) + '%' },
+    { k: 'showInfo', t: 'tog', name: '座標・時刻の表示' },
+    { k: 'showFps', t: 'tog', name: 'コマ数の表示' },
+    { k: 'nameTags', t: 'tog', name: '友だちの名前の札' },
+    { t: 'act', name: '全画面の切りかえ', fn: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else { const p = document.documentElement.requestFullscreen(); if (p && p.catch) p.catch(() => ui.toast('この画面では全画面にできません')); } } catch (e) { ui.toast('この画面では全画面にできません'); } } }] },
+  { id: 'ctrl', name: '操作', items: [
+    { k: 'sens', t: 'range', name: '視点の速さ（マウス）', min: 2, max: 30, step: 1, fmt: v => v + '' },
+    { k: 'touchSens', t: 'range', name: '視点の速さ（タッチ）', min: 2, max: 30, step: 1, fmt: v => v + '' },
+    { k: 'invertY', t: 'tog', name: '上下を逆にする' },
+    { k: 'autoJump', t: 'tog', name: '段差で自動ジャンプ' },
+    { k: 'sprintTap', t: 'tog', name: '「前へ」を2回押すと走る' },
+    { k: 'sneakToggle', t: 'tog', name: '「しゃがむ」を押すたびに切りかえ', desc: 'オフのときは、押している間だけしゃがみます' },
+    { k: 'swapMouse', t: 'tog', name: 'マウスの左右を入れかえる', desc: 'オンにすると、右ボタンでこわす・左ボタンで置く になります' },
+    { k: 'touchSize', t: 'range', name: 'タッチボタンの大きさ', min: 0.8, max: 1.4, step: 0.1, fmt: v => Math.round(v * 100) + '%' },
+    { k: 'holdMs', t: 'range', name: '長押しでこわし始めるまで', min: 200, max: 600, step: 10, fmt: v => (v / 1000).toFixed(2) + '秒' }] },
+  { id: 'keys', name: 'キー', items: [] },
+  { id: 'audio', name: '音', items: [
+    { k: 'master', t: 'range', name: '全体の音量', min: 0, max: 10, step: 1, fmt: v => v + '' },
+    { k: 'sfx', t: 'range', name: '効果音', min: 0, max: 10, step: 1, fmt: v => v + '' },
+    { k: 'music', t: 'range', name: '音楽', min: 0, max: 10, step: 1, fmt: v => v + '' }] }
+];
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
 const keys = {};
 const touchSt = { stick: null, sx: 0, sy: 0, mag: 0, jump: false, sneak: false, brk: false, use: false, look: new Map(), rayHold: 0 };
-let pointerLocked = false, lastJumpTap = 0, lastWTap = 0, sprintLatch = false, mouseNdc = [0, 0], mouseL = false, mouseR = false;
+let pointerLocked = false, lastJumpTap = 0, lastWTap = 0, sprintLatch = false, sneakLatch = false, mouseNdc = [0, 0], mouseL = false, mouseR = false;
 
 const ui = {
   screen: null, slots: [], ent: null, entPos: null, craft: [], craftW: 2, recipe: null, recTab: 'ok', menu: null, menuStack: [],
@@ -28,7 +89,7 @@ const ui = {
     const hb = $('hotbar');
     for (let i = 0; i < 9; i++) { const el = this.mkSlotEl(); el.dataset.h = i; hb.appendChild(el); }
     hb.addEventListener('pointerdown', (e) => { const s = e.target.closest('.slot'); if (s) { player.sel = +s.dataset.h; sfx('click', 0.4); e.preventDefault(); } });
-    $('howText').innerHTML = HOWTO_HTML;
+    $('howText').innerHTML = howtoHtml();
     if (window.__blockOnline) { const h = $('homeLink'); h.hidden = false; try { if (window.NetDB && NetDB.hub) h.href = NetDB.hub.home(); } catch (e) { } }
     this.bindMenus(); this.bindScreen(); this.bindInput();
   },
@@ -67,9 +128,11 @@ const ui = {
     if (this.infoT <= 0) {
       this.infoT = 0.25;
       let t = '';
+      if ((settings.showInfo || settings.showFps) && game.world && !settings.showInfo) t = game.fps + ' コマ/秒';
       if (settings.showInfo && game.world) {
         const w = game.world, h = (w.time / 1000 + 6) % 24, hh = Math.floor(h), mm = Math.floor((h - hh) * 6) * 10;
         t = 'X ' + Math.floor(p.x) + '  Y ' + Math.floor(p.y) + '  Z ' + Math.floor(p.z) + '\n' + BIOME_NAMES[w.biomeAt(Math.floor(p.x), Math.floor(p.z))] + '  ' + w.day + '日目 ' + hh + ':' + (mm < 10 ? '0' : '') + mm;
+        if (settings.showFps && !game.debug) t += '\n' + game.fps + ' コマ/秒';
         if (game.debug) t += '\n' + game.fps + 'fps  区画' + R.stats.sections + '  生き物' + ents.length + '  チャンク' + w.chunks.size;
       }
       if (t !== this.lastInfo) { this.lastInfo = t; $('info').textContent = t; }
@@ -132,7 +195,8 @@ const ui = {
     const on = (id, fn) => $(id).addEventListener('click', (e) => { sfx('click'); fn(e); });
     on('bNew', () => { this.showMenu('mNew', true, true); this.updNotes(); });
     on('bLoad', () => game.openWorldList());
-    on('bHow', () => this.showMenu('mHow', true, true)); on('bHow2', () => this.showMenu('mHow', true, true));
+    const how = () => { $('howText').innerHTML = howtoHtml(); this.showMenu('mHow', true, true); };
+    on('bHow', how); on('bHow2', how);
     on('bSet', () => this.openSettings()); on('bSet2', () => this.openSettings());
     on('bStart', () => { if (this.segVal('segNet') === 1 && !net.getName()) { this.toast('先に、なまえを入れてください'); this.back(); this.openOnline(); $('inNick').focus(); return; } game.startNew($('inName').value, $('inSeed').value, this.segVal('segMode'), this.segVal('segDiff'), this.segVal('segNet') === 1, Object.assign({}, this._newRules)); });
     on('bOnline', () => this.openOnline());
@@ -156,17 +220,13 @@ const ui = {
     on('bImport', () => $('inFile').click());
     $('inFile').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) game.importFile(f); e.target.value = ''; });
     for (const b of document.querySelectorAll('[data-back]')) b.addEventListener('click', () => { sfx('click'); saveSettings(); this.back(); });
-    for (const id of ['segMode', 'segDiff', 'segQual', 'segNet']) $(id).addEventListener('click', (e) => {
+    for (const id of ['segMode', 'segDiff', 'segNet']) $(id).addEventListener('click', (e) => {
       const b = e.target.closest('.btn'); if (!b) return; sfx('click');
       for (const o of $(id).children) o.classList.toggle('on', o === b);
-      if (id === 'segQual') { settings.quality = +b.dataset.v; applySettings(); }
-      else { if (id === 'segDiff') { this._newRules.keep = +b.dataset.v < 2; this.paintRuleSeg('segRules', this._newRules, true); } this.updNotes(); }
+      if (id === 'segDiff') { this._newRules.keep = +b.dataset.v < 2; this.paintRuleSeg('segRules', this._newRules, true); }
+      this.updNotes();
     });
-    $('segTog').addEventListener('click', (e) => { const b = e.target.closest('.btn'); if (!b) return; sfx('click'); settings[b.dataset.k] = !settings[b.dataset.k]; b.classList.toggle('on', settings[b.dataset.k]); applySettings(); });
-    const rng = [['sDist', 'oDist', 'viewDist', v => v + ''], ['sFov', 'oFov', 'fov', v => v + ''], ['sSens', 'oSens', 'sens', v => v + ''], ['sBright', 'oBright', 'bright', v => v + ''], ['sSfx', 'oSfx', 'sfx', v => v + ''], ['sMusic', 'oMusic', 'music', v => v + '']];
-    for (const [sid, oid, key, fmt] of rng) $(sid).addEventListener('input', (e) => { settings[key] = +e.target.value; $(oid).textContent = fmt(settings[key]); applySettings(); });
-    this._rng = rng;
-    $('bFull').addEventListener('click', () => { sfx('click'); try { if (document.fullscreenElement) document.exitFullscreen(); else { const p = document.documentElement.requestFullscreen(); if (p && p.catch) p.catch(() => this.toast('この画面では全画面にできません')); } } catch (e) { this.toast('この画面では全画面にできません'); } });
+    this.bindSettings();
   },
   segVal(id) { const b = $(id).querySelector('.btn.on'); return b ? +b.dataset.v : 0; },
   setSeg(id, v) { for (const o of $(id).children) o.classList.toggle('on', +o.dataset.v === v); },
@@ -271,11 +331,57 @@ const ui = {
     $('modeNote').textContent = this.segVal('segMode') === 0 ? '材料を集め、道具をつくり、夜を生きのびます' : 'すべてのブロックを自由に使えて、空も飛べます';
     $('diffNote').textContent = ['敵が出ず、おなかも減りません', '敵が弱め。力尽きても持ち物を落としません', '敵がふつうの強さ。力尽きると持ち物を落とします', '敵が強く、数も多くなります'][this.segVal('segDiff')];
   },
-  openSettings() {
-    for (const [sid, oid, key, fmt] of this._rng) { $(sid).value = settings[key]; $(oid).textContent = fmt(settings[key]); }
-    for (const b of $('segQual').children) b.classList.toggle('on', +b.dataset.v === settings.quality);
-    for (const b of $('segTog').children) b.classList.toggle('on', !!settings[b.dataset.k]);
-    this.showMenu('mSettings', true, true);
+  // ---------- 設定（画面・操作・キー・音に分ける） ----------
+  bindSettings() {
+    const tabs = $('setTabs');
+    for (const t of SET_TABS) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm'; b.dataset.t = t.id; b.textContent = t.name; tabs.appendChild(b); }
+    tabs.addEventListener('click', (e) => { const b = e.target.closest('.btn'); if (!b) return; sfx('click'); this.setTab = b.dataset.t; this.keyWait = null; this.paintSettings(); });
+    const body = $('setBody');
+    body.addEventListener('input', (e) => { const el = e.target; if (el.type !== 'range') return; const it = this.setItem(el.dataset.k); settings[it.k] = +el.value; el.nextElementSibling.textContent = it.fmt(settings[it.k]); applySettings(); });
+    body.addEventListener('click', (e) => {
+      const b = e.target.closest('.btn'); if (!b) return; sfx('click');
+      if (b.dataset.key) { this.keyWait = this.keyWait === b.dataset.key ? null : b.dataset.key; this.paintSettings(); return; }
+      const it = this.setItem(b.dataset.k); if (!it) return;
+      if (it.t === 'tog') settings[it.k] = !settings[it.k];
+      else if (it.t === 'sel') settings[it.k] = +b.dataset.v;
+      else if (it.t === 'act') { it.fn(); return; }
+      applySettings(); saveSettings(); this.paintSettings();
+    });
+    $('bSetReset').addEventListener('click', () => {
+      sfx('click'); const tab = SET_TABS.find(t => t.id === this.setTab);
+      if (tab.id === 'keys') settings.keys = Object.assign({}, KEY_DEF); else for (const it of tab.items) if (it.k) settings[it.k] = SET_DEF[it.k];
+      this.keyWait = null; applySettings(); saveSettings(); this.paintSettings(); this.toast('「' + tab.name + '」を最初の設定にもどしました');
+    });
+  },
+  setItem(k) { for (const t of SET_TABS) for (const it of t.items) if ((it.k || it.name) === k) return it; return null; },
+  openSettings(tab) { this.setTab = tab || this.setTab || 'video'; this.keyWait = null; this.paintSettings(); this.showMenu('mSettings', true, true); },
+  paintSettings() {
+    const tab = SET_TABS.find(t => t.id === this.setTab) || SET_TABS[0], body = $('setBody');
+    for (const b of $('setTabs').children) b.classList.toggle('on', b.dataset.t === tab.id);
+    let h = '';
+    if (tab.id === 'keys') {
+      h += '<p class="dim">変えたい行のボタンを押してから、割り当てたいキーを押します（Esc でやめる）。ほかと同じキーを選ぶと、入れかわります。</p>';
+      for (const [a, name] of KEY_ACTS) h += '<div class="krow"><span>' + esc(name) + '</span><button class="btn sm' + (this.keyWait === a ? ' on' : '') + '" type="button" data-key="' + a + '">' + (this.keyWait === a ? 'キーを押してください…' : esc(keyName(settings.keys[a]))) + '</button></div>';
+      h += '<p class="dim">メニューは Esc、見回しは矢印キーでもできます（この2つは変えられません）。こわす・置くはマウスのボタンです（「操作」で左右を入れかえられます）。</p>';
+    } else for (const it of tab.items) {
+      const key = it.k || it.name;
+      if (it.t === 'range') h += '<label class="field"><span>' + esc(it.name) + '</span><input type="range" data-k="' + key + '" min="' + it.min + '" max="' + it.max + '" step="' + it.step + '" value="' + settings[it.k] + '"><output>' + esc(it.fmt(settings[it.k])) + '</output></label>';
+      else if (it.t === 'tog') h += '<div class="srow"><span>' + esc(it.name) + '</span><button class="btn sm tog' + (settings[it.k] ? ' on' : '') + '" type="button" data-k="' + key + '">' + (settings[it.k] ? 'オン' : 'オフ') + '</button></div>';
+      else if (it.t === 'sel') h += '<div class="srow"><span>' + esc(it.name) + '</span><div class="seg">' + it.opts.map(o => '<button class="btn sm' + (settings[it.k] === o[0] ? ' on' : '') + '" type="button" data-k="' + key + '" data-v="' + o[0] + '">' + esc(o[1]) + '</button>').join('') + '</div></div>';
+      else h += '<div class="srow"><span></span><button class="btn sm" type="button" data-k="' + key + '">' + esc(it.name) + '</button></div>';
+      if (it.desc) h += '<p class="dim sdesc">' + esc(it.desc) + '</p>';
+    }
+    body.innerHTML = h;
+  },
+  // キー設定：待っているときに押されたキーを割り当てる。同じキーを使っていた動作とは入れかえる
+  takeKey(code) {
+    const a = this.keyWait; this.keyWait = null;
+    if (code !== 'Escape') {
+      const old = settings.keys[a];
+      for (const b in settings.keys) if (b !== a && settings.keys[b] === code) settings.keys[b] = old;
+      settings.keys[a] = code; saveSettings(); sfx('click');
+    }
+    this.paintSettings();
   },
   openNotes() {
     const box = $('notes'); box.innerHTML = ''; let next = true, done = 0;
@@ -516,37 +622,43 @@ const ui = {
     const cv = $('gl'), app = $('app');
     app.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('keydown', (e) => {
+      if (this.keyWait) { e.preventDefault(); if (!e.repeat) this.takeKey(e.code); return; }
       if (e.target && e.target.tagName === 'INPUT') return;
-      const c = e.code;
-      if (game.state === 'playing' || game.state === 'paused') { if (c === 'Space' || c === 'Tab' || c === 'F3' || c.startsWith('Arrow') || c === 'Quote' || c === 'Slash') e.preventDefault(); }
+      const c = e.code, K = settings.keys;
+      if (game.state === 'playing' || game.state === 'paused') { if (c === 'Space' || c === 'Tab' || c === 'F3' || c === 'F5' || c.startsWith('Arrow') || c === 'Quote' || c === 'Slash' || Object.values(K).includes(c)) e.preventDefault(); }
       if (e.repeat) return;
       keys[c] = true;
       if (c === 'Escape') { if (this.screen) this.close(); else if (this.menu && this.menuStack.length) this.back(); else if (game.state === 'playing') game.pause(); else if (game.state === 'paused' && performance.now() - game.pausedAt > 350) game.resume(); return; }
       if (game.state !== 'playing') return;
-      if (c === 'KeyE') { this.toggleInv(); return; }
+      if (c === K.inv) { this.toggleInv(); return; }
       if (this.screen) return;
-      if (c.startsWith('Digit') && c !== 'Digit0') player.sel = +c.slice(5) - 1;
-      else if (c === 'KeyQ') { const s = player.held(); if (s && !player.dead) { this.dropStack({ id: s.id, n: 1, d: s.d }); if (player.mode === 0) { s.n--; if (s.n <= 0) player.inv[player.sel] = null; } player.invDirty = true; } }
-      else if (c === 'Space') { const now = performance.now(); if (now - lastJumpTap < 300) player.toggleFly(); lastJumpTap = now; }
-      else if (c === 'KeyW') { const now = performance.now(); if (now - lastWTap < 280) sprintLatch = true; lastWTap = now; }
-      else if (c === 'KeyB' || c === 'F3') { if (c === 'F3') game.debug = !game.debug; else { settings.showInfo = !settings.showInfo; saveSettings(); } this.infoT = 0; }
+      let hot = -1; for (let i = 1; i <= 9; i++) if (K['hot' + i] === c) hot = i - 1;
+      if (hot >= 0) player.sel = hot;
+      else if (c === K.drop) { const s = player.held(); if (s && !player.dead) { this.dropStack({ id: s.id, n: 1, d: s.d }); if (player.mode === 0) { s.n--; if (s.n <= 0) player.inv[player.sel] = null; } player.invDirty = true; } }
+      else if (c === K.jump) { const now = performance.now(); if (now - lastJumpTap < 300) player.toggleFly(); lastJumpTap = now; }
+      else if (c === K.fwd) { const now = performance.now(); if (settings.sprintTap && now - lastWTap < 280) sprintLatch = true; lastWTap = now; }
+      else if (c === K.sneak) { if (settings.sneakToggle) sneakLatch = !sneakLatch; }
+      else if (c === K.view) { settings.view = (settings.view + 1) % 3; saveSettings(); this.toast(['自分の目から見ます', 'うしろから見ます', '前から見ます'][settings.view], 2); }
+      else if (c === K.map) { if (this.toggleMap) this.toggleMap(); }
+      else if (c === K.info || c === 'F3') { if (c === 'F3') game.debug = !game.debug; else { settings.showInfo = !settings.showInfo; saveSettings(); } this.infoT = 0; }
     });
-    window.addEventListener('keyup', (e) => { keys[e.code] = false; if (e.code === 'KeyW') sprintLatch = false; });
+    window.addEventListener('keyup', (e) => { keys[e.code] = false; if (e.code === settings.keys.fwd) sprintLatch = false; });
     window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseL = mouseR = false; sprintLatch = false; });
     cv.addEventListener('mousedown', (e) => {
       if (game.state !== 'playing' || this.screen || touchSt.touchUsed && e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
       audio.unlock();
       if (!pointerLocked) requestLock(true);
-      if (e.button === 0) { mouseL = true; input.breakPressed = true; }
-      else if (e.button === 2) { mouseR = true; input.usePressed = true; }
-      else if (e.button === 1) { e.preventDefault(); const t = player.target; if (t && player.mode === 1 && ITEMS[t.id]) { player.inv[player.sel] = { id: t.id, n: 1, d: 0 }; player.invDirty = true; } }
+      const btn = settings.swapMouse ? (e.button === 0 ? 2 : e.button === 2 ? 0 : e.button) : e.button;
+      if (btn === 0) { mouseL = true; input.breakPressed = true; }
+      else if (btn === 2) { mouseR = true; input.usePressed = true; }
+      else if (btn === 1) { e.preventDefault(); const t = player.target; if (t && player.mode === 1 && ITEMS[t.id]) { player.inv[player.sel] = { id: t.id, n: 1, d: 0 }; player.invDirty = true; } }
     });
-    window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseL = false; else if (e.button === 2) mouseR = false; });
+    window.addEventListener('mouseup', (e) => { const btn = settings.swapMouse ? (e.button === 0 ? 2 : e.button === 2 ? 0 : e.button) : e.button; if (btn === 0) mouseL = false; else if (btn === 2) mouseR = false; });
     window.addEventListener('mousemove', (e) => {
       const r = cv.getBoundingClientRect();
       mouseNdc[0] = ((e.clientX - r.left) / r.width) * 2 - 1; mouseNdc[1] = 1 - ((e.clientY - r.top) / r.height) * 2;
       if (game.state !== 'playing' || this.screen || touchSt.lookActive) return;
-      if (pointerLocked || e.target === cv) { const k = settings.sens * 0.00021; input.lookDX += clamp(e.movementX || 0, -200, 200) * k; input.lookDY += clamp(e.movementY || 0, -200, 200) * k; }
+      if (pointerLocked || e.target === cv) { const k = settings.sens * 0.00021; input.lookDX += clamp(e.movementX || 0, -200, 200) * k; input.lookDY += clamp(e.movementY || 0, -200, 200) * k * (settings.invertY ? -1 : 1); }
     });
     cv.addEventListener('wheel', (e) => { e.preventDefault(); if (game.state !== 'playing' || this.screen) return; player.sel = (player.sel + (e.deltaY > 0 ? 1 : 8)) % 9; }, { passive: false });
     document.addEventListener('pointerlockchange', () => {
@@ -560,7 +672,7 @@ const ui = {
     document.addEventListener('pointerlockerror', () => { if (game.state === 'playing' && !touchSt.touchUsed) this.hint('マウスを固定できないときは、そのままマウスを動かすか、矢印キーで見回せます'); });
     // ---- タッチ ----
     const ndc = (t) => { const r = cv.getBoundingClientRect(); return [((t.clientX - r.left) / r.width) * 2 - 1, 1 - ((t.clientY - r.top) / r.height) * 2]; };
-    const markTouch = () => { if (!touchSt.touchUsed) { touchSt.touchUsed = true; app.classList.add('touch'); if (!settings.touchInit) { settings.touchInit = true; settings.viewDist = Math.min(settings.viewDist, 5); settings.quality = Math.min(settings.quality, 0.8); settings.autoJump = true; settings.fancyLeaves = false; applySettings(); saveSettings(); } } audio.unlock(); };
+    const markTouch = () => { if (!touchSt.touchUsed) { touchSt.touchUsed = true; app.classList.add('touch'); if (!settings.touchInit) { settings.touchInit = true; settings.viewDist = Math.min(settings.viewDist, 5); settings.quality = Math.min(settings.quality, 0.8); settings.autoJump = true; settings.fancyLeaves = false; settings.autoQ = true; applySettings(); saveSettings(); } } audio.unlock(); };
     window.addEventListener('touchstart', markTouch, { passive: true, capture: true });
     cv.addEventListener('touchstart', (e) => { e.preventDefault(); if (game.state !== 'playing') return; for (const t of e.changedTouches) touchSt.look.set(t.identifier, { x: t.clientX, y: t.clientY, x0: t.clientX, y0: t.clientY, t0: performance.now(), mode: 0, n: ndc(t) }); }, { passive: false });
     cv.addEventListener('touchmove', (e) => {
@@ -569,7 +681,7 @@ const ui = {
         const l = touchSt.look.get(t.identifier); if (!l) continue;
         const dx = t.clientX - l.x, dy = t.clientY - l.y; l.x = t.clientX; l.y = t.clientY; l.n = ndc(t);
         if (l.mode === 0 && Math.hypot(t.clientX - l.x0, t.clientY - l.y0) > 12) l.mode = 1;
-        if (l.mode === 1) { const k = settings.sens * 0.00055; input.lookDX += dx * k; input.lookDY += dy * k; }
+        if (l.mode === 1) { const k = settings.touchSens * 0.00055; input.lookDX += dx * k; input.lookDY += dy * k * (settings.invertY ? -1 : 1); }
         else if (l.mode === 2) input.rayNdc = l.n;
       }
     }, { passive: false });
@@ -578,13 +690,13 @@ const ui = {
       for (const t of e.changedTouches) {
         const l = touchSt.look.get(t.identifier); if (!l) continue;
         touchSt.look.delete(t.identifier);
-        if (l.mode === 0 && performance.now() - l.t0 < 320 && game.state === 'playing') { input.rayNdc = l.n; input.tapPending = true; touchSt.rayHold = 3; }
+        if (l.mode === 0 && performance.now() - l.t0 < Math.min(320, settings.holdMs - 10) && game.state === 'playing') { input.rayNdc = l.n; input.tapPending = true; touchSt.rayHold = 3; }
         else if (l.mode === 2) { input.rayNdc = null; }
       }
     };
     cv.addEventListener('touchend', endLook, { passive: false }); cv.addEventListener('touchcancel', endLook, { passive: false });
     const stick = $('stick'), base = $('stickBase'), knob = $('stickKnob');
-    const stickMove = (t) => { const s = touchSt.stick; let dx = t.clientX - s.x, dy = t.clientY - s.y; const d = Math.hypot(dx, dy), m = 52; if (d > m) { dx *= m / d; dy *= m / d; } touchSt.sx = dx / m; touchSt.sy = dy / m; touchSt.mag = Math.min(1, d / m); knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; };
+    const stickMove = (t) => { const s = touchSt.stick; let dx = t.clientX - s.x, dy = t.clientY - s.y; const d = Math.hypot(dx, dy), m = 52 * settings.touchSize; if (d > m) { dx *= m / d; dy *= m / d; } touchSt.sx = dx / m; touchSt.sy = dy / m; touchSt.mag = Math.min(1, d / m); knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; };
     stick.addEventListener('touchstart', (e) => { e.preventDefault(); if (touchSt.stick) return; const t = e.changedTouches[0], r = stick.getBoundingClientRect(); touchSt.stick = { id: t.identifier, x: t.clientX, y: t.clientY }; base.style.left = (t.clientX - r.left) + 'px'; base.style.top = (t.clientY - r.top) + 'px'; base.style.bottom = 'auto'; stickMove(t); }, { passive: false });
     stick.addEventListener('touchmove', (e) => { e.preventDefault(); for (const t of e.changedTouches) if (touchSt.stick && t.identifier === touchSt.stick.id) stickMove(t); }, { passive: false });
     const stickEnd = (e) => { e.preventDefault(); for (const t of e.changedTouches) if (touchSt.stick && t.identifier === touchSt.stick.id) { touchSt.stick = null; touchSt.sx = touchSt.sy = touchSt.mag = 0; knob.style.transform = ''; base.style.left = ''; base.style.top = ''; base.style.bottom = ''; } };
@@ -600,14 +712,15 @@ const ui = {
   },
   // 毎フレーム：キーやスティックの状態を動きに変える
   pollInput(dt) {
-    let f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+    const K = settings.keys;
+    let f = (keys[K.fwd] ? 1 : 0) - (keys[K.back] ? 1 : 0), s = (keys[K.right] ? 1 : 0) - (keys[K.left] ? 1 : 0);
     if (touchSt.stick) { f -= touchSt.sy; s += touchSt.sx; }
     input.fwd = clamp(f, -1, 1); input.strafe = clamp(s, -1, 1);
-    input.jump = !!keys.Space || touchSt.jump;
-    input.sneak = !!keys.ShiftLeft || !!keys.ShiftRight || touchSt.sneak;
-    input.sprint = !!keys.KeyF || sprintLatch || (touchSt.mag > 0.94 && touchSt.sy < -0.75);
+    input.jump = !!keys[K.jump] || touchSt.jump;
+    input.sneak = (settings.sneakToggle ? sneakLatch : !!keys[K.sneak] || (K.sneak === 'ShiftLeft' && !!keys.ShiftRight)) || touchSt.sneak;
+    input.sprint = !!keys[K.sprint] || sprintLatch || (touchSt.mag > 0.94 && touchSt.sy < -0.75);
     const ar = 2.0 * dt;
-    if (keys.ArrowLeft) input.lookDX -= ar; if (keys.ArrowRight) input.lookDX += ar; if (keys.ArrowUp) input.lookDY -= ar * 0.8; if (keys.ArrowDown) input.lookDY += ar * 0.8;
+    if (keys.ArrowLeft) input.lookDX -= ar; if (keys.ArrowRight) input.lookDX += ar; const iy = settings.invertY ? -1 : 1; if (keys.ArrowUp) input.lookDY -= ar * 0.8 * iy; if (keys.ArrowDown) input.lookDY += ar * 0.8 * iy;
     if (!pointerLocked && !touchSt.touchUsed && game.state === 'playing' && !this.screen && document.hasFocus()) {
       // マウスを固定できないとき：画面の端に寄せると回り続ける
       const ex = Math.abs(mouseNdc[0]) > 0.84 ? Math.sign(mouseNdc[0]) * (Math.abs(mouseNdc[0]) - 0.84) / 0.16 : 0, ey = Math.abs(mouseNdc[1]) > 0.8 ? Math.sign(mouseNdc[1]) * (Math.abs(mouseNdc[1]) - 0.8) / 0.2 : 0;
@@ -617,7 +730,7 @@ const ui = {
     if (touchSt.touchUsed) {
       const now = performance.now();
       touchSt.lookActive = touchSt.look.size > 0;
-      for (const l of touchSt.look.values()) { if (l.mode === 0 && now - l.t0 > 330) { l.mode = 2; input.breakPressed = true; input.rayNdc = l.n; } if (l.mode === 2) anyBreak = true; }
+      for (const l of touchSt.look.values()) { if (l.mode === 0 && now - l.t0 > settings.holdMs) { l.mode = 2; input.breakPressed = true; input.rayNdc = l.n; } if (l.mode === 2) anyBreak = true; }
       if (!anyBreak) { if (touchSt.rayHold > 0) { if (--touchSt.rayHold === 0) input.rayNdc = null; } else if (!input.tapPending) input.rayNdc = null; }
     }
     input.breakHeld = mouseL || touchSt.brk || anyBreak;
@@ -631,12 +744,15 @@ function requestLock(gesture) {
   try { cv.focus({ preventScroll: true }); const p = cv.requestPointerLock(); if (p && p.catch) p.catch(() => { if (gesture) ui._edgeOn = true; }); } catch (e) { if (gesture) ui._edgeOn = true; }
   if (gesture) setTimeout(() => { if (!pointerLocked && game.state === 'playing' && !ui.screen) { ui._edgeOn = true; ui.hint('マウスを動かすと見回せます（画面の端に寄せると回り続けます。矢印キーでも回せます）'); setTimeout(() => ui.hint(''), 7000); } }, 900);
 }
-const HOWTO_HTML = `
+function howtoHtml() {
+  const K = settings.keys, k = (a) => '<kbd>' + esc(keyName(K[a])) + '</kbd>';
+  return `
 <dt>パソコン</dt>
-<dd><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 歩く ／ <kbd>スペース</kbd> ジャンプ ／ <kbd>Shift</kbd> しゃがむ</dd>
-<dd><kbd>W</kbd> をすばやく2回、または <kbd>F</kbd> を押しながら進むと走れます</dd>
-<dd>マウスで見回す ／ 左ボタンを押しっぱなしでこわす・攻撃 ／ 右ボタンで置く・使う（食べ物は押しっぱなし）</dd>
-<dd><kbd>1</kbd>〜<kbd>9</kbd> かホイールで持ち物を選ぶ ／ <kbd>E</kbd> 持ち物 ／ <kbd>Q</kbd> 捨てる ／ <kbd>Esc</kbd> メニュー</dd>
+<dd>${k('fwd')} ${k('left')} ${k('back')} ${k('right')} 歩く ／ ${k('jump')} ジャンプ ／ ${k('sneak')} しゃがむ</dd>
+<dd>${settings.sprintTap ? k('fwd') + ' をすばやく2回、または ' : ''}${k('sprint')} を押しながら進むと走れます</dd>
+<dd>マウスで見回す ／ ${settings.swapMouse ? '右' : '左'}ボタンを押しっぱなしでこわす・攻撃 ／ ${settings.swapMouse ? '左' : '右'}ボタンで置く・使う（食べ物は押しっぱなし）</dd>
+<dd>${k('hot1')}〜${k('hot9')} かホイールで持ち物を選ぶ ／ ${k('inv')} 持ち物 ／ ${k('drop')} 捨てる ／ ${k('view')} 視点の切りかえ ／ <kbd>Esc</kbd> メニュー</dd>
+<dd>キーの割り当ては「設定」の「キー」で変えられます</dd>
 <dt>スマホ・タブレット</dt>
 <dd>左下のスティックで歩き、画面をなぞって見回します</dd>
 <dd>ブロックを長押しでこわす、軽くタップで置く・使う。右下のボタンでも同じことができます</dd>
@@ -648,4 +764,8 @@ const HOWTO_HTML = `
 <dt>クリエイティブ</dt>
 <dd>ジャンプをすばやく2回で空を飛べます（ジャンプで上がり、しゃがむで下がります）</dd>
 <dt>セーブについて</dt>
-<dd>20秒ごとと、メニューを開いたときに自動で保存されます。保存先はこの端末のブラウザの中です。大事な世界は「つづきから」の「書き出す」でファイルに残せます</dd>`;
+<dd>20秒ごとと、メニューを開いたときに自動で保存されます。保存先はこの端末のブラウザの中です。大事な世界は「つづきから」の「書き出す」でファイルに残せます</dd>
+<dt>みんなで遊ぶ</dt>
+<dd>「みんなの世界」は中継サーバーに保存され、コードを知っている友だちがいつでも入れます。メニューの「招待リンクをコピー」で友だちを呼べます</dd>
+<dd>全員がベッドに入ると朝になります。メニューを開いていても世界は止まりません</dd>`;
+}

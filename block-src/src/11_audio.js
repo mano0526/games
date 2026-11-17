@@ -22,7 +22,7 @@ const audio = {
       this.mus.restUntil = c.currentTime + 3;
     } catch (e) { this.ctx = null; }
   },
-  setVolumes() { if (!this.ctx) return; this.sfxG.gain.value = settings.sfx / 10 * 0.9; this.musG.gain.value = settings.music / 10 * 0.55; },
+  setVolumes() { if (!this.ctx) return; const m = settings.master / 10; this.sfxG.gain.value = settings.sfx / 10 * 0.9 * m; this.musG.gain.value = settings.music / 10 * 0.55 * m; },
   out(pan) {
     if (!pan || !this.ctx.createStereoPanner) return this.sfxG;
     const p = this.ctx.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); p.connect(this.sfxG); return p;
@@ -42,7 +42,7 @@ const audio = {
     o.connect(g); g.connect(dst); o.start(t); o.stop(t + dur + 0.02);
   },
   play(name, vol, pan) {
-    const c = this.ctx; if (!c || c.state !== 'running' || vol <= 0.01 || settings.sfx <= 0) return;
+    const c = this.ctx; if (!c || c.state !== 'running' || vol <= 0.01 || settings.sfx <= 0 || settings.master <= 0) return;
     const now = c.currentTime;
     if (this.last[name] && now - this.last[name] < 0.035) return;
     this.last[name] = now;
@@ -122,7 +122,7 @@ const audio = {
     lp.connect(g); g.connect(this.musG); g.connect(this.rev);
   },
   tickMusic(night) {
-    const c = this.ctx; if (!c || c.state !== 'running' || settings.music <= 0) return;
+    const c = this.ctx; if (!c || c.state !== 'running' || settings.music <= 0 || settings.master <= 0) return;
     const m = this.mus, now = c.currentTime;
     if (!m.piece) {
       if (now < m.restUntil) return;

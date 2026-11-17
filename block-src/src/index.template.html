@@ -10,7 +10,8 @@
   --accent: #f2b33d; --accent-lo: #a8701a; --good: #7fc04a; --bad: #e0523a;
   --font-display: "DotGothic16", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
   --font-body: "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", system-ui, sans-serif;
-  --s: min(40px, calc((100vw - 28px) / 9.3));
+  --hud: 1; --tb: 1;
+  --s: min(calc(40px * var(--hud)), calc((100vw - 28px) / 9.3));
   --gl: max(16px, env(safe-area-inset-left, 0px)); --gr: max(16px, env(safe-area-inset-right, 0px));
 }
 html, body { height: 100%; }
@@ -145,6 +146,15 @@ label.field output { text-align: right; font-family: var(--font-display); font-v
 #inCode { text-transform: uppercase; letter-spacing: .2em; font-family: var(--font-display); }
 #mOnline a { color: var(--accent); overflow-wrap: anywhere; }
 #homeLink { color: #fff; font-family: var(--font-display); font-size: 14px; text-shadow: 1px 1px 0 #000; text-align: center; }
+#setTabs { margin-bottom: 12px; } #setTabs .btn { min-height: 40px; font-size: 16px; }
+#setBody { gap: 8px; }
+#setBody label.field { grid-template-columns: minmax(6.5em, 11.5em) 1fr 3.6em; }
+.srow, .krow { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; min-height: 36px; }
+.srow .seg { justify-content: flex-end; } .srow .seg .btn { flex: 0 1 auto; }
+.btn.tog { min-width: 4.6em; } .btn.tog.on { background: #4a3a1a; }
+.krow .btn { min-width: 8.5em; }
+.krow .btn.on { background: var(--accent); color: #2b1c08; }
+.sdesc { margin: -6px 0 2px; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .seg .btn { flex: 1 1 auto; min-width: 0; padding-inline: 8px; }
 .wslot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; background: var(--slot); padding: 8px 10px; border: 2px solid var(--panel-lo); }
@@ -200,14 +210,14 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
 #touch { position: absolute; inset: 0; display: none; pointer-events: none; }
 #app.touch #touch { display: block; }
 #stick { position: absolute; left: 0; bottom: 0; width: 46%; height: 52%; pointer-events: auto; }
-#stickBase { position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px; border: 3px solid rgba(255,255,255,.35); background: rgba(0,0,0,.22); left: calc(var(--gl) + 66px); bottom: calc(var(--s) + 70px); top: auto; }
+#stickBase { position: absolute; width: calc(112px * var(--tb)); height: calc(112px * var(--tb)); margin: calc(-56px * var(--tb)) 0 0 calc(-56px * var(--tb)); border: 3px solid rgba(255,255,255,.35); background: rgba(0,0,0,.22); left: calc(var(--gl) + 66px); bottom: calc(var(--s) + 70px); top: auto; }
 #stickKnob { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; background: rgba(255,255,255,.5); border: 3px solid rgba(0,0,0,.4); box-sizing: border-box; }
-.tbtn { position: absolute; width: 62px; height: 62px; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 14px; color: #fff; text-shadow: 1px 1px 0 #000; background: rgba(0,0,0,.3); border: 3px solid rgba(255,255,255,.4); pointer-events: auto; box-sizing: border-box; }
+.tbtn { position: absolute; width: calc(62px * var(--tb)); height: calc(62px * var(--tb)); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: calc(14px * var(--tb)); color: #fff; text-shadow: 1px 1px 0 #000; background: rgba(0,0,0,.3); border: 3px solid rgba(255,255,255,.4); pointer-events: auto; box-sizing: border-box; }
 .tbtn.on { background: rgba(242,179,61,.55); border-color: #fff; }
 #tJump { right: var(--gr); bottom: calc(var(--s) + 34px); }
-#tBreak { right: calc(var(--gr) + 70px); bottom: calc(var(--s) + 34px); }
-#tUse { right: var(--gr); bottom: calc(var(--s) + 104px); }
-#tSneak { right: calc(var(--gr) + 70px); bottom: calc(var(--s) + 104px); width: 62px; height: 44px; font-size: 13px; }
+#tBreak { right: calc(var(--gr) + 70px * var(--tb)); bottom: calc(var(--s) + 34px); }
+#tUse { right: var(--gr); bottom: calc(var(--s) + 34px + 70px * var(--tb)); }
+#tSneak { right: calc(var(--gr) + 70px * var(--tb)); bottom: calc(var(--s) + 34px + 70px * var(--tb)); width: calc(62px * var(--tb)); height: calc(44px * var(--tb)); font-size: calc(13px * var(--tb)); }
 #tInv { right: var(--gr); top: 8px; height: 40px; width: 68px; }
 #tPause { right: calc(var(--gr) + 74px); top: 8px; height: 40px; width: 68px; }
 /* せまい画面・低い画面 */
@@ -374,23 +384,9 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
 
     <section id="mSettings" class="panel">
       <h2>設定</h2>
-      <div class="col">
-        <label class="field">見える距離<input type="range" id="sDist" min="3" max="12" step="1"><output id="oDist"></output></label>
-        <label class="field">視野の広さ<input type="range" id="sFov" min="55" max="100" step="1"><output id="oFov"></output></label>
-        <label class="field">視点の速さ<input type="range" id="sSens" min="2" max="30" step="1"><output id="oSens"></output></label>
-        <label class="field">明るさ<input type="range" id="sBright" min="0" max="10" step="1"><output id="oBright"></output></label>
-        <label class="field">効果音<input type="range" id="sSfx" min="0" max="10" step="1"><output id="oSfx"></output></label>
-        <label class="field">音楽<input type="range" id="sMusic" min="0" max="10" step="1"><output id="oMusic"></output></label>
-        <div><div>画質</div><div class="seg" id="segQual"><button class="btn" type="button" data-v="0.6">軽い</button><button class="btn" type="button" data-v="0.8">ふつう</button><button class="btn" type="button" data-v="1">きれい</button></div></div>
-        <div class="seg" id="segTog">
-          <button class="btn sm" type="button" data-k="clouds">雲</button>
-          <button class="btn sm" type="button" data-k="fancyLeaves">葉のすき間</button>
-          <button class="btn sm" type="button" data-k="bobbing">歩くときのゆれ</button>
-          <button class="btn sm" type="button" data-k="autoJump">段差で自動ジャンプ</button>
-          <button class="btn sm" type="button" data-k="showInfo">座標の表示</button>
-        </div>
-        <div class="rowf"><button class="btn pri" data-back type="button">とじる</button><button class="btn" id="bFull" type="button">全画面の切りかえ</button></div>
-      </div>
+      <div class="seg" id="setTabs"></div>
+      <div class="col" id="setBody"></div>
+      <div class="rowf" style="margin-top:12px"><button class="btn pri" data-back type="button">とじる</button><button class="btn sm" id="bSetReset" type="button">この画面を最初の設定にもどす</button></div>
     </section>
 
     <section id="mHow" class="panel">

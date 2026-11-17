@@ -447,6 +447,14 @@ class Player {
     if (game.shake > 0) { cam.x += (Math.random() - 0.5) * game.shake * 0.2; cam.y += (Math.random() - 0.5) * game.shake * 0.2; }
     cam.fov = settings.fov * (this.sprinting ? 1.08 : 1) * (this.flying && this.sprinting ? 1.05 : 1);
     if (this.dead) { cam.roll = 0.5; cam.y = this.y + 0.4; }
+    else if (settings.view) {   // うしろから／前から見る：かべにめりこまないよう、ぶつかる手前で止める
+      const back = settings.view === 1 ? 1 : -1, cp = Math.cos(this.pitch);
+      const dx = Math.sin(this.yaw) * cp * back, dy = -Math.sin(this.pitch) * back, dz = Math.cos(this.yaw) * cp * back;
+      let dist = 4; const hit = game.world.raycast(cam.x, cam.y, cam.z, dx, dy, dz, dist + 0.4);
+      if (hit && SOLID[hit.id]) dist = Math.max(0.2, hit.t - 0.4);
+      cam.x += dx * dist; cam.y += dy * dist; cam.z += dz * dist;
+      if (back < 0) { cam.yaw = this.yaw + Math.PI; cam.pitch = -this.pitch; }
+    }
     return cam;
   }
   drawHand(world) {
