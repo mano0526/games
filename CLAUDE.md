@@ -16,6 +16,8 @@
 | fall.html | ドロップ・バトル（ぷよテト風、2〜4人＋COM）。オンラインは自前（各自の端末で動かす方式） |
 | lobby.js | 共通：ゲーム前の設定画面（ワナワナ・ドロップ・ドッカン・カートの参加/キャラ/ルール画面）。`LK.html(o)`／`LK.bind`／`LK.navDev`／`LK.navSide` |
 | netplay.js | パーティ・キッチン用のオンライン部品（リモートプレイ方式）。カートとワナワナは使っていない |
+| block.html | block（マイクラ風の3D箱庭、1〜4人）。**ソースは block-src/**（下の「block」の章）。block.html は作った結果なので直接いじらない |
+| block-src/ | block のソース一式（src/*.js・index.template.html・build.py・test/）と作業メモ NOTES.md |
 | netdb.js | 共通部品：各自の端末で動かす方式のDB（`NetDB.open(game)`／`NetDB.mem()`）、全ゲーム共通の部屋一覧 `NetDB.lobby`（np/lobby/）、共通の名前 `NetDB.name` と音量 `NetDB.vol`。カート・ワナワナ・一覧ページ・netplay.js が使う |
 
 ## オンラインの仕組み
@@ -186,6 +188,24 @@
 - `MGS.key={name,modes:['ffa','2v2','1v1','1v3'],desc,ctl,create(mode,teams)}` → g に update(dt)/draw(c)/scores()/winners()/done。
 - 便利関数: mkActor/moveActor/separate/drawActor/drawFloor/dodgeDir/seek/mgIn/mgPickWin/aliveWin/drawMGTop（vals に null を入れると表示しない）。
 - テスト: `SETUP.fo.g=MG_ORDER.indexOf(key);SETUP.fo.m=modeIndex;startFree()` を全員COMで最後まで回し、scene.phase が result になるか・pageerror がないか確認。
+
+## block（マイクラ風、2026-11-18〜）
+- 題名は小文字の「block」（ユーザー指定）。もとは Claude の公開ページで作った「カクカク開拓記」。Claude のページ版（1人用だけ。外と通信できない決まりのため）は https://claude.ai/artifact/XdFvApVstmQQfyE8hYy9tm で、同じソースから作る。
+- **作り方**：`cd block-src && python3 build.py` → `dist/block.html`（この置き場用。Firebase の SDK と netdb.js を読みこむ）／`dist/kakukaku.html`（Claude のページ用）／`dist/test.html`・`dist/test_mp.html`（テスト用）。できた `dist/block.html` を置き場の直下の `block.html` にコピーして push。`dist/` は置き場に入れない。
+- ソースの並び（1つの関数の中に全部つなげる）：01_util・02_blocks・03_gen（ここまでは地形づくりの作業スレッドにも入る）→ 04_textures・05_world・06_mesher・07_render・08_entities・09_player・10_ui・11_audio・11b_net・11c_netent・12_main。テスト用に `window.__kk` に主な物を出してある。
+- **オンライン（「みんなの世界」＝いつでも入れる世界）**：ユーザーの希望で「部屋主がいなくても、コードを知っている友だちがいつでも入れる」方式。世界の正本を Firebase に置く。`np/block/w/{コード}/` の下：
+  - `meta`（文字列JSON：名前・種・モード・むずかしさ・ルール・gv0）、`time`（{t,d,at}＝基準。時刻は全員がサーバーの時計から計算する）、`gv/{区画}`（その区画を最初に作ったときの地形の版）
+  - `c/{dim}_{rx}_{rz}/c{36進}` ＝ 変えたマスだけ（値＝id | meta<<8。区画＝4×4チャンク＝64×64マス）。`e/…` ＝ チェスト・かまどの中身（欄ごと）。`a/…` ＝ だれも動かしていない動物。`al/{pid}` ＝ 動かしている動物の控え（急に切れたとき用）
+  - `pl/{pid}` 参加者、`st/{pid}` 位置と「自分が動かしている生き物・落とし物」（文字列JSON、毎秒10回まで）、`dm/{pid}` 個別の連絡（hit・dmg・pick・got・give・kill・pvp）
+  - 置いた変更は 0.1 秒ごとにまとめて update。**届いた変更は まわりへの通知なしであてはめる**（水が流れる・砂が落ちる・たいまつが外れる等の結果は「変えた人の端末」だけが計算して、それも変更として送る。こうしないと落とし物が人数分できてしまう）。
+  - ランダムな成長・かまど・動物の引き取りは「そのチャンクにいちばん近い人」の端末（`net.owns`）。生き物と落とし物は持ち主の端末が動かし、ほかの人には影（`e.remote`）。近い人へ持ち主を移す（`netGive`）。抜けた人の分は pid 最小の人が引き取る。
+  - 参加者の持ち物・実績は端末の localStorage `blk_pd_{コード}`。入ったことのある世界は `blk_worlds`。
+  - 4人まで。部屋一覧（np/lobby/block-{コード}）にも出す。招待リンクは `block.html?room=XXXX`（なまえが決まっていればそのまま入る）。
+- 地形の版（gv）：`GENS` に版ごとの作り手を全部残す。区画ごとに最初に作った版を覚える（1人用は meta.rgv、オンラインは gv/）。昔のセーブ（rgv なし）は全部 gv1。**地形づくりを変えるときは必ず新しい版として足す**（既存の世界の地形が変わってしまうため）。
+- スポーンは原作にならった（敵＝明かり0の場所に人から24〜128ブロック、128より遠いと消える／動物＝消えない。遠くなったら「しまう」）。
+- **テスト**：`cd block-src/dist && python3 -m http.server 8765 --bind 127.0.0.1` を動かしておき、`python3 block-src/test/mp3.py` など。`test_mp.html` は にせの Firebase（`test/fakefb.js`＋`fakefb_worker.js`、SharedWorker）につながるので、同じブラウザの中の複数ページで試せる（`test/mplib.py`。`?lag=150` で遅れをまねる。`R.skip=true` で絵を描かずに計算だけ進める）。**本物の Firebase では一度も試せていない**（この環境から外に出られない）。
+- ユーザーが決めたこと（2026-11-18）：友だちのところへ行くボタンとチャットは作らない。最初に出る場所は全員同じ。ボスは人数で強くしない。本家くらいの手ごたえ。名前と見た目は本家そのままにしない（今の敵と同じ方針）。
+- これから作るもの（ユーザー確定。順番も）：設定の作り直し（画面を分ける・キー設定）→ バイオームの作り直し（gv2）→ 地図（最初から持っている）→ ブロック大量追加（階段・半ブロック・柵・看板・明かりの種類・色の素材）→ ネザー・エンド相当とボス → 軽量化 → 動物を飼う・増やす＋作物 → 弓矢と盾＋敵の種類 → 経験値・エンチャント＋ポーション → 村と村人＋構造物 → ボート・トロッコ・馬＋滑空する羽 → 天気。くわしくは block-src/NOTES.md。
 
 ## 残っている課題・案（ユーザーの要望順）
 - カートの作り直しは実施済み（2026-11-15）。ユーザーの実機確認待ち。特にオンライン（Firebase 本番）は作業環境から外に通信できないため未確認。

@@ -1,0 +1,495 @@
+// ===== 04_textures.js : ドット絵の生成（ブロック・アイテム・画面用アイコン） =====
+const TEX = {};        // 名前 → 層の番号
+const TEX_DATA = [];   // 層 → 16x16 の RGBA
+function C(h) { return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)]; }
+function CP(list) { return list.map(C); }
+function shadeC(c, f) { return [clamp(Math.round(c[0] * f), 0, 255), clamp(Math.round(c[1] * f), 0, 255), clamp(Math.round(c[2] * f), 0, 255)]; }
+
+function painter(d, rng) {
+  const o = {
+    d, rng,
+    px(x, y, c, a) { x &= 15; y &= 15; const i = (y * 16 + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = a === undefined ? 255 : a; },
+    clr(x, y) { const i = ((y & 15) * 16 + (x & 15)) * 4; d[i + 3] = 0; },
+    get(x, y) { const i = ((y & 15) * 16 + (x & 15)) * 4; return [d[i], d[i + 1], d[i + 2], d[i + 3]]; },
+    rect(x0, y0, w, h, c, a) { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) o.px(x, y, c, a); },
+    speckle(pal, a) { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) o.px(x, y, pal[Math.floor(rng() * pal.length)], a); },
+    // なめらかな斑点模様（つなぎ目なし）
+    blot(pal, cell, a) {
+      const n = 16 / cell, g = [];
+      for (let i = 0; i < n * n; i++) g.push(rng());
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const gx = x / cell, gy = y / cell, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0;
+        const v = lerp(lerp(g[(y0 % n) * n + x0 % n], g[(y0 % n) * n + (x0 + 1) % n], fx), lerp(g[((y0 + 1) % n) * n + x0 % n], g[((y0 + 1) % n) * n + (x0 + 1) % n], fx), fy);
+        const t = clamp(v + (rng() - 0.5) * 0.25, 0, 0.999);
+        o.px(x, y, pal[Math.floor(t * pal.length)], a);
+      }
+    },
+    dash(n, len, c) { for (let i = 0; i < n; i++) { const x = Math.floor(rng() * 16), y = Math.floor(rng() * 16), l = 1 + Math.floor(rng() * len); for (let k = 0; k < l; k++) o.px(x + k, y, c); } },
+    dots(n, c, a) { for (let i = 0; i < n; i++) o.px(Math.floor(rng() * 16), Math.floor(rng() * 16), c, a); },
+    copy(name) { d.set(TEX_DATA[TEX[name]]); },
+    mul(f) { for (let i = 0; i < 1024; i += 4) { d[i] *= f; d[i + 1] *= f; d[i + 2] *= f; } }
+  };
+  return o;
+}
+function newTex(name, fn) {
+  const d = new Uint8ClampedArray(1024);
+  fn(painter(d, mulberry32(strSeed('t_' + name))));
+  TEX[name] = TEX_DATA.length; TEX_DATA.push(d);
+  return d;
+}
+// 文字で描いたドット絵を RGBA にする
+function sprite(rows, pal) {
+  const d = new Uint8ClampedArray(1024);
+  for (let y = 0; y < 16; y++) {
+    const row = (rows[y] || '').padEnd(16, '.');
+    for (let x = 0; x < 16; x++) {
+      const ch = row[x]; if (ch === '.' || ch === ' ') continue;
+      const c = pal[ch]; if (!c) continue;
+      const i = (y * 16 + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+    }
+  }
+  return d;
+}
+function P(obj) { const o = {}; for (const k in obj) o[k] = C(obj[k]); return o; }
+
+const GRASS_PALS = [
+  CP(['#6fb64a', '#64aa42', '#7bc254', '#5a9e3b']), CP(['#4f9a3e', '#458f37', '#5aa647', '#3d8431']),
+  CP(['#5f9f6a', '#559560', '#6aaa74', '#4c8a58']), CP(['#a3b24d', '#98a745', '#aebd58', '#8c9b3e'])
+];
+const WOOD_COL = {
+  oak: { m: '#b08a55', d: '#8f6d40', l: '#c09a63', bark: ['#6b4f2f', '#5c4327', '#7a5a37', '#4f3920'], leaf: ['#4f9a38', '#438a2f', '#5aa842', '#3b7b2a'], hole: '#2c5a22' },
+  birch: { m: '#d9c896', d: '#bfad7d', l: '#e6d7a8', bark: ['#e8e4d8', '#dcd8cc', '#f1eee4', '#e3dfd2'], leaf: ['#7fb24a', '#72a541', '#8cbe56', '#659638'], hole: '#4a7a2c' },
+  spruce: { m: '#7a5a38', d: '#5f4428', l: '#8a6843', bark: ['#4a3423', '#3d2a1b', '#57402c', '#33231a'], leaf: ['#3a6e4a', '#2f6040', '#457a55', '#28543a'], hole: '#1d3f2c' },
+  cherry: { m: '#e0a3a8', d: '#c98489', l: '#ecb7ba', bark: ['#4d2f33', '#402629', '#5c3a3e', '#35201f'], leaf: ['#f2a7c3', '#ec93b4', '#f7bdd2', '#e27fa6'], hole: '#b85f86' }
+};
+const WOOL_COL = { white: '#ececec', red: '#c9413a', yellow: '#f0cc3a', blue: '#3f66c9', green: '#5a8f3a', black: '#2e2e33', pink: '#f0a0bd' };
+const ORE_SPOTS = [[3, 3], [4, 3], [3, 4], [10, 2], [11, 2], [11, 3], [12, 3], [6, 7], [7, 7], [7, 8], [8, 8], [6, 8], [12, 9], [13, 9], [12, 10], [2, 11], [3, 11], [3, 12], [4, 12], [8, 12], [9, 12], [9, 13], [10, 13]];
+const ORE_HL = [[3, 3], [10, 2], [6, 7], [12, 9], [2, 11], [8, 12]];
+const ORE_SH = [[5, 4], [4, 5], [13, 4], [12, 4], [9, 9], [8, 9], [14, 10], [13, 11], [5, 13], [4, 13], [11, 14], [10, 14]];
+
+function buildTextures() {
+  const stonePal = CP(['#8b8d91', '#84868a', '#7c7e83', '#93959a', '#888a8e']);
+  const dirtPal = CP(['#8a5f3d', '#7d5535', '#946a45', '#6f4a2e', '#855a39']);
+  newTex('stone', p => { p.speckle(stonePal); p.dash(7, 3, C('#6e7075')); p.dash(4, 3, C('#9c9ea3')); });
+  newTex('dirt', p => { p.speckle(dirtPal); p.dots(6, C('#a37a52')); p.dots(5, C('#5e3f27')); });
+  GRASS_PALS.forEach((pal, i) => {
+    newTex('grass_top_' + i, p => { p.speckle(pal); p.dots(10, shadeC(pal[3], 0.86)); p.dots(5, shadeC(pal[2], 1.1)); });
+    newTex('grass_side_' + i, p => {
+      p.copy('dirt');
+      for (let x = 0; x < 16; x++) {
+        const dep = 2 + Math.floor(p.rng() * 3);
+        for (let y = 0; y < dep; y++) p.px(x, y, pal[Math.floor(p.rng() * pal.length)]);
+        p.px(x, dep, shadeC(pal[3], 0.72));
+      }
+    });
+    newTex('tallgrass_' + i, p => {
+      for (let x = 1; x < 16; x += 1 + Math.floor(p.rng() * 2)) {
+        const hgt = 5 + Math.floor(p.rng() * 9); let cx = x;
+        for (let k = 0; k < hgt; k++) {
+          if (k > 3 && p.rng() < 0.22) cx += p.rng() < 0.5 ? 1 : -1;
+          p.px(clamp(cx, 0, 15), 15 - k, k > hgt - 3 ? pal[2] : (x & 1 ? pal[1] : pal[3]));
+        }
+      }
+    });
+  });
+  newTex('grass_side_snow', p => {
+    p.copy('dirt');
+    for (let x = 0; x < 16; x++) { const dep = 3 + Math.floor(p.rng() * 3); for (let y = 0; y < dep; y++) p.px(x, y, y === dep - 1 ? C('#cfdde8') : C('#f4f8fb')); }
+  });
+  newTex('cobble', p => cobbleTex(p, CP(['#8f9195', '#7e8085', '#9c9ea2', '#74767b']), C('#55575c')));
+  newTex('mossy_cobble', p => {
+    cobbleTex(p, CP(['#8f9195', '#7e8085', '#9c9ea2', '#74767b']), C('#55575c'));
+    const g = CP(['#5d8a3a', '#4d7a30', '#6a9a44']);
+    for (let i = 0; i < 9; i++) { const x = Math.floor(p.rng() * 16), y = Math.floor(p.rng() * 16); for (let k = 0; k < 7; k++) p.px(x + Math.floor(p.rng() * 4) - 1, y + Math.floor(p.rng() * 3) - 1, g[Math.floor(p.rng() * 3)]); }
+  });
+  newTex('bedrock', p => p.blot(CP(['#2a2a2d', '#3b3b3f', '#55555a', '#343438', '#6a6a70', '#27272a']), 4));
+  newTex('sand', p => { p.speckle(CP(['#e3d6a1', '#dccf98', '#e9ddac', '#d8ca92'])); p.dots(6, C('#c9ba82')); });
+  newTex('gravel', p => { p.blot(CP(['#8e8a86', '#7a7672', '#a09c97', '#6b6763', '#8f7f72', '#99948e']), 2); p.dots(8, C('#5d5955')); });
+  newTex('clay', p => { p.speckle(CP(['#9aa3b0', '#929ba8', '#a3acb8', '#97a0ad'])); p.dash(3, 4, C('#8a93a0')); });
+  newTex('snow', p => { p.speckle(CP(['#f4f8fb', '#eaf1f6', '#ffffff', '#f0f5f9'])); p.dots(6, C('#dbe7ef')); });
+  newTex('ice', p => {
+    p.rect(0, 0, 16, 16, C('#a8d4f2'), 175);
+    for (let k = 0; k < 5; k++) { let x = Math.floor(p.rng() * 16), y = Math.floor(p.rng() * 16); for (let i = 0; i < 5; i++) { p.px(x, y, C('#dceffc'), 200); x++; if (p.rng() < 0.6) y--; } }
+    p.dots(8, C('#8fc0e6'), 185);
+  });
+  for (const k in WOOD_COL) {
+    const w = WOOD_COL[k], m = C(w.m), dk = C(w.d), lt = C(w.l);
+    newTex('planks_' + k, p => {
+      for (let b = 0; b < 4; b++) {
+        const tone = [1, 0.96, 1.03, 0.98][b];
+        for (let y = b * 4; y < b * 4 + 4; y++) for (let x = 0; x < 16; x++) p.px(x, y, shadeC(p.rng() < 0.2 ? lt : m, tone));
+        for (let x = 0; x < 16; x++) p.px(x, b * 4 + 3, dk);
+        const jx = (b * 5 + 3) % 16; for (let y = b * 4; y < b * 4 + 3; y++) p.px(jx, y, dk);
+        for (let i = 0; i < 2; i++) { const x = Math.floor(p.rng() * 13), y = b * 4 + Math.floor(p.rng() * 3); p.px(x, y, shadeC(m, 0.9)); p.px(x + 1, y, shadeC(m, 0.9)); }
+      }
+    });
+    const bark = CP(w.bark);
+    newTex('log_' + k, p => {
+      for (let x = 0; x < 16; x++) { let c = bark[Math.floor(p.rng() * 3)]; for (let y = 0; y < 16; y++) { if (p.rng() < 0.18) c = bark[Math.floor(p.rng() * 4)]; p.px(x, y, c); } }
+      if (k === 'birch') for (let i = 0; i < 9; i++) { const x = Math.floor(p.rng() * 16), y = Math.floor(p.rng() * 16), l = 2 + Math.floor(p.rng() * 3); for (let j = 0; j < l; j++) p.px(x + j, y, C('#3d3b36')); }
+      else for (let x = 1; x < 16; x += 3 + Math.floor(p.rng() * 2)) for (let y = 0; y < 16; y++) if (p.rng() < 0.8) p.px(x, y, bark[3]);
+      if (k === 'cherry') for (let i = 0; i < 6; i++) { const x = Math.floor(p.rng() * 14), y = Math.floor(p.rng() * 16); p.px(x, y, C('#7a5055')); p.px(x + 1, y, C('#7a5055')); }
+    });
+    newTex('log_' + k + '_top', p => {
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const dx = Math.abs(x - 7.5), dy = Math.abs(y - 7.5);
+        const r = Math.max(dx, dy) * 0.65 + Math.hypot(dx, dy) * 0.35;
+        if (Math.max(dx, dy) > 6.6) p.px(x, y, bark[(x + y) & 1 ? 0 : 1]);
+        else p.px(x, y, Math.floor(r + 0.3) % 2 ? lt : (r < 1.2 ? dk : m));
+      }
+    });
+    const lp = CP(w.leaf);
+    const leafFn = (fast) => p => {
+      p.blot(lp, 2);
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const hsh = hash2(x * 7 + (y >> 1), y * 5 + (x >> 1), 91 + k.length) / 4294967296;
+        if (hsh < 0.2) { if (fast) p.px(x, y, C(w.hole)); else p.clr(x, y); }
+        else if (hsh > 0.93) p.px(x, y, shadeC(lp[2], 1.12));
+      }
+      if (k === 'cherry') p.dots(7, C('#fde4ee'));
+    };
+    newTex('leaves_' + k, leafFn(false));
+    newTex('leaves_' + k + '_f', leafFn(true));
+    newTex('sapling_' + k, p => {
+      const s = sprite(['', '', '', '.....aa..bb.....', '....abba.abb....', '....abbbabba....', '.....abbbba.....', '..aa..abba..aa..', '.abba..tt..abba.', '.abbba.tt.abbba.', '..abbbattabbba..', '...aaa.tt.aaa...', '.......tt.......', '.......tt.......', '.......tt.......', '......tttt......'],
+        { a: lp[3], b: lp[2], t: bark[0] });
+      p.d.set(s);
+    });
+  }
+  const oreDef = { coal: ['#2b2b2e', '#4f4f56'], iron: ['#c9a383', '#ecd2ba'], gold: ['#f2c53d', '#fff0a0'], diamond: ['#5fe0d8', '#d2fffb'], glow: ['#ffb84a', '#fff6c8'] };
+  for (const k in oreDef) newTex('ore_' + k, p => {
+    p.copy('stone');
+    for (const [x, y] of ORE_SH) p.px(x, y, C('#62646a'));
+    for (const [x, y] of ORE_SPOTS) p.px(x, y, C(oreDef[k][0]));
+    for (const [x, y] of ORE_HL) p.px(x, y, C(oreDef[k][1]));
+  });
+  newTex('sandstone', p => {
+    p.speckle(CP(['#dccf98', '#d5c78f', '#e3d6a1']));
+    for (const y of [0]) for (let x = 0; x < 16; x++) p.px(x, y, C('#ece1b4'));
+    for (const y of [4, 9, 13]) for (let x = 0; x < 16; x++) if (p.rng() < 0.85) p.px(x, y, C('#c4b57d'));
+    for (let x = 0; x < 16; x++) p.px(x, 15, C('#b9aa73'));
+  });
+  newTex('sandstone_top', p => { p.speckle(CP(['#e3d6a1', '#dccf98', '#e6daa7'])); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#ece1b4')); p.px(0, i, C('#ece1b4')); p.px(i, 15, C('#c4b57d')); p.px(15, i, C('#c4b57d')); } });
+  newTex('glass', p => {
+    for (let i = 0; i < 16; i++) { p.px(i, 0, C('#dff3f8')); p.px(0, i, C('#dff3f8')); p.px(i, 15, C('#a9cdd8')); p.px(15, i, C('#a9cdd8')); }
+    for (const [x, y] of [[2, 5], [3, 4], [4, 3], [5, 2], [11, 13], [12, 12], [13, 11]]) p.px(x, y, C('#ffffff'), 230);
+  });
+  newTex('bricks', p => {
+    p.rect(0, 0, 16, 16, C('#c9c1b4'));
+    const bp = CP(['#a5503c', '#964634', '#b35b45', '#9e4a38']);
+    for (let r = 0; r < 4; r++) for (let x = 0; x < 16; x++) {
+      const off = r % 2 ? 4 : 0, bx = (x + off) % 8;
+      if (bx === 7) continue;
+      const tone = bp[((x + off) >> 3) + r & 3];
+      for (let y = r * 4; y < r * 4 + 3; y++) p.px(x, y, p.rng() < 0.15 ? shadeC(tone, 0.9) : tone);
+    }
+  });
+  const sbrick = (p, cracked) => {
+    const pal = CP(['#909296', '#888a8e', '#96989c']);
+    p.speckle(pal);
+    const bricks = [[0, 0, 8, 8], [8, 0, 8, 8], [4, 8, 8, 8], [12, 8, 8, 8]];
+    for (const [bx, by, bw, bh] of bricks) for (let i = 0; i < bw; i++) for (let j = 0; j < bh; j++) {
+      if (j === 0 || i === 0) p.px(bx + i, by + j, C('#a6a8ad'));
+      if (j === bh - 1 || i === bw - 1) p.px(bx + i, by + j, C('#5f6166'));
+    }
+    if (cracked) for (const [x, y] of [[2, 2], [3, 3], [3, 4], [4, 5], [5, 5], [11, 1], [11, 2], [12, 3], [13, 3], [13, 4], [7, 10], [8, 11], [8, 12], [9, 13], [10, 13], [1, 12], [2, 13], [14, 11], [15, 12]]) p.px(x, y, C('#4a4c50'));
+  };
+  newTex('stone_bricks', p => sbrick(p, false));
+  newTex('cracked_bricks', p => sbrick(p, true));
+  newTex('obsidian', p => { p.blot(CP(['#16112a', '#1d1730', '#241c3a', '#2d2447', '#1a1430']), 4); p.dots(6, C('#5b4a8a')); });
+  const metal = (name, m, l, s) => newTex(name, p => {
+    p.rect(0, 0, 16, 16, C(m));
+    for (let y = 2; y < 14; y += 3) for (let x = 2; x < 14; x++) p.px(x, y, shadeC(C(m), 0.94));
+    for (let i = 0; i < 16; i++) { p.px(i, 0, C(l)); p.px(0, i, C(l)); p.px(i, 15, C(s)); p.px(15, i, C(s)); }
+    for (let i = 1; i < 15; i++) { p.px(i, 1, shadeC(C(l), 0.95)); p.px(1, i, shadeC(C(l), 0.95)); p.px(i, 14, shadeC(C(s), 1.1)); p.px(14, i, shadeC(C(s), 1.1)); }
+    p.px(4, 4, C(l)); p.px(5, 4, C(l)); p.px(4, 5, C(l));
+  });
+  metal('iron_block', '#d8d8d8', '#f6f6f6', '#a2a2a2'); metal('gold_block', '#f6cf3e', '#fff3a0', '#c99a1e'); metal('diamond_block', '#6ee6de', '#d2fffb', '#35b3ab');
+  newTex('glow_block', p => { p.blot(CP(['#ffc23a', '#ffd45c', '#ffe9a0', '#fff6cf', '#ffd45c']), 4); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#e6a52e')); p.px(0, i, C('#e6a52e')); p.px(i, 15, C('#c98a22')); p.px(15, i, C('#c98a22')); } p.dash(4, 3, C('#e6a52e')); });
+  newTex('altar_top', p => {
+    p.copy('obsidian');
+    const g = C('#f6cf3e'), g2 = C('#c99a1e');
+    for (let i = 0; i < 16; i++) { p.px(i, 0, g2); p.px(0, i, g2); p.px(i, 15, g2); p.px(15, i, g2); }
+    for (let i = 0; i < 5; i++) { p.px(7 - i, 3 + i, g); p.px(8 + i, 3 + i, g); p.px(3 + i, 8 + i, g); p.px(12 - i, 8 + i, g); }
+    p.rect(7, 7, 2, 2, C('#6ee6de')); p.px(7, 7, C('#d2fffb'));
+    for (const [x, y] of [[2, 2], [13, 2], [2, 13], [13, 13]]) p.px(x, y, C('#8f6fe0'));
+  });
+  newTex('altar_side', p => {
+    p.copy('obsidian');
+    for (let x = 0; x < 16; x++) { p.px(x, 2, C('#f6cf3e')); p.px(x, 3, C('#c99a1e')); p.px(x, 14, C('#c99a1e')); }
+    for (const [x, y] of [[3, 7], [3, 8], [3, 9], [4, 8], [7, 6], [8, 6], [7, 7], [8, 8], [7, 9], [8, 9], [12, 7], [11, 8], [12, 8], [13, 8], [12, 9], [12, 10]]) p.px(x, y, C('#8f6fe0'));
+  });
+  for (const k in WOOL_COL) newTex('wool_' + k, p => {
+    const c = C(WOOL_COL[k]);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const w = ((x + (y >> 1) * 2) % 4 === 0) ? 0.9 : ((x + y) % 5 === 0 ? 1.06 : 1);
+      p.px(x, y, shadeC(c, w * (0.97 + p.rng() * 0.06)));
+    }
+  });
+  // 作業台・かまど・チェスト
+  newTex('table_top', p => {
+    p.copy('planks_oak'); const dk = C('#6b4a25');
+    for (let i = 0; i < 16; i++) { p.px(i, 0, dk); p.px(0, i, dk); p.px(i, 15, dk); p.px(15, i, dk); }
+    for (let i = 2; i < 14; i++) { p.px(i, 5, dk); p.px(i, 10, dk); p.px(5, i, dk); p.px(10, i, dk); }
+    for (let i = 2; i < 14; i++) { p.px(i, 2, C('#c9a46b')); p.px(2, i, C('#c9a46b')); }
+  });
+  const tableSide = (p, alt) => {
+    p.copy('planks_oak'); const dk = C('#6b4a25'), ir = C('#c9c9c9'), ir2 = C('#8c8c8c'), hd = C('#8a6238');
+    for (let i = 0; i < 16; i++) { p.px(i, 0, dk); p.px(i, 1, C('#c9a46b')); p.px(0, i, dk); p.px(15, i, dk); p.px(i, 15, dk); }
+    if (!alt) {   // のこぎりと金づち
+      for (let i = 0; i < 6; i++) { p.px(3 + i, 5, ir); p.px(3 + i, 6, i % 2 ? ir2 : ir); } p.px(9, 5, hd); p.px(10, 5, hd); p.px(9, 6, hd); p.px(10, 6, hd);
+      p.rect(4, 9, 4, 2, ir2); p.px(5, 11, hd); p.px(6, 11, hd); p.px(5, 12, hd); p.px(6, 12, hd); p.px(5, 13, hd); p.px(6, 13, hd);
+      p.px(11, 9, hd); p.px(11, 10, hd); p.px(11, 11, hd); p.px(11, 12, hd); p.px(10, 9, ir); p.px(12, 9, ir);
+    } else {      // はさみとオノ
+      p.px(4, 4, ir); p.px(5, 5, ir); p.px(6, 6, ir); p.px(8, 4, ir); p.px(7, 5, ir); p.px(5, 7, hd); p.px(4, 8, hd); p.px(7, 7, hd); p.px(8, 8, hd);
+      p.rect(10, 9, 3, 3, ir); p.px(10, 9, ir2); p.px(11, 12, hd); p.px(11, 13, hd); p.px(11, 8, hd); p.px(11, 7, hd);
+      p.px(4, 11, hd); p.px(5, 11, hd); p.px(6, 11, hd); p.px(7, 11, hd); p.px(4, 12, ir2); p.px(7, 12, ir2);
+    }
+  };
+  newTex('table_side', p => tableSide(p, false));
+  newTex('table_front', p => tableSide(p, true));
+  newTex('furnace_top', p => { p.copy('stone'); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#a6a8ad')); p.px(0, i, C('#a6a8ad')); p.px(i, 15, C('#5f6166')); p.px(15, i, C('#5f6166')); } for (let i = 4; i < 12; i++) { p.px(i, 4, C('#6e7075')); p.px(i, 11, C('#6e7075')); p.px(4, i, C('#6e7075')); p.px(11, i, C('#6e7075')); } });
+  newTex('furnace_side', p => { cobbleTex(p, CP(['#8f9195', '#84868a', '#9a9ca0']), C('#606267')); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#a6a8ad')); p.px(i, 15, C('#55575c')); } });
+  const furnaceFront = (p, lit) => {
+    p.copy('furnace_side');
+    p.rect(3, 2, 10, 4, C('#55575c')); p.rect(4, 3, 8, 2, C('#2a2a2d')); for (let x = 5; x < 12; x += 2) p.px(x, 3, C('#55575c'));
+    p.rect(3, 8, 10, 7, C('#55575c')); p.rect(4, 9, 8, 5, C('#1b1b1d'));
+    if (lit) {
+      const f = CP(['#d9421f', '#ff8a2b', '#ffd23d', '#fff3a8']);
+      for (let x = 4; x < 12; x++) { const hgt = 2 + Math.floor(p.rng() * 3); for (let k = 0; k < hgt; k++) p.px(x, 13 - k, f[clamp(2 - k + Math.floor(p.rng() * 2), 0, 3)]); }
+    } else { for (let x = 4; x < 12; x++) if (p.rng() < 0.6) p.px(x, 13, C('#3a3a3d')); }
+  };
+  newTex('furnace_front', p => furnaceFront(p, false));
+  newTex('furnace_front_lit', p => furnaceFront(p, true));
+  const chest = (p, kind) => {
+    const m = C('#a8742f'), dk = C('#5b3d18'), lt = C('#c48d42');
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) p.px(x, y, p.rng() < 0.2 ? lt : m);
+    for (let i = 0; i < 16; i++) { p.px(i, 0, dk); p.px(0, i, dk); p.px(i, 15, dk); p.px(15, i, dk); }
+    if (kind !== 'top') { for (let x = 0; x < 16; x++) { p.px(x, 5, dk); p.px(x, 6, shadeC(m, 0.8)); } for (let y = 1; y < 15; y++) if (y !== 5) { p.px(5, y, shadeC(m, 0.88)); p.px(10, y, shadeC(m, 0.88)); } }
+    else { for (let i = 2; i < 14; i++) { p.px(i, 2, lt); p.px(2, i, lt); p.px(i, 13, shadeC(m, 0.8)); p.px(13, i, shadeC(m, 0.8)); } }
+    if (kind === 'front') { p.rect(6, 3, 4, 5, C('#3d3d40')); p.rect(7, 4, 2, 3, C('#d9d9d9')); p.px(7, 4, C('#ffffff')); }
+  };
+  newTex('chest_top', p => chest(p, 'top')); newTex('chest_side', p => chest(p, 'side')); newTex('chest_front', p => chest(p, 'front'));
+  newTex('torch', p => {
+    for (let y = 6; y < 16; y++) { p.px(7, y, C('#8a6238')); p.px(8, y, C('#6e4c29')); }
+    p.px(7, 2, C('#fff3a8')); p.px(8, 2, C('#fff3a8')); p.px(7, 3, C('#ffd84a')); p.px(8, 3, C('#ffe880'));
+    p.px(7, 4, C('#ffb02e')); p.px(8, 4, C('#ffc247')); p.px(7, 5, C('#f08a1a')); p.px(8, 5, C('#d9741a'));
+  });
+  newTex('cactus_side', p => {
+    const g = CP(['#4f9a4a', '#488f44', '#56a551']);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) p.px(x, y, (x % 4 === 1) ? C('#3a7a36') : g[Math.floor(p.rng() * 3)]);
+    for (let y = 1; y < 16; y += 3) for (let x = 1; x < 16; x += 4) p.px(x + ((y / 3) & 1 ? 2 : 0), y, C('#e8e6a0'));
+  });
+  newTex('cactus_top', p => { p.speckle(CP(['#5aa955', '#4f9a4a', '#63b45e'])); for (let i = 1; i < 15; i++) { p.px(i, 1, C('#3a7a36')); p.px(1, i, C('#3a7a36')); p.px(i, 14, C('#3a7a36')); p.px(14, i, C('#3a7a36')); } p.rect(7, 7, 2, 2, C('#7ac474')); });
+  const flower = (name, rows, pal) => { const d = sprite(rows, P(pal)); TEX[name] = TEX_DATA.length; TEX_DATA.push(d); };
+  flower('flower_red', ['', '', '', '......rr........', '.....rRRr.rr....', '.....rRyRrRRr...', '......rRRrRyR...', '.......rr.rRr...', '.......s...s....', '.......s..s.....', '....ll.s.s......', '...lLLlss.......', '....lLLs..ll....', '......ls.lLl....', '.......sll......', '.......s........'],
+    { r: '#b82e25', R: '#e2463a', y: '#ffd84a', s: '#3f8a35', l: '#3f8a35', L: '#5aa842' });
+  flower('flower_yellow', ['', '', '', '', '......yYy.......', '.....yYYYy......', '.....YYoYY......', '.....yYYYy......', '......yYy.......', '.......s........', '.......s........', '....ll.s........', '...lLLls..ll....', '....lLss.lLl....', '......sll.......', '.......s........'],
+    { y: '#e0b81e', Y: '#f8d93a', o: '#e0801e', s: '#3f8a35', l: '#3f8a35', L: '#5aa842' });
+  flower('flower_blue', ['', '', '.......b........', '......bBb.......', '......bBb..b....', '...b...s..bBb...', '..bBb..s..bBb...', '..bBb..s...s....', '...s...s..s.....', '...s..ss.s......', '....s.sss.......', '.....sss........', '...ll.s..ll.....', '..lLLls.lLLl....', '...lllsllll.....', '.......s........'],
+    { b: '#3a5fc4', B: '#6f9bf5', s: '#3f8a35', l: '#3f8a35', L: '#5aa842' });
+  flower('flower_white', ['', '', '', '', '.....w.w.w......', '......www.......', '.....wwyww......', '......www.......', '.....w.w.w......', '.......s........', '.......s........', '.......s..ll....', '...ll..s.lLl....', '..lLLl.sll......', '...lLLss........', '.......s........'],
+    { w: '#f6f6f2', y: '#f8d93a', s: '#3f8a35', l: '#3f8a35', L: '#5aa842' });
+  flower('deadbush', ['', '', '', '', '...b......b.....', '....b..b.b......', '.b...b.b.b...b..', '..b..b.bb...b...', '...b..bb...b....', '....b.bb..b.....', '.....bbb.b......', '......bbb.......', '.......bb.......', '.......b........', '.......b........', '.......b........'], { b: '#8a6a3a' });
+  flower('mushroom_brown', ['', '', '', '', '', '', '', '', '.....cccccc.....', '....cCCcCCCc....', '...cCCCCCCcCc...', '...cccccccccc...', '......ssss......', '......sSss......', '......sSss......', '.....ssssss.....'], { c: '#7a5236', C: '#a67650', s: '#d9ccb4', S: '#f1e8d6' });
+  flower('mushroom_red', ['', '', '', '', '', '', '', '.....rrrrrr.....', '....rRRwRRRr....', '...rRwRRRRwRr...', '...rRRRRwRRRr...', '...rrrrrrrrrr...', '......ssss......', '......sSss......', '......sSss......', '.....ssssss.....'], { r: '#a8261e', R: '#d63a2f', w: '#fbeeea', s: '#d9ccb4', S: '#f1e8d6' });
+  flower('crown', ['', '', '', '', '', '', '', '..g...gg...g....', '.gGg.gGGg.gGg...', '.gGg.gGGg.gGg...', '.gGGgGrGGgGGg...', '.gGGGGGGGGGGg...', '.gbGGGrrGGGbg...', '.gGGGGGGGGGGg...', '.ggggggggggggg..', '..dddddddddd....'], { g: '#c99a1e', G: '#f6cf3e', r: '#d63a2f', b: '#6ee6de', d: '#8c6a12' });
+  newTex('farmland_dry', p => { p.speckle(CP(['#6f4a2e', '#7d5535', '#644227'])); for (let y = 2; y < 16; y += 4) for (let x = 0; x < 16; x++) p.px(x, y, C('#553720')); p.dots(6, C('#946a45')); });
+  newTex('farmland_wet', p => { p.speckle(CP(['#4a2f1c', '#553722', '#412817'])); for (let y = 2; y < 16; y += 4) for (let x = 0; x < 16; x++) p.px(x, y, C('#33200f')); p.dots(6, C('#6a4a30')); });
+  for (let s = 0; s < 4; s++) newTex('wheat_' + s, p => {
+    const hgt = 4 + s * 3, g = s < 3 ? CP([['#4f9a38', '#5aa842'], ['#6aa83a', '#7fb845'], ['#9ab33e', '#b0c44c']][s]) : CP(['#c9a035', '#e0bb48']);
+    for (let x = 1; x < 16; x += 2) {
+      const hh = hgt - Math.floor(p.rng() * 2);
+      for (let k = 0; k < hh; k++) p.px(x + (k > 5 && p.rng() < 0.2 ? 1 : 0), 15 - k, g[k & 1]);
+      if (s === 3) { p.px(x, 15 - hh, C('#f0d060')); p.px(x, 14 - hh, C('#d9b13c')); p.px(x - 1, 15 - hh + 1, C('#b98f25')); p.px(x + 1, 15 - hh + 2, C('#b98f25')); }
+    }
+  });
+  // ベッド・ドア・はしご
+  newTex('bed_top_head', p => { p.rect(0, 0, 16, 16, C('#c9413a')); p.rect(0, 0, 16, 2, C('#8a6238')); p.rect(2, 3, 12, 6, C('#f2f2f0')); for (let x = 2; x < 14; x++) p.px(x, 8, C('#cfcfcc')); p.px(2, 3, C('#cfcfcc')); p.px(13, 3, C('#cfcfcc')); for (let x = 0; x < 16; x++) p.px(x, 10, C('#f2f2f0')); p.rect(0, 11, 16, 5, C('#c9413a')); for (let x = 0; x < 16; x++) if (x % 3 === 0) p.px(x, 13, C('#a8322c')); });
+  newTex('bed_top_foot', p => { p.rect(0, 0, 16, 16, C('#c9413a')); for (let y = 1; y < 16; y += 3) for (let x = 0; x < 16; x++) if ((x + y) % 3 === 0) p.px(x, y, C('#a8322c')); p.rect(0, 14, 16, 2, C('#8a6238')); for (let i = 0; i < 16; i++) { p.px(0, i, C('#b33830')); p.px(15, i, C('#b33830')); } });
+  newTex('bed_side', p => { p.rect(0, 7, 16, 3, C('#c9413a')); p.rect(0, 10, 16, 2, C('#e6e6e2')); p.rect(0, 12, 16, 4, C('#6e4c29')); p.rect(0, 12, 3, 4, C('#8a6238')); p.rect(13, 12, 3, 4, C('#8a6238')); p.rect(3, 13, 10, 3, C('#3d2a16')); for (let x = 0; x < 16; x++) p.px(x, 7, C('#de5a52')); });
+  const door = (p, top) => {
+    const m = C('#b08a55'), dk = C('#7a5a32'), lt = C('#c9a46b');
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) p.px(x, y, p.rng() < 0.15 ? lt : m);
+    for (let i = 0; i < 16; i++) { p.px(0, i, dk); p.px(15, i, dk); } for (let x = 0; x < 16; x++) p.px(x, top ? 0 : 15, dk);
+    if (top) { for (const x0 of [3, 9]) { p.rect(x0 - 1, 2, 6, 7, dk); for (let y = 3; y < 8; y++) for (let x = x0; x < x0 + 4; x++) p.clr(x, y); } p.rect(2, 11, 12, 1, dk); p.rect(2, 12, 12, 1, lt); }
+    else { p.rect(3, 3, 10, 9, dk); p.rect(4, 4, 8, 7, shadeC(m, 0.92)); p.rect(4, 4, 8, 1, lt); p.rect(12, 0, 2, 2, C('#e8c84a')); p.px(12, 0, C('#fff3a0')); }
+  };
+  newTex('door_top', p => door(p, true)); newTex('door_bottom', p => door(p, false));
+  newTex('ladder', p => { const a = C('#9a7040'), b2 = C('#6e4c29'); for (let y = 0; y < 16; y++) { p.px(2, y, a); p.px(3, y, b2); p.px(12, y, a); p.px(13, y, b2); } for (const y of [1, 5, 9, 13]) for (let x = 2; x < 14; x++) { p.px(x, y, a); p.px(x, y + 1, b2); } });
+  // 水・溶岩（動く）
+  for (let f = 0; f < 8; f++) newTex('water_' + f, p => {
+    const pal = CP(['#2f62cf', '#3b72e0', '#4a82ea', '#6a9cf5']);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const v = Math.sin((x + f * 2) * Math.PI / 8 + Math.sin(y * Math.PI / 4) * 1.2) + Math.sin((y - f * 2) * Math.PI / 8 + Math.cos(x * Math.PI / 8) * 1.1);
+      const i = v > 1.45 ? 3 : v > 0.5 ? 2 : v > -0.7 ? 1 : 0;
+      p.px(x, y, pal[i], i === 3 ? 205 : 172);
+    }
+  });
+  for (let f = 0; f < 4; f++) newTex('lava_' + f, p => {
+    const pal = CP(['#c93d12', '#e8591a', '#ff8a1c', '#ffb02e', '#ffd75a']);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const v = Math.sin((x + f * 4) * Math.PI / 8 + Math.sin(y * Math.PI / 8) * 2) + Math.sin((y - f * 4) * Math.PI / 8 + Math.sin(x * Math.PI / 8) * 2);
+      p.px(x, y, pal[clamp(Math.floor((v + 2) * 1.25), 0, 4)]);
+    }
+  });
+  // ひび割れ（8段階）
+  const crackSeq = []; { const r = mulberry32(4242); for (let l = 0; l < 7; l++) { let x = 7 + Math.floor(r() * 2), y = 7 + Math.floor(r() * 2); const ang = l * 0.9 + r(); for (let k = 0; k < 9; k++) { crackSeq.push([l, k, Math.round(x), Math.round(y)]); x += Math.cos(ang + (r() - 0.5) * 1.6); y += Math.sin(ang + (r() - 0.5) * 1.6); } } }
+  for (let s = 0; s < 8; s++) newTex('crack_' + s, p => { for (const [l, k, x, y] of crackSeq) if (k <= s + 1 && l <= s + 2 && x >= 0 && x < 16 && y >= 0 && y < 16) p.px(x, y, [20, 20, 22], 175); });
+  // 太陽と月
+  newTex('sun', p => { p.rect(2, 2, 12, 12, C('#ffe27a')); p.rect(3, 3, 10, 10, C('#fff1b0')); p.rect(5, 5, 6, 6, C('#fffbe0')); });
+  newTex('moon', p => { p.rect(3, 3, 10, 10, C('#e6ebf2')); p.rect(3, 3, 10, 1, C('#f6f8fb')); for (const [x, y] of [[5, 5], [6, 5], [5, 6], [10, 7], [10, 8], [11, 8], [7, 10], [6, 11], [7, 11]]) p.px(x, y, C('#c2c9d6')); p.rect(11, 4, 2, 9, C('#d3d9e3')); });
+
+  // ブロックの各面の層番号を決める（向きのあるブロックは正面が南側）
+  for (let id = 1; id < 256; id++) {
+    const b = BLOCKS[id]; if (!b || !b.tex) continue;
+    const t = b.tex, nm = (n) => { if (TEX[n] === undefined && TEX[n + '_0'] !== undefined) return TEX[n + '_0']; if (TEX[n] === undefined) throw new Error('絵がありません: ' + n); return TEX[n]; };
+    if (typeof t === 'string') b.tl = [nm(t), nm(t), nm(t), nm(t), nm(t), nm(t)];
+    else { const s = nm(t.side); b.tl = [s, s, nm(t.top), nm(t.bottom), t.front ? nm(t.front) : s, s]; }
+  }
+}
+function cobbleTex(p, pal, mortar) {
+  const pts = [];
+  for (let gy = 0; gy < 4; gy++) for (let gx = 0; gx < 4; gx++) pts.push([gx * 4 + 1 + p.rng() * 2.5 + (gy & 1) * 2, gy * 4 + 1 + p.rng() * 2.5, Math.floor(p.rng() * pal.length)]);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    let d1 = 99, d2 = 99, bi = 0;
+    for (let i = 0; i < pts.length; i++) {
+      let dx = Math.abs(x - pts[i][0]), dy = Math.abs(y - pts[i][1]);
+      if (dx > 8) dx = 16 - dx; if (dy > 8) dy = 16 - dy;
+      const dd = Math.hypot(dx, dy * 1.15);
+      if (dd < d1) { d2 = d1; d1 = dd; bi = i; } else if (dd < d2) d2 = dd;
+    }
+    if (d2 - d1 < 0.9) p.px(x, y, mortar);
+    else p.px(x, y, shadeC(pal[pts[bi][2]], 0.97 + p.rng() * 0.06));
+  }
+}
+
+// ---------------- アイテムのドット絵 ----------------
+const ICON = {};   // アイテム番号 → 16x16 RGBA（立方体ブロックは別あつかい）
+const TOOL_PAL = {
+  wood: { m: '#b08a55', l: '#c9a46b', d: '#7a5a32' }, stone: { m: '#8b8d91', l: '#aeb0b5', d: '#5f6166' },
+  iron: { m: '#d8d8d8', l: '#ffffff', d: '#8c8c8c' }, diamond: { m: '#5fe0d8', l: '#c8fbf6', d: '#2a9a93' }
+};
+const TOOL_ROWS = {
+  pick: ['', '....ddddddd.....', '...dmlllllmdd...', '...dmddddmlmmd..', '....d....hdmlmd.', '........hH.dlmd.', '.......hH..dlmd.', '......hH...dmmd.', '.....hH....dmd..', '....hH.....dd...', '...hH...........', '..hH............', '.hH.............', 'hH..............', 'H...............', ''],
+  axe: ['', '.........ddd....', '........dmmmd...', '.......dmllmmd..', '......dmlmmmmd..', '.....dmmmmmhmd..', '......dmmmhHd...', '.......ddhH.....', '........hH......', '.......hH.......', '......hH........', '.....hH.........', '....hH..........', '...hH...........', '..hH............', '..H.............'],
+  shovel: ['', '..........dddd..', '.........dmllmd.', '.........dmlmmd.', '.........dmmmmd.', '.........dmmmd..', '........hHddd...', '.......hH.......', '......hH........', '.....hH.........', '....hH..........', '...hH...........', '..hH............', '.hHh............', '.HH.............', ''],
+  sword: ['.............ddd', '............dlmd', '...........dlmd.', '..........dlmd..', '.........dlmd...', '........dlmd....', '..dd...dlmd.....', '..dmd.dlmd......', '...dmdlmd.......', '....dmmd........', '...hHdmd........', '..hH..dmd.......', '.hH....dd.......', 'hH..............', 'H...............', ''],
+  hoe: ['', '.......ddddd....', '......dmlllmd...', '......dmmddhmd..', '.......dd.hHd...', '.........hH.....', '........hH......', '.......hH.......', '......hH........', '.....hH.........', '....hH..........', '...hH...........', '..hH............', '.hH.............', 'hH..............', '']
+};
+const ARMOR_ROWS = [
+  ['', '', '', '....dddddddd....', '...dllllllmmd...', '..dllmmmmmmmsd..', '..dlmmmmmmmmsd..', '..dlmmddddmmsd..', '..dlmd....dmsd..', '..dmmd....dmsd..', '..dddd....dddd..', '', '', '', '', ''],
+  ['', '', '..ddd......ddd..', '..dlmd....dmsd..', '..dlmmddddmmsd..', '..dllmmmmmmmsd..', '...dlmmmmmmsd...', '...dlmmmmmmsd...', '...dlmmmmmmsd...', '...dlmmmmmmsd...', '...dmmmmmmmsd...', '...dmmmmmmssd...', '...dddddddddd...', '', '', ''],
+  ['', '', '...dddddddddd...', '...dllmmmmmmsd..', '...dlmmmmmmmsd..', '...dlmmddmmmsd..', '...dlmd..dmmsd..', '...dlmd..dmmsd..', '...dlmd..dmmsd..', '...dlmd..dmmsd..', '...dmmd..dmssd..', '...dmmd..dmssd..', '...dddd..ddddd..', '', '', ''],
+  ['', '', '', '', '', '...dddd..dddd...', '...dlmd..dlmd...', '...dlmd..dlmd...', '...dlmd..dlmd...', '..ddlmd.ddlmd...', '..dllmd.dllmd...', '..dmmsd.dmmsd...', '..ddddd.ddddd...', '', '', '']
+];
+const ARMOR_PAL = { iron: { l: '#f6f6f6', m: '#d0d0d0', s: '#a2a2a2', d: '#5f5f5f' }, diamond: { l: '#d2fffb', m: '#6ee6de', s: '#35b3ab', d: '#176e69' } };
+const R_LUMP = ['', '', '', '.....dddd.......', '....dmmmmdd.....', '...dmlmmmmmd....', '...dmmmmlmmd....', '..dmmmmmmmmmd...', '..dmmlmmmmmmd...', '..dmmmmmmlmmd...', '...dmmmmmmmd....', '...dmmmlmmd.....', '....dddmmd......', '.......dd.......', '', ''];
+const R_INGOT = ['', '', '', '', '......ddddddd...', '.....dllllllmd..', '....dllllllmmd..', '...dlllllllmdd..', '..dmmmmmmmmdsd..', '..dmmmmmmmmdsd..', '..dmmmmmmmmdd...', '..ddddddddd.....', '', '', '', ''];
+const R_GEM = ['', '', '', '.....dddddd.....', '....dllllmmd....', '...dlwllmmmmd...', '..dllllmmmmmsd..', '..dmmmmmmmmssd..', '...dmmmmmmssd...', '....dmmmmssd....', '.....dmmssd.....', '......dmsd......', '.......dd.......', '', '', ''];
+const R_PILE = ['', '', '', '', '', '', '.......l....l...', '......lml.......', '.....lmmml......', '....lmmmmml.....', '...dmmmlmmmd....', '..dmmlmmmmmmd...', '..dmmmmmmlmmd...', '...dddddddddd...', '', ''];
+const R_BALL = ['', '', '', '', '......dddd......', '.....dllmmd.....', '....dllmmmmd....', '....dlmmmmmd....', '....dmmmmmsd....', '....dmmmmssd....', '.....dmmssd.....', '......dddd......', '', '', '', ''];
+const R_MEAT = ['', '', '', '.....ddddd......', '...ddmmmmmdd....', '..dmmllmmmmmd...', '..dmllmmmmmmmd..', '..dmlmmmmmfmmd..', '..dmmmmmmffmmd..', '...dmmmmmfmmd...', '....ddmmmmmd....', '......ddddd.....', '', '', '', ''];
+const R_DRUM = ['', '', '.........ddd....', '........dmmmd...', '.......dmllmmd..', '......dmllmmmd..', '......dmlmmmmd..', '......dmmmmmd...', '.....dbdmmmd....', '....dbd.ddd.....', '...dbd..........', '..dbbd..........', '..dbdbd.........', '...d.d..........', '', ''];
+const R_APPLE = ['', '........t.......', '.......tgg......', '.......t.gg.....', '....ddd.ddd.....', '...dllmdmmmd....', '..dlwlmmmmmmd...', '..dllmmmmmmmd...', '..dlmmmmmmmsd...', '..dmmmmmmmmsd...', '..dmmmmmmmssd...', '...dmmmmmssd....', '....dmmsssd.....', '.....dd.dd......', '', ''];
+const R_BUCKET = ['', '', '....dddddddd....', '...dffffffffd...', '...dffffffffd...', '...dllmmmmmsd...', '...dllmmmmmsd...', '....dlmmmmsd....', '....dlmmmmsd....', '....dlmmmmsd....', '.....dmmmsd.....', '.....dmmmsd.....', '.....dddddd.....', '', '', ''];
+const R_BOWL = ['', '', '', '', '', '', '.dddddddddddddd.', '.dllllllllllllld', '..dmmmmmmmmmmd..', '..dmmmmmmmmmsd..', '...dmmmmmmssd...', '....dssssssd....', '.....dddddd.....', '', '', ''];
+
+function buildIcons() {
+  const S = (id, rows, pal) => { ICON[id] = sprite(rows, P(pal)); };
+  const HP = { h: '#9a7040', H: '#6e4c29' };
+  TOOL_MATS.forEach((m, mi) => TOOL_TYPES.forEach((t, ti) => S(300 + mi * 5 + ti, TOOL_ROWS[t.k], Object.assign({}, HP, TOOL_PAL[m.k]))));
+  ARMOR_MATS.forEach((m, mi) => ARMOR_ROWS.forEach((rows, pi) => S(320 + mi * 4 + pi, rows, ARMOR_PAL[m.k])));
+  const stick = []; for (let y = 0; y < 16; y++) { let r = ''; for (let x = 0; x < 16; x++) r += (x + y === 15 && x > 1 && x < 14) ? 'h' : (x + y === 16 && x > 2 && x < 15) ? 'H' : '.'; stick.push(r); }
+  S(I.stick, stick, HP);
+  S(I.coal, R_LUMP, { m: '#2e2e33', l: '#5a5a62', d: '#141416' });
+  S(I.charcoal, R_LUMP, { m: '#3d352d', l: '#6b5e50', d: '#1c1814' });
+  S(I.iron_ingot, R_INGOT, { l: '#f6f6f6', m: '#d0d0d0', s: '#a2a2a2', d: '#5f5f5f' });
+  S(I.gold_ingot, R_INGOT, { l: '#fff3a0', m: '#f6cf3e', s: '#c99a1e', d: '#7a5a0e' });
+  S(I.brick, R_INGOT, { l: '#c96b55', m: '#a5503c', s: '#84402f', d: '#52251a' });
+  S(I.diamond, R_GEM, { l: '#c8fbf6', m: '#5fe0d8', s: '#2fa59e', d: '#145e5a', w: '#ffffff' });
+  S(I.glow_dust, R_PILE, { m: '#ffd45c', l: '#fff6cf', d: '#c98a22' });
+  const dyeC = { red: ['#d63a2f', '#f0705f', '#8a1f18'], yellow: ['#f0cc3a', '#fff0a0', '#a8851a'], blue: ['#3f66c9', '#7f9df0', '#22408a'], green: ['#5a8f3a', '#8cc060', '#355a20'], black: ['#2e2e33', '#5a5a62', '#101012'], pink: ['#f0a0bd', '#fbd3e0', '#b8607f'] };
+  _dyes.forEach(([k], i) => S(286 + i, R_PILE, { m: dyeC[k][0], l: dyeC[k][1], d: dyeC[k][2] }));
+  S(I.clay_ball, R_BALL, { l: '#c0c8d2', m: '#9aa3b0', s: '#7a8390', d: '#4f5661' });
+  S(I.snowball, R_BALL, { l: '#ffffff', m: '#eaf1f6', s: '#c5d6e2', d: '#8fa6b8' });
+  S(I.wheat_seeds, ['', '', '', '', '', '....a....a......', '...aba..aba.....', '....a....a..a...', '.......a...aba..', '..a...aba...a...', '.aba...a........', '..a.......a.....', '.........aba....', '..........a.....', '', ''], { a: '#6f8f2f', b: '#b7cf6a' });
+  S(I.wheat, ['', '...........ab...', '..........aba...', '....ab...aba....', '...aba..aba.....', '..aba..aba...ab.', '..ab..aba...aba.', '...s.aba...aba..', '....sab...aba...', '.....s...aba....', '......s.sab.....', '.......ss.......', '......tttt......', '.....ss.ss......', '....s.....s.....', ''], { a: '#d9b13c', b: '#f6dc70', s: '#b98f25', t: '#8a6238' });
+  S(I.bread, ['', '', '', '', '....dddddddd....', '...dllllllllmd..', '..dllmlllmlllmd.', '..dlmllmllmllmd.', '..dmmmmmmmmmmmd.', '..dsmmmmmmmmmsd.', '...dssssssssd...', '....dddddddd....', '', '', '', ''], { l: '#e8bd72', m: '#c98f45', s: '#a56f30', d: '#6e4a1e' });
+  S(I.apple, R_APPLE, { l: '#f0705f', m: '#d63a2f', s: '#a82820', d: '#6e1712', w: '#ffffff', t: '#6e4c29', g: '#5aa842' });
+  S(I.golden_apple, R_APPLE, { l: '#fff3a0', m: '#f6cf3e', s: '#c99a1e', d: '#7a5a0e', w: '#ffffff', t: '#6e4c29', g: '#5aa842' });
+  S(I.raw_pork, R_MEAT, { m: '#f0959a', l: '#f7b8bb', f: '#fbe3e0', d: '#a8555c' });
+  S(I.cooked_pork, R_MEAT, { m: '#c98f55', l: '#dba86e', f: '#ecd4a8', d: '#7a4f26' });
+  S(I.raw_beef, R_MEAT, { m: '#c9403f', l: '#e06563', f: '#f5d6cf', d: '#7a1f22' });
+  S(I.steak, R_MEAT, { m: '#8a5230', l: '#a66a42', f: '#d9b58a', d: '#4f2c16' });
+  S(I.raw_mutton, R_MEAT, { m: '#d9605f', l: '#e98987', f: '#f7dfd8', d: '#8a3035' });
+  S(I.cooked_mutton, R_MEAT, { m: '#a6683c', l: '#bf8250', f: '#e2c296', d: '#5e3819' });
+  S(I.raw_chicken, R_DRUM, { m: '#f2b8a6', l: '#f9d5c8', d: '#b0705f', b: '#f2efe6' });
+  S(I.cooked_chicken, R_DRUM, { m: '#c98a45', l: '#e0aa66', d: '#7a4d20', b: '#f2efe6' });
+  S(I.feather, ['', '...........dd...', '.........ddlld..', '........dllllmd.', '.......dlllmmd..', '......dlllmmd...', '.....dllmmmd....', '....dllmmmd.....', '....dlmmdd......', '...dqmdd........', '..dq.d..........', '.dq.............', '.q..............', '', '', ''], { l: '#ffffff', m: '#d9dde3', d: '#9aa1ab', q: '#c9c0a8' });
+  S(I.bowl, R_BOWL, { m: '#8a6238', l: '#5e4124', s: '#6e4c29', d: '#3d2a16' });
+  const stew = R_BOWL.slice(); stew[7] = '.dllxllllxllllld'; stew[5] = '......w...w.....'; stew[4] = '.......w...w....';
+  S(I.mushroom_stew, stew, { m: '#8a6238', l: '#b5651d', s: '#6e4c29', d: '#3d2a16', x: '#d63a2f', w: '#e8e8e8' });
+  S(I.bucket, R_BUCKET, { l: '#f6f6f6', m: '#d0d0d0', s: '#a2a2a2', d: '#5f5f5f', f: '#6f6f72' });
+  S(I.water_bucket, R_BUCKET, { l: '#f6f6f6', m: '#d0d0d0', s: '#a2a2a2', d: '#5f5f5f', f: '#3f76e4' });
+  S(I.lava_bucket, R_BUCKET, { l: '#f6f6f6', m: '#d0d0d0', s: '#a2a2a2', d: '#5f5f5f', f: '#ff8a1c' });
+  S(I.shadow_shard, ['', '', '.......dd.......', '......dmmd......', '......dmld..d...', '.....dmmld.dmd..', '.....dmlmd.dld..', '....dmmlmmddmd..', '....dmllmmmdd...', '...dmmlmmmmd....', '...dmlmmmmd.....', '....dmmmmd......', '.....dmmd.......', '......dd........', '', ''], { m: '#3b2a6b', l: '#8f6fe0', d: '#150d2e' });
+  // 立方体でないブロックのアイコン
+  ICON.icon_bed = sprite(['', '', '', '', '', '.dd.............', '.dwwd...........', '.dwwwdrrrrrrrrd.', '.dwwwdrrRrrRrrd.', '.ddddddddddddddd', '.dmmmmmmmmmmmmmd', '.ddddddddddddddd', '.dm..........dm.', '.dm..........dm.', '', ''], P({ d: '#4a321a', w: '#f2f2f0', r: '#c9413a', R: '#e2685f', m: '#8a6238' }));
+  ICON.icon_door = sprite(['...dddddddddd...', '...dmmmmmmmmd...', '...dmddmmddmd...', '...dmdwmmdwmd...', '...dmdwmmdwmd...', '...dmddmmddmd...', '...dmmmmmmmmd...', '...dmmmmmmmyd...', '...dmmmmmmmmd...', '...dmddddddmd...', '...dmdllllldd...', '...dmdlllllmd...', '...dmdlllllmd...', '...dmddddddmd...', '...dmmmmmmmmd...', '...dddddddddd...'], P({ d: '#5b3d18', m: '#b08a55', l: '#c9a46b', w: '#9fd4e8', y: '#f6cf3e' }));
+  for (let id = 1; id < 256; id++) {
+    const b = BLOCKS[id]; if (!b || !ITEMS[id]) continue;
+    if (b.sprite) ICON[id] = ICON[b.sprite] || TEX_DATA[TEX[b.sprite]];
+  }
+}
+
+// ---------------- 画面用の画像（データURL） ----------------
+const ICON_URL = {};
+function dataToCanvas(d) {
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const ctx = c.getContext('2d'); const im = ctx.createImageData(16, 16); im.data.set(d); ctx.putImageData(im, 0, 0);
+  return c;
+}
+function shadedCanvas(d, f) { const e = new Uint8ClampedArray(d); for (let i = 0; i < 1024; i += 4) { e[i] *= f; e[i + 1] *= f; e[i + 2] *= f; } return dataToCanvas(e); }
+function buildIconUrls() {
+  for (const k in ITEMS) {
+    const id = +k, it = ITEMS[id];
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+    if (ICON[id]) ctx.drawImage(dataToCanvas(ICON[id]), 0, 0, 32, 32);
+    else if (it.block) {
+      const b = BLOCKS[id], tl = b.tl;
+      const hgt = b.shape === S_LAYER ? 2 : 16;
+      ctx.setTransform(14 / 16, 7 / 16, -14 / 16, 7 / 16, 16, 1 + (16 - hgt));
+      ctx.drawImage(dataToCanvas(TEX_DATA[tl[2]]), 0, 0);
+      ctx.setTransform(14 / 16, 7 / 16, 0, 1, 2, 8 + (16 - hgt));
+      ctx.drawImage(shadedCanvas(TEX_DATA[tl[4]], 0.8), 0, 16 - hgt, 16, hgt, 0, 0, 16, hgt);
+      ctx.setTransform(14 / 16, -7 / 16, 0, 1, 16, 15 + (16 - hgt));
+      ctx.drawImage(shadedCanvas(TEX_DATA[tl[0]], 0.6), 0, 16 - hgt, 16, hgt, 0, 0, 16, hgt);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    ICON_URL[id] = c.toDataURL();
+  }
+}
+// 体力などの小さなアイコン
+const HUD_URL = {};
+function buildHudIcons() {
+  const mk = (rows, pal) => {
+    const c = document.createElement('canvas'); c.width = c.height = 9; const ctx = c.getContext('2d');
+    for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) { const ch = (rows[y] || '')[x]; if (ch && pal[ch]) { ctx.fillStyle = pal[ch]; ctx.fillRect(x, y, 1, 1); } }
+    return c.toDataURL();
+  };
+  const heart = ['.dd...dd.', 'dwrd.dRRd', 'drrrdRRRd', 'drrrrRRRd', 'drrrrRRRd', '.drrrRRd.', '..drrRd..', '...drd...', '....d....'];
+  const heartR = ['.dd...dd.', 'dwrd.dRRd', 'drrrdRRRd', 'drrrRRRRd', 'drrrRRRRd', '.drrRRRd.', '..drRRd..', '...dRd...', '....d....'];
+  HUD_URL.heart = mk(heart, { d: '#2a0d0d', r: '#e0312f', R: '#e0312f', w: '#ffb3a8' });
+  HUD_URL.heart_half = mk(heartR, { d: '#2a0d0d', r: '#e0312f', R: '#4a2327', w: '#ffb3a8' });
+  HUD_URL.heart_empty = mk(heart, { d: '#2a0d0d', r: '#4a2327', R: '#4a2327', w: '#4a2327' });
+  const oni = ['....d....', '...dwd...', '..dwwWd..', '..dwwWd..', '.dwwwWWd.', '.dwwwWWd.', 'dwwnnNNWd', 'dwwnnNNWd', '.ddddddd.'];
+  HUD_URL.food = mk(oni, { d: '#2b2b2b', w: '#f6f6f0', W: '#f6f6f0', n: '#1f2a22', N: '#1f2a22' });
+  HUD_URL.food_half = mk(oni, { d: '#2b2b2b', w: '#f6f6f0', W: '#55554f', n: '#1f2a22', N: '#3a3a36' });
+  HUD_URL.food_empty = mk(oni, { d: '#2b2b2b', w: '#55554f', W: '#55554f', n: '#3a3a36', N: '#3a3a36' });
+  HUD_URL.bubble = mk(['..ddddd..', '.dwwbbbd.', 'dwwbbbbbd', 'dwbbbbbbd', 'dbbbbbbbd', 'dbbbbbbbd', 'dbbbbbbbd', '.dbbbbbd.', '..ddddd..'], { d: '#1d3f7a', b: '#6aa9f5', w: '#e3f1ff' });
+  const arm = ['.d.....d.', 'dld...dmd', 'dlmdddmsd', 'dlmmmmmsd', '.dlmmmsd.', '.dlmmmsd.', '.dlmmmsd.', '.dmmmssd.', '.ddddddd.'];
+  HUD_URL.armor = mk(arm, { d: '#3a3a3a', l: '#f6f6f6', m: '#d0d0d0', s: '#a2a2a2' });
+  HUD_URL.armor_empty = mk(arm, { d: '#2b2b2b', l: '#4a4a4a', m: '#4a4a4a', s: '#4a4a4a' });
+}

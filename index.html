@@ -11,7 +11,7 @@
 /* Layout: one column shelf of four game cards; each card = color band + name + how online works */
 :root{
   --bg:#f4f1fb; --ink:#211a33; --mute:#615a75; --card:#ffffff; --line:#d9d2ea; --acc:#ff5a3c;
-  --party:#2fa3d8; --kart:#2048c8; --kitchen:#ef6b3a; --trap:#c9881a; --asobi:#2f8a57; --bomber:#d6453a; --fall:#7a4fd0; 
+  --party:#2fa3d8; --kart:#2048c8; --kitchen:#ef6b3a; --trap:#c9881a; --asobi:#2f8a57; --bomber:#d6453a; --fall:#7a4fd0; --block:#4f9a3a; 
   --f-d:"Dela Gothic One","M PLUS Rounded 1c","Hiragino Sans",sans-serif;
   --f-b:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
 }
@@ -133,6 +133,11 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
       <p>「まるドロップ（同じ色を4つつなげて消す）」と「ブロック（横1列をそろえて消す）」を、それぞれ好きなほうで対戦する落ちものパズル。消すと相手にじゃまが届きます。</p>
       <div class="meta"><span class="chip">2〜4人</span><span class="chip">各自の端末で動かす方式</span><span class="chip">1台でもOK</span></div>
       <a class="play" href="fall.html">遊ぶ</a></div></li>
+    <li class="game" style="--c:var(--block)"><div class="band"></div><div class="body">
+      <h2>block</h2>
+      <p>ブロックをほって、つんで、生きのびる3Dの箱庭ゲーム。「みんなの世界」を作ると、コードを知っている友だちがいつでも入れます。</p>
+      <div class="meta"><span class="chip">1〜4人</span><span class="chip">各自の端末で動かす方式</span><span class="chip">いつでも入れる世界</span></div>
+      <a class="play" href="block.html">遊ぶ</a></div></li>
     
   </ul>
   <section class="box">
@@ -161,7 +166,7 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
 'use strict';
 // ---- みんなの部屋：ホームで集まって、ホストが えらんだ ゲームへ 全員で 移動する ----
 (function(){const box=document.getElementById('hub');const DB=NetDB.open('hub');const G=NetDB.lobby.GAMES;const LOCAL=NetDB.LOCAL;
-  const COL={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)',bomber:'var(--bomber)',fall:'var(--fall)'};
+  const COL={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)',bomber:'var(--bomber)',fall:'var(--fall)',block:'var(--block)'};
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   let pid='';try{pid=sessionStorage.getItem('hub_pid')||'';if(!pid){pid='h'+Math.random().toString(36).slice(2,10);sessionStorage.setItem('hub_pid',pid)}}catch(e){pid='h'+Math.random().toString(36).slice(2,10)}
   const S={code:'',m:null,p:{},offs:[],beat:0,err:'',msg:'',got:false};
@@ -206,7 +211,7 @@ h1{font-family:var(--f-d);font-weight:400;font-size:clamp(30px,7vw,46px);line-he
   draw();if(NetDB.hub.code)enter(NetDB.hub.code,false);
   setInterval(()=>{if(S.code)draw()},15000);})();
 // ---- open rooms (all games) ----
-(function(){const ul=document.getElementById('rooms'),em=document.getElementById('roomsEmpty');const G=NetDB.lobby.GAMES;const C={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)',bomber:'var(--bomber)',fall:'var(--fall)'};
+(function(){const ul=document.getElementById('rooms'),em=document.getElementById('roomsEmpty');const G=NetDB.lobby.GAMES;const C={party:'var(--party)',kart:'var(--kart)',kitchen:'var(--kitchen)',trap:'var(--trap)',asobi:'var(--asobi)',bomber:'var(--bomber)',fall:'var(--fall)',block:'var(--block)'};
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   NetDB.lobby.watch(list=>{em.hidden=list.length>0;ul.innerHTML=list.slice(0,12).map(r=>{const full=(r.n||0)>=(r.max||4),busy=r.st&&r.st!=='lobby';
     return`<li style="--c:${C[r.g]}"><span class="dot"></span><span class="t"><b>${esc(G[r.g].name)}</b><small>${esc(r.host||'')}さんの部屋・${r.n||1}/${r.max||4}人・コード ${esc(r.code)}</small></span>${full?'<span class="busy">満員</span>':busy&&(r.g==='kart'||r.g==='trap'||r.g==='asobi')?'<span class="busy">ゲーム中</span>':`<a href="${NetDB.lobby.joinUrl(r)}">参加</a>`}</li>`;}).join('');});})();
