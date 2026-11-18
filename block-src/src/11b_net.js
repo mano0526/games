@@ -263,7 +263,7 @@ const net = {
       if (p.y < -900) { p.x = P[0]; p.y = P[1]; p.z = P[2]; p.yaw = P[3]; }
       p.held = P[5] | 0; p.flags = P[6] | 0; p.sneaking = !!(p.flags & 1); p.sleeping = !!(p.flags & 2); p.dead = !!(p.flags & 4); p.mode = (p.flags & 16) ? 1 : 0; p.eating = !!(p.flags & 32); p.blocking = !!(p.flags & 64); p.shield = !!(p.flags & 128); p.sprinting = !!(p.flags & 512);
       if (p.swingN !== P[7]) { if (p.swingN >= 0) p.swingT = 1; p.swingN = P[7]; }
-      p.open = P[8] || 0; p.dim = P[9] | 0;
+      p.open = P[8] || 0; p.dim = P[9] | 0; p.armorC = P[10] | 0;   // 身につけている防具（姿に出す）
     }
     p.seen = now;
     if (p.dim !== this.world.dim) { if (p.ents.size) { for (const e of p.ents.values()) if (e !== true) e.dead = true; p.ents.clear(); } return; }   // べつの世界にいる人の生き物・落とし物は見えない
@@ -342,7 +342,7 @@ const net = {
     if (this.accSt < 0.1) return;
     const p = player, h = p.held();
     const fl = (p.sneaking ? 1 : 0) | (game.inBed ? 2 : 0) | (p.dead ? 4 : 0) | (p.flying ? 8 : 0) | (p.mode === 1 ? 16 : 0) | (p.eating > 0 ? 32 : 0) | (p.blocking ? 64 : 0) | (p.armor[4] ? 128 : 0) | (p.inWater && !p.onGround && !p.flying ? 256 : 0) | (p.sprinting ? 512 : 0);
-    const P = [r2(p.x), r2(p.y), r2(p.z), r2(p.yaw), r2(p.pitch), h ? (p.drawT > 0.55 ? I.bow_p2 : p.drawT > 0.02 ? I.bow_p1 : h.id) : 0, fl, this.swingN, ui.entPos ? posKey(ui.entPos.x, ui.entPos.y, ui.entPos.z) : 0, this.world.dim];
+    const P = [r2(p.x), r2(p.y), r2(p.z), r2(p.yaw), r2(p.pitch), h ? (p.drawT > 0.55 ? I.bow_p2 : p.drawT > 0.02 ? I.bow_p1 : h.id) : 0, fl, this.swingN, ui.entPos ? posKey(ui.entPos.x, ui.entPos.y, ui.entPos.z) : 0, this.world.dim, armorCode(p.armor)];
     const ps = P.join(',');
     let E = null, full = 0;
     if (this.peers.size && this.accEnt >= 0.2) {

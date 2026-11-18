@@ -319,10 +319,11 @@ function drawPeers(world, cam) {
   }
 }
 // 自分の姿（うしろから／前から見るとき）
-const _self = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, walk: 0, walkAmp: 0, swingT: 0, sneaking: false, sleeping: false, held: 0, hurtT: 0, eating: false, blocking: false, shield: false, sprinting: false, swim: 0 };
+const _self = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, walk: 0, walkAmp: 0, swingT: 0, sneaking: false, sleeping: false, held: 0, hurtT: 0, eating: false, blocking: false, shield: false, sprinting: false, swim: 0, armorC: 0 };
 function drawSelf(world, cam) {
   const p = player, s = _self, h = p.held();
   s.x = p.x; s.y = p.y; s.z = p.z; s.yaw = p.yaw + (R.dbgYaw || 0); s.pitch = p.pitch; s.walk = p.bob * 1.9; s.walkAmp = p.bobAmp; s.swingT = p.swingT; s.sneaking = p.sneaking; s.sleeping = game.inBed;   // dbgYaw＝試験で 横から見るため
+  s.armorC = armorCode(p.armor);
   s.sprinting = p.sprinting; s.swim += ((p.inWater && !p.onGround && !p.flying && Math.hypot(p.vx, p.vz) > 0.6 ? 1 : 0) - s.swim) * 0.14;   // 走っている／泳いでいる（0〜1 で なめらかに）
   s.held = h ? (p.drawT > 0.55 ? I.bow_p2 : p.drawT > 0.02 ? I.bow_p1 : h.id) : 0; s.hurtT = p.hurtT > 0 ? 1 : 0; s.eating = p.eating > 0; s.blocking = p.blocking; s.shield = !!p.armor[4];
   drawHuman(world, MODELS.pl0, s, p.x - cam.x, p.y - cam.y, p.z - cam.z);
@@ -359,6 +360,13 @@ function drawHuman(world, model, p, x, y, z) {
     }
     if (id === 'arm1' && p.held && ITEMS[p.held]) { handM = _hi; m4Translate(_ht, 6, 12.8, -0.8); m4Mul(handM, M, _ht); }
     if (id === 'arm0' && p.shield && !p.sleeping) { shM = _hs; shM.set(p.blocking ? _hm : M); }
+    if (p.armorC) {   // 身につけている防具：体のまわりに 少し大きい箱を かぶせる（かぶとは 顔の前を あける）
+      const ac = p.armorC, bb = pt.b, box = (mi, x0, y0, z0, x1, y1, z1, k) => { const c = ARMOR_RGB[mi - 1], q = k || 1; if (c) addColorBox(dynCol, M, x0, y0, z0, x1, y1, z1, c[0] * r * q, c[1] * g * q, c[2] * b * q, 1); };   // k＝ふちどり用に 少し暗く
+      if (id === 'head') { const m0 = ac & 3; if (m0) { box(m0, bb[0] - 0.6, bb[4] - 2.4, bb[2] - 0.6, bb[3] + 0.6, bb[4] + 0.7, bb[5] + 0.6); box(m0, bb[0] - 0.6, bb[1] + 1.2, bb[2] + 3, bb[3] + 0.6, bb[4] - 2.4, bb[5] + 0.6); box(m0, bb[0] - 0.8, bb[4] - 2.9, bb[2] - 0.8, bb[3] + 0.8, bb[4] - 2.2, bb[5] + 0.8, 0.72); } }
+      else if (id === 'body') { const m0 = (ac >> 2) & 3; if (m0) { box(m0, bb[0] - 0.5, bb[1] + 0.3, bb[2] - 0.5, bb[3] + 0.5, bb[4] + 0.3, bb[5] + 0.5); box(m0, bb[0] - 0.7, bb[1] + 0.3, bb[2] - 0.7, bb[3] + 0.7, bb[1] + 1.6, bb[5] + 0.7, 0.72); box(m0, bb[0] + 2.5, bb[4] - 4.5, bb[2] - 0.8, bb[3] - 2.5, bb[4] - 1.5, bb[2] - 0.4, 0.8); } const m1 = (ac >> 4) & 3; if (m1) box(m1, bb[0] - 0.3, bb[1] - 0.2, bb[2] - 0.3, bb[3] + 0.3, bb[1] + 2, bb[5] + 0.3); }
+      else if (id === 'arm0' || id === 'arm1') { const m0 = (ac >> 2) & 3; if (m0) box(m0, bb[0] - 0.5, bb[4] - 5, bb[2] - 0.5, bb[3] + 0.5, bb[4] + 0.5, bb[5] + 0.5); }
+      else if (id === 'leg0' || id === 'leg1') { const m1 = (ac >> 4) & 3, m2 = (ac >> 6) & 3; if (m1) box(m1, bb[0] - 0.35, bb[1] + 4.2, bb[2] - 0.35, bb[3] + 0.35, bb[4] + 0.1, bb[5] + 0.35); if (m2) { box(m2, bb[0] - 0.6, bb[1] - 0.05, bb[2] - 0.6, bb[3] + 0.6, bb[1] + 4.2, bb[5] + 0.6); box(m2, bb[0] - 0.75, bb[1] + 3.6, bb[2] - 0.75, bb[3] + 0.75, bb[1] + 4.4, bb[5] + 0.75, 0.72); } }
+    }
     const bb = pt.b;
     for (let f = 0; f < 6; f++) {
       const uv = pt.uv[f], sh = FACE_SHADE[f] * 0.9 + 0.1;

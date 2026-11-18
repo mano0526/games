@@ -44,6 +44,10 @@ async def main():
     await s.ev(f"() => {{ {K}.player.food = 9; }}"); await s.wait(400)
     r = await s.ev("() => { const c = [...document.getElementById('foods').children]; const full = c[0].src; return [c[0].getBoundingClientRect().left < c[9].getBoundingClientRect().left, c.map(x => x.src === full ? 1 : 0).join('')]; }")
     check('おなかは 右から へる（満タンが左、空が右）', r[0] is True and __import__('re').fullmatch('1+0+', r[1]) is not None, r)
+    r = await s.ev(f"() => {{ const k = {K}, p = k.player, I = k.I; const a0 = k.selfPose.armorC; p.armor[0] = {{ id: I.iron_helmet, n: 1, d: 0 }}; p.armor[3] = {{ id: I.diamond_boots, n: 1, d: 0 }}; k.ui.open('inv'); const d = document.querySelector('#scrTop .doll'); return [a0, d ? d._ac : -1]; }}")
+    await s.wait(300)
+    r2 = await s.ev(f"() => {{ const k = {K}; const g = document.querySelectorAll('#scrTop .slot.ghost').length; k.ui.close(true); return [k.selfPose.armorC, g]; }}")
+    check('身につけた防具が 姿と 持ち物画面の姿に出る（鉄のかぶと＝1、ダイヤのくつ＝2<<6）', r == [0, 129] and r2 == [129, 3], [r, r2])
     errs = [l for l in s.logs if 'PAGEERROR' in l or l.startswith('error')]
     check('エラーなし', len(errs) == 0, errs[:4])
     await s.close()

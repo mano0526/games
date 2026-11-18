@@ -566,6 +566,7 @@ const ui = {
       const q = this.getS(r); this.paintSlot(r.el, q);
       if (r.t === 'armor') { r.el.classList.toggle('ghost', !q); if (!q) r.el.querySelector('i').style.backgroundImage = 'url(' + ICON_URL[r.i === 4 ? I.shield : I['iron_' + ARMOR_TYPES[r.i][0]]] + ')'; }   // 空の防具のマスには「ここに何を入れるか」の うすい絵
     }
+    const dl = document.querySelector('#scrTop .doll'); if (dl && dl._ac !== armorCode(player.armor)) this.paintDoll(dl);
     const c = $('cursorItem'), s = player.cursor;
     if (s && this.slots[0] && this.slots[0].el) c.style.setProperty('--s', this.slots[0].el.offsetWidth + 'px');   // つかんだ物の大きさを マスに合わせる
     if (s) { c.style.display = 'block'; c.firstChild.style.backgroundImage = 'url(' + ICON_URL[s.id] + ')'; c.lastChild.textContent = s.n > 1 ? s.n : ''; if (this._cx !== undefined) this.moveCursor(this._cx, this._cy); $('scrInfo').textContent = '持っている物：' + itemName(s.id) + (s.n > 1 ? ' ×' + s.n : ''); }
@@ -638,6 +639,12 @@ const ui = {
     const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.clearRect(0, 0, 16, 32);
     const P = { head: [4, 0], body: [4, 8], arm0: [12, 8], arm1: [0, 8], leg0: [8, 20], leg1: [4, 20] };
     for (const p of m) { const d = P[p.id]; if (!d) continue; const uv = p.uv[5]; c.drawImage(src, uv[0], uv[1], uv[2], uv[3], d[0], d[1], uv[2], uv[3]); }
+    const ac = armorCode(player.armor), col = (mi) => { const q = ARMOR_RGB[mi - 1]; return 'rgb(' + Math.round(q[0] * 235) + ',' + Math.round(q[1] * 235) + ',' + Math.round(q[2] * 235) + ')'; };   // 身につけた防具を 姿にも出す
+    if (ac & 3) { c.fillStyle = col(ac & 3); c.fillRect(4, 0, 8, 2); c.fillRect(4, 2, 1, 4); c.fillRect(11, 2, 1, 4); }
+    if ((ac >> 2) & 3) { c.fillStyle = col((ac >> 2) & 3); c.fillRect(4, 8, 8, 11); c.fillRect(0, 8, 4, 5); c.fillRect(12, 8, 4, 5); }
+    if ((ac >> 4) & 3) { c.fillStyle = col((ac >> 4) & 3); c.fillRect(4, 19, 8, 9); }
+    if ((ac >> 6) & 3) { c.fillStyle = col((ac >> 6) & 3); c.fillRect(4, 28, 8, 4); }
+    cv._ac = ac;
   },
   // ちからの台：えらべる力を3つ ならべる（1つ目の名前だけ見える。レベルと粉が足りないものは おせない）
   paintEnch() {

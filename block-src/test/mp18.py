@@ -61,6 +61,9 @@ async def main():
     r = await poll(m, 0, f"() => {{ const p = [...{K}.net.peers.values()][0]; return [p.sprinting, +p.walkAmp.toFixed(1)]; }}", lambda r: r[0] is True and r[1] > 0.3, 60, 150)
     await m.pg[1].keyboard.up('KeyF'); await m.pg[1].keyboard.up('KeyW')
     check('B が走ると、A の画面でも 走る姿になる', r[0] is True and r[1] > 0.3, r)
+    await m.ev(1, f"() => {{ const k = {K}, p = k.player; p.armor[1] = {{ id: k.I.diamond_chest, n: 1, d: 0 }}; }}")
+    r = await poll(m, 0, f"() => [...{K}.net.peers.values()][0].armorC", lambda r: r == 8, 60, 150)
+    check('B の防具が A の画面の B の姿にも出る', r == 8, r)
     errs = [e for e in m.errs() if '404' not in e]
     check('エラーなし', len(errs) == 0, errs[:6])
     await m.close()

@@ -364,6 +364,9 @@ const ARMOR_MATS = [
   { k: 'iron', n: '鉄', def: [2, 6, 5, 2], dur: [165, 240, 225, 195], mat: 259 },
   { k: 'diamond', n: 'ダイヤ', def: [3, 8, 6, 3], dur: [363, 528, 495, 429], mat: 261 }
 ];
+// 身につけている防具を 1つの数に（姿に出す用。マスごとに2ビット：0＝なし、1〜＝素材の番号+1）
+function armorCode(arr) { let c = 0; for (let i = 0; i < 4; i++) { const a = arr[i]; if (a && ITEMS[a.id] && ITEMS[a.id].armor) c |= ((ARMOR_MATS.findIndex(m => m.k === ITEMS[a.id].armor.mat) + 1) & 3) << (i * 2); } return c; }
+const ARMOR_RGB = [[0.82, 0.82, 0.85], [0.42, 0.9, 0.86]];   // 鉄・ダイヤ
 const ARMOR_TYPES = [['helmet', 'のかぶと'], ['chest', 'のよろい'], ['legs', 'のズボン'], ['boots', 'のくつ']];
 ARMOR_MATS.forEach((m, mi) => ARMOR_TYPES.forEach(([k, n], pi) => {
   defItem(320 + mi * 4 + pi, m.k + '_' + k, m.n + n, { stack: 1, armor: { slot: pi, def: m.def[pi], dur: m.dur[pi], mat: m.k } });
