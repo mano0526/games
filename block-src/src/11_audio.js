@@ -27,6 +27,19 @@ const audio = {
     if (!pan || !this.ctx.createStereoPanner) return this.sfxG;
     const p = this.ctx.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); p.connect(this.sfxG); return p;
   },
+  // 雨の音（鳴りっぱなしの ざあざあ）。vol 0〜1、inside＝屋根の下（こもった音）
+  rain(vol, inside) {
+    if (!this.ctx || !this.noiseBuf) return;
+    if (!this.rainN) {
+      if (vol <= 0) return;
+      const c = this.ctx, s = c.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true;
+      const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2400; f.Q.value = 0.35;
+      const g = c.createGain(); g.gain.value = 0; s.connect(f); f.connect(g); g.connect(this.sfxG); s.start();
+      this.rainN = { f, g };
+    }
+    const t = this.ctx.currentTime;
+    this.rainN.g.gain.setTargetAtTime(vol * 0.16, t, 0.4); this.rainN.f.frequency.setTargetAtTime(inside ? 700 : 2400, t, 0.4);
+  },
   noise(t, dur, type, f0, f1, q, vol, dst, attack) {
     const c = this.ctx, s = c.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true;
     const f = c.createBiquadFilter(); f.type = type; f.Q.value = q || 0.8;
@@ -104,6 +117,7 @@ const audio = {
       case 'craft': T(0.05, 'triangle', 240, 150, 0.4); N(0.04, 'lowpass', 1500, 700, 1, 0.25); T(0.09, 'triangle', 523, 0, 0.22, 0.004, null, 0.07); T(0.09, 'triangle', 659, 0, 0.22, 0.004, null, 0.13); T(0.16, 'triangle', 784, 0, 0.25, 0.004, null, 0.19); break;
       case 'achieve': [523, 659, 784, 1047, 1319].forEach((f, i) => { T(0.5, 'triangle', f, 0, 0.26, 0.005, null, i * 0.09); T(0.6, 'sine', f * 2, 0, 0.1, 0.005, null, i * 0.09); }); T(0.9, 'sine', 1568, 0, 0.14, 0.01, null, 0.5); break;
       case 'trade': [988, 1319, 1760].forEach((f, i) => T(0.16, 'sine', f, f, 0.2, 0.003, null, i * 0.06)); T(0.07, 'square', 2637, 2637, 0.04, 0.002, null, 0.2); break;
+      case 'thunder': N(2.2, 'lowpass', 220, 50, 0.7, 0.95, 0.03); N(0.5, 'bandpass', 900, 200, 0.8, 0.5, 0.005); T(1.6, 'sine', 62, 34, 0.5, 0.02); break;
       case 'treasure': [1319, 1568, 1976, 2637].forEach((f, i) => T(0.35, 'sine', f, 0, 0.18, 0.004, null, i * 0.07)); break;
       case 'dawn': T(1.4, 'sine', 784, 0, 0.16, 0.02); T(1.6, 'sine', 1175, 0, 0.13, 0.02, null, 0.28); T(1.9, 'sine', 1568, 0, 0.1, 0.02, null, 0.56); break;
       case 'sleep': [659, 587, 523, 392].forEach((f, i) => T(0.9, 'sine', f, 0, 0.16, 0.03, null, i * 0.32)); break;

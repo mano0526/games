@@ -224,6 +224,7 @@ const game = {
   },
   beginWorld(meta, chunks) {
     this.disposeWorld();
+    WX.reset();
     const w = this.world = new World(meta.seed, chunks); _activeWorld = w; w.onUnload = freeChunkMeshes; w.onMark = (x, y, z, o) => { spawnSato(x, y, z, o); };
     w.setGen(meta.gv0 || 1, meta.rgv ? new Map(Object.entries(meta.rgv)) : null);
     w.day = meta.day || 1; w.time = meta.time || 0; w.tick = meta.tick || 0;
@@ -609,6 +610,7 @@ const game = {
     tickEntities(w);
     // ボスがたおれたかは、ここ（生き物を動かしたすぐ後）で見る。あとの「ボスがいなければ出す」より先に見ないと、たおした瞬間に 次のボスが出てしまう
     if (this.boss && this.boss.dead) { if (this.boss.hp <= 0) this.bossDefeated(this.boss.type); else { this.boss = null; this.bossLost = 120; } }   // 倒した以外で消えた＝ほかの人の端末に移った
+    WX.tick(w);
     if (w.tick % 20 === 0) { spawnCycle(w); if (w.dim) this.dimTick(); else if (!this.ach.village && w.tick % 60 === 0) { const V = this.villageNear(player.x, player.z); if (V && Math.abs(V.x - player.x) < V.rad && Math.abs(V.z - player.z) < V.rad) { this.unlock('village'); ui.toast('村を見つけた！ サトビトに「使う」で 物を こうかんできる', 7); } } if (!this.ach.dog && w.tick % 100 === 0) { const me = meId(); for (const e of ents) if (e.type === 'dog' && e.tamer === me) { this.unlock('dog'); break; } } }
     if (w.tick % 10 === 0) map.mark();
     player.tick(); net.tick();
@@ -638,6 +640,7 @@ const game = {
     if (this.fpsT >= 0.5) { this.fps = Math.round(this.frames / this.fpsT); this.frames = 0; this.fpsT = 0; }
     R.time += dt;
     const w = this.world; if (!w || R.lost) return;
+    WX.frame(w, dt);
     const cam = this.cam, vd = Math.min(settings.viewDist, this.dynDist, w.dim === 1 ? 6 : 99);   // ホムラの底は もやで遠くが見えないので、読みこむ広さもしぼる（洞くつだらけで面が多いため）
     if (this.state === 'title') {
       this.titleAng += dt * 0.045; w.time = (w.time + dt * 30) % 24000; if (w.time > 10500) w.time = 500;
@@ -690,6 +693,7 @@ const game = {
     if (net.on) drawPeers(w, cam);
     if (player.ride && !player.dead && this.state !== 'loading') drawRide(w, rideCode(player), player.ride.yaw, player.x, player.y, player.z, cam, player.ride.walk, player.ride.walkAmp);   // 自分の乗り物（自分の目線でも 見える）
     if (settings.view && !player.dead && this.state !== 'loading') drawSelf(w, cam);
+    WX.draw(w, cam);
     drawParticles(w, cam);
     const t = player.target;
     if (t && this.state === 'playing' && !ui.screen && !player.dead) {
@@ -717,5 +721,5 @@ function startApp(data) {
   game.boot();
 }
 try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => { if (game.world && !game.isDemo) { game.save(); return { resume: game.online ? '@' + net.code : game.worldId }; } return {}; }); } catch (e) { }
-window.__kk = { get selfPose() { return _self; }, tradesOf, VJOBS, spawnSato, VIL_CELL, lotXZ, walkPath, F4, rideCode, rideRec, RAIL_CON, mkMob, mobEx, hurtMob, mobUse, POTIONS, itemDmg, enchOf, enchSet, enchAny, enchList, enchRoll, enchKind, ENCH, ENCH_NEED, xpNeed, spawnXp, holdKind, spawnShot, spawnPrimed, blast, blastAll, losTo, get MOB_USED() { return MOB_USED; }, mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
+window.__kk = { get selfPose() { return _self; }, tradesOf, VJOBS, spawnSato, VIL_CELL, lotXZ, walkPath, F4, rideCode, rideRec, RAIL_CON, mkMob, WX, weatherAt, WX_SLOT, mobEx, hurtMob, mobUse, POTIONS, itemDmg, enchOf, enchSet, enchAny, enchList, enchRoll, enchKind, ENCH, ENCH_NEED, xpNeed, spawnXp, holdKind, spawnShot, spawnPrimed, blast, blastAll, losTo, get MOB_USED() { return MOB_USED; }, mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
 if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(startApp); else startApp((window.claude && window.claude.hot && window.claude.hot.data) || {});

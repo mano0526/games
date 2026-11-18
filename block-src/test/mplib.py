@@ -31,7 +31,9 @@ class Mp:
         return pg
     async def ev(self, i, js, arg=None): return await self.pg[i].evaluate(js, arg)
     async def wait(self, ms): await self.pg[0].wait_for_timeout(ms)
-    async def playing(self, i, timeout=180000): await self.pg[i].wait_for_function('window.__kk.game.state === "playing"', timeout=timeout)
+    async def playing(self, i, timeout=180000):
+        await self.pg[i].wait_for_function('window.__kk.game.state === "playing"', timeout=timeout)
+        await self.pg[i].evaluate("() => { if (window.__kk.WX) window.__kk.WX.force = 0; }")   # 試験の間は 晴れに しておく（みんなの世界の天気は 本当の時計で決まるので、日によって 雨になる）
     async def shot(self, i, name):
         # 絵を描くのは写真をとるときだけ（2ページ同時だと遅いので、ふだんは計算だけ進める）
         await self.pg[i].evaluate("() => { window.__kk.R.skip = false; }")

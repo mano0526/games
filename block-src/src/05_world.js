@@ -647,6 +647,10 @@ class World {
       if (!c || c.stage < 2) continue;
       if (this.net && !this.net.owns(c.cx, c.cz)) continue;   // いちばん近い人の端末だけが育てる
       const top = Math.min(CH - 1, c.maxY + 1) + 1;
+      if (this.wx > 0 && !this.dim && Math.random() < 0.25) {   // 雪：寒い所では 少しずつ つもる
+        const lx = (Math.random() * 16) | 0, lz = (Math.random() * 16) | 0, wx0 = c.cx * 16 + lx, wz0 = c.cz * 16 + lz, sy = this.surfaceY(wx0, wz0);
+        if (sy > SEA && sy < CH - 2 && (WX_COLD[c.biome[(lz << 4) | lx]] === 1 || (sy > 102 && !WX_COLD[c.biome[(lz << 4) | lx]])) && OPAQUE[this.getBlock(wx0, sy, wz0)] && this.getBlock(wx0, sy + 1, wz0) === 0) this.setBlock(wx0, sy + 1, wz0, B.snow_layer, 0);
+      }
       for (let n = 0; n < 10; n++) {
         const lx = (Math.random() * 16) | 0, lz = (Math.random() * 16) | 0, y = (Math.random() * top) | 0;
         const i = (y << 8) | (lz << 4) | lx, id = c.blocks[i];
@@ -675,7 +679,7 @@ class World {
       }
     } else if (id === B.farmland) {
       if (!this.areaLoaded(x, z, 4)) return;
-      let wet = false;
+      let wet = this.wx > 0 && (this.getLightRaw(x, y + 1, z) >> 4) === 15 && !WX_COLD[this.biomeAt(x, z)];   // 雨に ぬれる（雪の所・かわいた所は べつ）
       for (let dz = -4; dz <= 4 && !wet; dz++) for (let dx = -4; dx <= 4; dx++) if (this.getBlock(x + dx, y, z + dz) === B.water || this.getBlock(x + dx, y + 1, z + dz) === B.water) { wet = true; break; }
       if (wet !== (meta === 1)) this.setBlock(x, y, z, id, wet ? 1 : 0);
       else if (!wet && SHAPE[this.getBlock(x, y + 1, z)] !== S_CROP && Math.random() < 0.25) this.setBlock(x, y, z, B.dirt, 0);

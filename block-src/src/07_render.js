@@ -66,7 +66,7 @@ void main(){ v_ndc = a_pos; gl_Position = vec4(a_pos, 0.9999, 1.0); }`;
 const FS_SKY = `#version 300 es
 precision highp float; precision mediump sampler2DArray;
 uniform mat4 u_inv; uniform vec3 u_zen; uniform vec3 u_hor; uniform vec3 u_sun; uniform float u_night; uniform float u_time;
-uniform sampler2DArray u_tex; uniform float u_sunL; uniform float u_moonL; uniform vec3 u_glow; uniform float u_under;
+uniform sampler2DArray u_tex; uniform float u_sunL; uniform float u_moonL; uniform vec3 u_glow; uniform float u_under; uniform float u_dim;
 in vec2 v_ndc; out vec4 o;
 float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 void main(){
@@ -88,10 +88,10 @@ void main(){
   if (dir.y < -0.03) {
   } else if (sd > 0.5) {
     vec2 p = vec2(dot(dir, rgt), dot(dir, up2)) / sd / 0.16;
-    if (abs(p.x) < 1.0 && abs(p.y) < 1.0) { vec4 s = textureLod(u_tex, vec3(p * 0.5 + 0.5, u_sunL), 0.0); col = mix(col, s.rgb, s.a); }
+    if (abs(p.x) < 1.0 && abs(p.y) < 1.0) { vec4 s = textureLod(u_tex, vec3(p * 0.5 + 0.5, u_sunL), 0.0); col = mix(col, s.rgb, s.a * u_dim); }
   } else if (sd < -0.5) {
     vec2 p = vec2(dot(dir, rgt), dot(dir, up2)) / -sd / 0.12;
-    if (abs(p.x) < 1.0 && abs(p.y) < 1.0) { vec4 s = textureLod(u_tex, vec3(p * 0.5 + 0.5, u_moonL), 0.0); col = mix(col, s.rgb, s.a * 0.95); }
+    if (abs(p.x) < 1.0 && abs(p.y) < 1.0) { vec4 s = textureLod(u_tex, vec3(p * 0.5 + 0.5, u_moonL), 0.0); col = mix(col, s.rgb, s.a * 0.95 * u_dim); }
   }
   col = mix(col, u_hor, u_under);
   o = vec4(col, 1.0);
@@ -166,7 +166,7 @@ function initRenderer(canvas) {
   R.prog.cutout = compileProg(VS_TERRAIN, FS_TERRAIN(1), tU);
   R.prog.trans = compileProg(VS_TERRAIN, FS_TERRAIN(2), tU);
   R.prog.dyn = compileProg(VS_DYN, FS_DYN, ['u_vp', 'u_tex', 'u_tex2', 'u_mode', 'u_fogColor', 'u_fog']);
-  R.prog.sky = compileProg(VS_SKY, FS_SKY, ['u_inv', 'u_zen', 'u_hor', 'u_sun', 'u_night', 'u_time', 'u_tex', 'u_sunL', 'u_moonL', 'u_glow', 'u_under']);
+  R.prog.sky = compileProg(VS_SKY, FS_SKY, ['u_inv', 'u_zen', 'u_hor', 'u_sun', 'u_night', 'u_time', 'u_tex', 'u_sunL', 'u_moonL', 'u_glow', 'u_under', 'u_dim']);
   R.prog.cloud = compileProg(VS_CLOUD, FS_CLOUD, ['u_vp', 'u_y', 'u_camXZ', 'u_time', 'u_tex', 'u_col', 'u_fogColor']);
   // 四角形用の共通インデックス
   const idx = new Uint32Array(R.maxQuads * 6);
@@ -356,6 +356,14 @@ function updateSky(world) {
   const l = Math.hypot(Math.cos(ang), s, 0.18);
   sk.sun = [Math.cos(ang) / l, s / l, 0.18 / l];
   sk.glow = [1.0 * dusk * 0.6, 0.5 * dusk * 0.6, 0.2 * dusk * 0.6];
+  const wa = R.wx || 0;
+  if (wa > 0) {   // 雨・雪：空は 灰色に、明るさは 少し落ちる。かみなりの しゅんかんは 白く光る
+    const st = R.wxStorm || 0, fl = R.flash || 0, gray = lerp3([0.04, 0.05, 0.075], [0.5, 0.54, 0.6], day), k = wa * 0.9;
+    sk.zen = lerp3(sk.zen, [gray[0] * 0.78 * (1 - st * 0.3), gray[1] * 0.78 * (1 - st * 0.3), gray[2] * 0.8 * (1 - st * 0.3)], k); sk.hor = sk.fog = lerp3(sk.hor, [gray[0] * (1 - st * 0.25), gray[1] * (1 - st * 0.25), gray[2] * (1 - st * 0.25)], k);
+    const dl = 1 - 0.26 * wa - 0.16 * st; sk.light = [sk.light[0] * dl + fl * 0.7, sk.light[1] * dl + fl * 0.7, sk.light[2] * dl + fl * 0.75];
+    sk.glow = [sk.glow[0] * (1 - wa), sk.glow[1] * (1 - wa), sk.glow[2] * (1 - wa)];
+    if (fl > 0) { sk.zen = lerp3(sk.zen, [0.85, 0.88, 1], fl * 0.6); sk.hor = sk.fog = lerp3(sk.hor, [0.9, 0.92, 1], fl * 0.6); }
+  }
 }
 // 動く物に当たる光の色（地形のシェーダーと同じ計算）
 function lightRGB(raw, out) {
@@ -413,6 +421,7 @@ function renderFrame(world, cam, viewR, under, drawHand) {
   R.fogColor = under === 1 ? [0.08, 0.2, 0.45].map((v, i) => v * (0.3 + 0.7 * sk.day)) : under === 2 ? [0.9, 0.35, 0.05] : sk.fog;
   const far = viewR * 16;
   R.fogStart = under === 1 ? 2 : under === 2 ? 0.2 : far * 0.62; R.fogEnd = under === 1 ? 30 : under === 2 ? 2.5 : far - 6;
+  if (!under && R.wx > 0) { R.fogStart *= 1 - 0.5 * R.wx; R.fogEnd *= 1 - 0.2 * R.wx; }   // 雨の日は 遠くが かすむ
   if (R.dim === 1 && !under) { R.fogStart = Math.min(R.fogStart, 14); R.fogEnd = Math.min(R.fogEnd, 86); }
   gl.clearColor(R.fogColor[0], R.fogColor[1], R.fogColor[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -424,7 +433,8 @@ function renderFrame(world, cam, viewR, under, drawHand) {
   gl.useProgram(ps.p);
   gl.uniformMatrix4fv(ps.u.u_inv, false, R.invVP);
   gl.uniform3fv(ps.u.u_zen, sk.zen); gl.uniform3fv(ps.u.u_hor, sk.hor); gl.uniform3fv(ps.u.u_sun, sk.sun);
-  gl.uniform1f(ps.u.u_night, sk.night); gl.uniform1f(ps.u.u_time, R.time); gl.uniform1i(ps.u.u_tex, 0);
+  const dimK = 1 - (R.wx || 0) * 0.93;   // 雨・雪の間は 太陽・月・星が かくれる
+  gl.uniform1f(ps.u.u_night, sk.night * dimK); gl.uniform1f(ps.u.u_dim, dimK); gl.uniform1f(ps.u.u_time, R.time); gl.uniform1i(ps.u.u_tex, 0);
   gl.uniform1f(ps.u.u_sunL, TEX.sun); gl.uniform1f(ps.u.u_moonL, TEX.moon); gl.uniform3fv(ps.u.u_glow, sk.glow);
   gl.uniform1f(ps.u.u_under, under || R.dim === 1 ? 1 : 0);
   if (under) gl.uniform3fv(ps.u.u_hor, R.fogColor);
@@ -490,7 +500,7 @@ function renderFrame(world, cam, viewR, under, drawHand) {
     gl.uniformMatrix4fv(pc.u.u_vp, false, R.vp); gl.uniform1f(pc.u.u_y, 132.5 - cam.y);
     gl.uniform2f(pc.u.u_camXZ, cam.x % 1536, cam.z % 1536); gl.uniform1f(pc.u.u_time, R.time);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, R.texCloud); gl.uniform1i(pc.u.u_tex, 2);
-    const cc = 0.25 + 0.75 * sk.day;
+    const cc = (0.25 + 0.75 * sk.day) * (1 - 0.5 * (R.wx || 0)) + (R.flash || 0) * 0.4;   // 雨雲は 暗く
     gl.uniform3f(pc.u.u_col, cc * (0.9 + 0.1 * sk.light[0]), cc * (0.9 + 0.1 * sk.light[1]), cc); gl.uniform3fv(pc.u.u_fogColor, sk.hor);
     gl.bindVertexArray(R.cloudVao); gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.activeTexture(gl.TEXTURE0); gl.depthMask(true);

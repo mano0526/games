@@ -552,7 +552,7 @@ function mobTick(world, e) {
         if (e.atkCd === 0) { e.atkCd = 20; e.swing = 8; hitTarget(T, d.dmg * DIFF_DMG[game.diff], e.x, e.z, 6, d.name); }
       }
     } else wander(world, e, d);
-    if (d.burns && e.age % 20 === 0 && world.dayFactor() > 0.75 && (world.getLightRaw(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)) >> 4) === 15 && fl !== 1) {
+    if (d.burns && e.age % 20 === 0 && !world.wx && world.dayFactor() > 0.75 && (world.getLightRaw(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)) >> 4) === 15 && fl !== 1) {
       e.fire = 25; hurtMob(e, 3, e.x, e.z, 0); fxPuff(e.x, e.y + 1, e.z, 12, 0.25, 0.2, 0.45, { speed: 1.2, life: 1.1, size: 0.1, up: 1.4 });
     }
   } else {
@@ -611,7 +611,7 @@ function wispTick(world, e, canTarget, pdx, pdy, pdz, pd3, T) {
   if (e.kb === 0) { e.vx += clamp((tx - e.x) * 0.6 - e.vx, -0.4, 0.4); e.vy += clamp((ty - e.y) * 0.8 - e.vy, -0.4, 0.4); e.vz += clamp((tz - e.z) * 0.6 - e.vz, -0.4, 0.4); }
   moveAABB(world, e, e.vx * 0.05, e.vy * 0.05, e.vz * 0.05);
   if (e.age % 3 === 0) fxPuff(e.x, e.y + 0.3, e.z, 1, 0.45, 0.8, 1, { glow: true, speed: 0.3, life: 0.5, size: 0.06, up: -0.2, grav: 0 });
-  if (world.dayFactor() > 0.75 && e.age % 20 === 0 && (world.getLightRaw(Math.floor(e.x), Math.floor(e.y), Math.floor(e.z)) >> 4) === 15) hurtMob(e, 2, e.x, e.z, 0);
+  if (world.dayFactor() > 0.75 && !world.wx && e.age % 20 === 0 && (world.getLightRaw(Math.floor(e.x), Math.floor(e.y), Math.floor(e.z)) >> 4) === 15) hurtMob(e, 2, e.x, e.z, 0);
 }
 function kingTick(world, e, canTarget, pdx, pdz, pdist, pd3, T) {
   e.moving = false;

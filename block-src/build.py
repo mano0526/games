@@ -5,7 +5,7 @@ root = os.path.dirname(os.path.abspath(__file__))
 rd = lambda f: open(os.path.join(root, 'src', f), encoding='utf8').read()
 shared = '\n'.join(rd(f) for f in ['01_util.js', '02_blocks.js', '03_gen.js', '03b_gen2.js', '03c_dims.js', '03d_gen3.js'])
 worker = "'use strict';\n" + shared + '\n' + rd('worker_boot.js')
-mains = ['04_textures.js', '05_world.js', '06_mesher.js', '07_render.js', '08_entities.js', '09_player.js', '10_ui.js', '10b_map.js', '11_audio.js', '11b_net.js', '11c_netent.js', '12_main.js']
+mains = ['04_textures.js', '05_world.js', '06_mesher.js', '07_render.js', '08_entities.js', '09_player.js', '10_ui.js', '10b_map.js', '11_audio.js', '10c_weather.js', '11b_net.js', '11c_netent.js', '12_main.js']
 js = "(function(){\n'use strict';\n" + shared + "\nconst WORKER_SRC = " + json.dumps(worker, ensure_ascii=False).replace('</', '<\\/') + ";\n" + '\n'.join(rd(f) for f in mains) + "\n})();\n"
 assert '</script' not in js
 os.makedirs(os.path.join(root, 'dist'), exist_ok=True)

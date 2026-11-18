@@ -5,7 +5,7 @@ const KEY_DEF = { fwd: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 
   hot1: 'Digit1', hot2: 'Digit2', hot3: 'Digit3', hot4: 'Digit4', hot5: 'Digit5', hot6: 'Digit6', hot7: 'Digit7', hot8: 'Digit8', hot9: 'Digit9' };
 const KEY_ACTS = [['fwd', '前へ進む'], ['back', '後ろへ下がる'], ['left', '左へ'], ['right', '右へ'], ['jump', 'ジャンプ（2回で飛ぶ／おりる）'], ['sneak', 'しゃがむ（飛んでいるときは下がる）'], ['sprint', '走る'], ['inv', '持ち物をひらく'], ['drop', '持っている物を1つ捨てる'],
   ['view', '視点を切りかえる'], ['map', '地図'], ['info', '座標の表示を切りかえる'], ['hot1', '持ち物らん 1'], ['hot2', '持ち物らん 2'], ['hot3', '持ち物らん 3'], ['hot4', '持ち物らん 4'], ['hot5', '持ち物らん 5'], ['hot6', '持ち物らん 6'], ['hot7', '持ち物らん 7'], ['hot8', '持ち物らん 8'], ['hot9', '持ち物らん 9']];
-const SET_DEF = { viewDist: 8, quality: 1, fov: 75, bright: 3, autoQ: false, fpsCap: 0, clouds: true, fancyLeaves: true, particles: 2, bobbing: true, handShow: true, hudScale: 1, showInfo: true, showFps: false, nameTags: true, view: 0, minimap: true,
+const SET_DEF = { viewDist: 8, quality: 1, fov: 75, bright: 3, autoQ: false, fpsCap: 0, clouds: true, rainFx: true, fancyLeaves: true, particles: 2, bobbing: true, handShow: true, hudScale: 1, showInfo: true, showFps: false, nameTags: true, view: 0, minimap: true,
   sens: 12, touchSens: 12, invertY: false, autoJump: false, sprintTap: true, sneakToggle: false, swapMouse: false, touchSize: 1, holdMs: 330,
   master: 10, sfx: 7, music: 5, touchInit: false, look: [0, 0, 0, 1, 0] };
 const settings = Object.assign({}, SET_DEF, { look: SET_DEF.look.slice(), keys: Object.assign({}, KEY_DEF) });
@@ -43,6 +43,7 @@ const SET_TABS = [
     { k: 'fov', t: 'range', name: '視野の広さ', min: 55, max: 100, step: 1, fmt: v => v + '' },
     { k: 'bright', t: 'range', name: '明るさ', min: 0, max: 10, step: 1, fmt: v => v + '' },
     { k: 'clouds', t: 'tog', name: '雲' },
+    { k: 'rainFx', t: 'tog', name: '雨つぶ・雪を えがく' },
     { k: 'fancyLeaves', t: 'tog', name: '葉のすき間' },
     { k: 'particles', t: 'sel', name: 'かけら・けむり', opts: [[0, '少なめ'], [1, 'ふつう'], [2, '多め']] },
     { k: 'bobbing', t: 'tog', name: '歩くときのゆれ' },
@@ -931,6 +932,10 @@ function howtoHtml() {
 <dd>ウマ：草原や サバンナにいます。何も持たずに「使う」で 乗ると あばれますが、何回か 乗るうちに なつきます。なついたウマに「くら」（羊毛3・糸2・鉄2）を使うと、思いどおりに 速く走れて、高く とべます。リンゴ・ニンジン・小麦で 体力がもどり、なついた2頭にあげると 子どもが生まれます</dd>
 <dd>トロッコ（鉄5）と レール（鉄6・棒1で16本）：レールは ならべると 自動で つながり、まがり・坂も できます。レールにトロッコを置いて 乗り、「前へ」で おし出します。金の「はやレール」の上では ぐんぐん 速くなります</dd>
 <dd>ソラの羽：よろいのマスに入れて、高い所から とび、空中で もう一度 ジャンプすると 滑空します。下を向くと 速くなり、その いきおいで 上を向くと のぼれます。ホシクイが落とすほか、ソラのはての ホシカゲが落とす「ほしの羽根」7まいと 糸でも 作れます</dd>
+<dt>天気</dt>
+<dd>ときどき 雨がふります（寒い所では 雪、砂漠では ふりません）。まれに かみなりも 鳴ります。雨の間は 空が暗くなり、遠くが かすみます</dd>
+<dd>雨は、畑を しめらせ、体についた火を消します。夜の敵（ヨルカゲ・ユミカゲ）は、雨の昼には もえません。寒い所では 雪が 少しずつ つもります</dd>
+<dd>屋根の下に入ると ぬれません。雨つぶの絵が 重い時は、設定の「雨つぶ・雪を えがく」を 切れます</dd>
 <dt>弓矢と盾</dt>
 <dd>弓は「使う」を長くおして引き、はなすと矢が飛びます（1秒でいっぱい。長く引くほど遠くへ強く）。スマホは軽くタップでも、自動で引いてうちます</dd>
 <dd>矢は 火打ち石・棒・羽根で4本。ブロックにささった矢は 少しすると落ちて、ひろえます</dd>
