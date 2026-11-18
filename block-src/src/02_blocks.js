@@ -1,7 +1,7 @@
 // ===== 02_blocks.js : ブロック・アイテム・レシピの定義（作業スレッドと共用） =====
 const S_NONE = 0, S_CUBE = 1, S_CROSS = 2, S_TORCH = 3, S_FLUID = 4, S_LAYER = 5, S_FARM = 6, S_CACTUS = 7,
   S_CROP = 8, S_CHEST = 9, S_DOOR = 10, S_BED = 11, S_LADDER = 12, S_FLAT = 13,
-  S_SLAB = 14, S_STAIR = 15, S_FENCE = 16, S_WALL = 17, S_PANE = 18, S_GATE = 19, S_TRAP = 20, S_SIGN = 21, S_LANTERN = 22, S_FIRE = 23, S_PORTAL = 24;
+  S_SLAB = 14, S_STAIR = 15, S_FENCE = 16, S_WALL = 17, S_PANE = 18, S_GATE = 19, S_TRAP = 20, S_SIGN = 21, S_LANTERN = 22, S_FIRE = 23, S_PORTAL = 24, S_RAIL = 25;
 
 // ブロックの番号は 0〜255 と 512〜1023（256〜511 はアイテムの番号なので使わない）
 const NB = 1024;
@@ -260,6 +260,9 @@ defBlock(708, 'hoshi_crystal', 'ほしの結晶', { tex: 'hoshi_crystal', hard: 
 defBlock(709, 'hoshi_egg', 'ホシのたまご', { tex: 'hoshi_egg', hard: 3, light: 9, sound: 'stone' });
 // 村の道。ふつうの土より 少し明るく、ふみかためてある（スコップで草を たたいても作れる）
 defBlock(719, 'path', 'ふみかためた道', { tex: { top: 'path_top', bottom: 'dirt', side: 'path_side' }, hard: 0.6, tool: 'shovel', sound: 'gravel', drop: 'dirt' });
+// レール：meta 0 南北／1 東西／2〜5 のぼり坂（南・西・北・東へ のぼる）／6〜9 まがり（南と西・西と北・北と東・東と南）。はやレールは まがらない
+defBlock(721, 'rail', 'レール', { shape: S_RAIL, tex: { top: 'rail', bottom: 'rail', side: 'rail_curve' }, cutout: true, hard: 0.5, tool: 'pick', sound: 'metal', support: 'floor', sprite: 'rail' });
+defBlock(722, 'rail_fast', 'はやレール', { shape: S_RAIL, tex: { top: 'rail_fast', bottom: 'rail_fast', side: 'rail_fast' }, cutout: true, hard: 0.5, tool: 'pick', sound: 'metal', support: 'floor', sprite: 'rail_fast', light: 3 });
 // 村人のしるし：地形づくりが 家の中に置く ござ。近くの人の端末が見つけると、村人に かわって消える（持ち物にはならない）
 defBlock(720, 'vmark', 'ござ', { shape: S_LAYER, lh: 1, tex: 'hay_top', hard: 0.1, sound: 'grass', drop: () => [] });
 for (let i = 0; i < NB; i++) if (BLOCKS[i] && typeof BLOCKS[i].drop === 'string') BLOCKS[i].drop = B[BLOCKS[i].drop];
@@ -350,7 +353,12 @@ const POTIONS = {
   night: ['よめの くすり', '#3a55d8', 3600, 346, '3分のあいだ 暗い所が 明るく見える']
 };
 { let pi = 367; for (const k in POTIONS) defItem(pi++, 'potion_' + k, POTIONS[k][0], { stack: 16, food: [0, 0], drink: true, leftover: 365, potion: k }); }
-defItem(373, 'jade', 'ヒスイ', {});   // 村人との こうかんに使う 緑の石
+defItem(373, 'jade', 'ヒスイ', {});
+defItem(374, 'boat', 'ボート', { stack: 1, vehicle: 'boat' });        // 水に「使う」と うかぶ。うかんだボートに「使う」で 乗る
+defItem(375, 'cart', 'トロッコ', { stack: 1, vehicle: 'cart' });      // レールに「使う」と 置ける
+defItem(376, 'saddle', 'くら', { stack: 1 });                          // なついた ウマに つけると、思いどおりに 走れる
+defItem(377, 'glider', 'ソラの羽', { stack: 1, armor: { slot: 1, def: 0, dur: 432, mat: 'glider' }, glide: true });   // よろいのマスに入れる。落ちている時に ジャンプで 滑空
+defItem(378, 'star_feather', 'ほしの羽根', {});                        // ソラのはての ホシカゲが ときどき落とす   // 村人との こうかんに使う 緑の石
 
 const TOOL_MATS = [
   { k: 'wood', n: '木', tier: 1, speed: 2, dur: 60, mat: '#planks' },
@@ -515,6 +523,12 @@ shapeless(I.pumpkin_pie, 1, [B.pumpkin, I.egg, I.wheat], 'food');
 shaped(I.bow, 1, [' SI', 'S I', ' SI'], { S: I.stick, I: I.string }, 'tool');
 shaped(I.arrow, 4, ['F', 'S', 'E'], { F: I.flint, S: I.stick, E: I.feather }, 'tool');
 shaped(I.shield, 1, ['PIP', 'PPP', ' P '], { P: '#planks', I: I.iron_ingot }, 'tool');
+shaped(I.boat, 1, ['P P', 'PPP'], { P: '#planks' }, 'tool');
+shaped(I.cart, 1, ['I I', 'III'], { I: I.iron_ingot }, 'tool');
+shaped(B.rail, 16, ['I I', 'ISI', 'I I'], { I: I.iron_ingot, S: I.stick }, 'tool');
+shaped(B.rail_fast, 6, ['G G', 'GSG', 'GDG'], { G: I.gold_ingot, S: I.stick, D: I.glow_dust }, 'tool');
+shaped(I.saddle, 1, ['WWW', 'S S', 'I I'], { W: '#wool', S: I.string, I: I.iron_ingot }, 'tool');
+shaped(I.glider, 1, ['FSF', 'FFF', 'F F'], { F: I.star_feather, S: I.string }, 'tool');
 shaped(B.hajike_box, 1, ['PSP', 'SPS', 'PSP'], { P: I.pop_powder, S: B.sand }, 'block');
 shaped(B.wool_white, 1, ['SS', 'SS'], { S: I.string }, 'block');
 // ---- 経験値と力・くすり ----
@@ -566,7 +580,7 @@ function itemName(id) { return ITEMS[id] ? ITEMS[id].name : '？'; }
 function maxStack(id) { return ITEMS[id] ? ITEMS[id].stack : 64; }
 
 // ---------------- 動物の好物 ----------------
-const MOB_FOOD = { cow: [267], sheep: [267], pig: [346, 347], chicken: [266, 349, 350] };   // 小麦／ニンジン・ジャガイモ／種
+const MOB_FOOD = { cow: [267], sheep: [267], pig: [346, 347], chicken: [266, 349, 350], horse: [269, 346, 267] };   // 小麦／ニンジン・ジャガイモ／種
 const MEATS = [271, 272, 273, 274, 275, 276, 277, 278];
 // 経験値：次のレベルまでに いる数（本家と同じ式）／鉱石をほった時の数 [少ない, 多い]／かまどから取り出した時の1こあたり
 function xpNeed(lv) { return lv >= 30 ? 112 + (lv - 30) * 9 : lv >= 15 ? 37 + (lv - 15) * 5 : 7 + lv * 2; }
@@ -625,3 +639,6 @@ function tradesOf(vs) {
       pk([J, 4, I.potion_heal, 1, 3], [J, 4, I.potion_regen, 1, 3]), pk([J, 5, I.potion_night, 1, 2], [J, 5, I.potion_speed, 1, 2]), [J, 3, I.xp_orb, 18, 4]];
   }
 }
+
+// ---- レールの つながり方：[つながる向き2つ（F4 の番号）, のぼる向き（なければ -1）] ----
+const RAIL_CON = [[0, 2, -1], [1, 3, -1], [0, 2, 0], [1, 3, 1], [2, 0, 2], [3, 1, 3], [0, 1, -1], [1, 2, -1], [2, 3, -1], [3, 0, -1]];

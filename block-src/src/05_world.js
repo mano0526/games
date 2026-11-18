@@ -142,6 +142,7 @@ function selectionBoxes(id, meta, mask) {
     case S_CROP: return [[0, 0, 0, 1, 0.3 + 0.2 * (meta & 3), 1]];
     case S_LAYER: return [[0, 0, 0, 1, (BLOCKS[id].lh || 2) / 16, 1]];
     case S_FLAT: return [[0.06, 0, 0.06, 0.94, 0.08, 0.94]];
+    case S_RAIL: return [[0, 0, 0, 1, meta >= 2 && meta <= 5 ? 0.6 : 0.12, 1]];
     case S_TORCH: {
       if (!meta) return [[0.4, 0, 0.4, 0.6, 0.65, 0.6]];
       const d = F4[(meta - 1) & 3], cx = 0.5 + d[0] * 0.35, cz = 0.5 + d[1] * 0.35;
@@ -698,6 +699,37 @@ class World {
       else if (cur === 0) this.setBlock(x + dx, y + dy, z + dz, id, m || 0, 1);
     });
     return true;
+  }
+  // ---------- レール ----------
+  railAt(x, y, z) { return SHAPE[this.getBlock(x, y, z)] === S_RAIL; }
+  // そのレールが いま つながっている数（となりに レールがある向きの数）
+  railLive(x, y, z) {
+    const c = RAIL_CON[this.getMeta(x, y, z)] || RAIL_CON[0]; let n = 0;
+    for (let k = 0; k < 2; k++) { const d = F4[c[k]], up = c[2] === c[k] ? 1 : 0; if (this.railAt(x + d[0], y + up, z + d[1]) || (!up && this.railAt(x + d[0], y - 1, z + d[1]))) n++; }
+    return n;
+  }
+  // まわりのレールを見て 形（meta）を決める。def＝だれとも つながらない時の向き（0 南北／1 東西）
+  railShape(x, y, z, def) {
+    const id = this.getBlock(x, y, z), cs = [];
+    for (let d = 0; d < 4; d++) { const f = F4[d]; if (this.railAt(x + f[0], y + 1, z + f[1]) && !SOLID[this.getBlock(x, y + 1, z)]) cs.push([d, 1]); else if (this.railAt(x + f[0], y, z + f[1]) || this.railAt(x + f[0], y - 1, z + f[1])) cs.push([d, 0]); }
+    if (!cs.length) return def & 1;
+    for (const a of cs) {   // まっすぐ（向かい合わせ）を 先に。のぼりが あれば 坂
+      const b = cs.find(q => q[0] === ((a[0] + 2) & 3));
+      if (b || cs.length === 1) { if (a[1]) return 2 + a[0]; if (b && b[1]) return 2 + b[0]; return a[0] & 1; }
+    }
+    if (id === B.rail_fast) return cs[0][1] ? 2 + cs[0][0] : cs[0][0] & 1;
+    const a = cs[0][0], b = cs[1][0];   // となり合う2つ → まがり（6 南と西／7 西と北／8 北と東／9 東と南）
+    return ((b - a + 4) & 3) === 1 ? 6 + a : 6 + b;
+  }
+  // レールを置いた・こわした後：自分と、まだ つながりきっていない となりのレールの形を 直す
+  railFix(x, y, z, def) {
+    if (this.railAt(x, y, z)) { const m = this.railShape(x, y, z, def | 0); if (m !== this.getMeta(x, y, z)) this.setBlock(x, y, z, this.getBlock(x, y, z), m, 1); }
+    for (let d = 0; d < 4; d++) for (let dy = -1; dy <= 1; dy++) {
+      const nx = x + F4[d][0], ny = y + dy, nz = z + F4[d][1];
+      if (!this.railAt(nx, ny, nz) || this.railLive(nx, ny, nz) >= 2) continue;
+      const m0 = this.getMeta(nx, ny, nz), m = this.railShape(nx, ny, nz, m0 & 1);
+      if (m !== m0) this.setBlock(nx, ny, nz, this.getBlock(nx, ny, nz), m, 1);
+    }
   }
   tickFurnaces() {
     for (const c of this.chunks.values()) {

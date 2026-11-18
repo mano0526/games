@@ -3,7 +3,7 @@
 //   meta  世界の設定      time 時刻      gv/区画 地形の版
 //   c/区画/マス 変えたブロック   e/区画/マス 入れ物の中身   a/区画/… しまってある動物
 //   pl/人 参加者   st/人 位置と、その人が動かしている生き物   dm/人 個別の連絡
-const NET_VER = 6, NET_MAX = 4;   // 6: 村人（サトビト）と 地形の版3 ／ 5: 火のついた はじけ箱の記録（種類4）と はじけの連絡 ／ 4: 動物の記録に「その動物だけの状態」が入った   // 2: ブロックの番号が256以上になった ／ 3: べつの世界（ホムラの底・ソラのはて）と門（2026-11-18）
+const NET_VER = 7, NET_MAX = 4;   // 7: 乗り物（ボート・トロッコ・ウマ）と 滑空 ／ 6: 村人（サトビト）と 地形の版3 ／ 5: 火のついた はじけ箱の記録（種類4）と はじけの連絡 ／ 4: 動物の記録に「その動物だけの状態」が入った   // 2: ブロックの番号が256以上になった ／ 3: べつの世界（ホムラの底・ソラのはて）と門（2026-11-18）
 const NET_CFG = { apiKey: 'AIzaSyBTuzvBh9qtf5F8JnHVa5bv1-igP3E_ebA', authDomain: 'claude-4d377.firebaseapp.com', databaseURL: 'https://claude-4d377-default-rtdb.asia-southeast1.firebasedatabase.app', projectId: 'claude-4d377', storageBucket: 'claude-4d377.firebasestorage.app', messagingSenderId: '652412386711', appId: '1:652412386711:web:a6033541ef4fa62da998d2' };
 const NET_URL = 'https://mano0526.github.io/games/block.html';
 function withTimeout(p, ms) {
@@ -263,7 +263,7 @@ const net = {
       if (p.y < -900) { p.x = P[0]; p.y = P[1]; p.z = P[2]; p.yaw = P[3]; }
       p.held = P[5] | 0; p.flags = P[6] | 0; p.sneaking = !!(p.flags & 1); p.sleeping = !!(p.flags & 2); p.dead = !!(p.flags & 4); p.mode = (p.flags & 16) ? 1 : 0; p.eating = !!(p.flags & 32); p.blocking = !!(p.flags & 64); p.shield = !!(p.flags & 128); p.sprinting = !!(p.flags & 512);
       if (p.swingN !== P[7]) { if (p.swingN >= 0) p.swingT = 1; p.swingN = P[7]; }
-      p.open = P[8] || 0; p.dim = P[9] | 0; p.armorC = P[10] | 0;   // 身につけている防具（姿に出す）
+      p.open = P[8] || 0; p.dim = P[9] | 0; p.armorC = P[10] | 0; p.rideC = P[11] | 0; p.rideYaw = +P[12] || 0; p.gliding = !!(p.flags & 1024);   // 身につけている防具（姿に出す）
     }
     p.seen = now;
     if (p.dim !== this.world.dim) { if (p.ents.size) { for (const e of p.ents.values()) if (e !== true) e.dead = true; p.ents.clear(); } return; }   // べつの世界にいる人の生き物・落とし物は見えない
@@ -341,8 +341,8 @@ const net = {
     this.accSt += dt; this.accIdle += dt; this.accEnt += dt; this.accFull += dt;
     if (this.accSt < 0.1) return;
     const p = player, h = p.held();
-    const fl = (p.sneaking ? 1 : 0) | (game.inBed ? 2 : 0) | (p.dead ? 4 : 0) | (p.flying ? 8 : 0) | (p.mode === 1 ? 16 : 0) | (p.eating > 0 ? 32 : 0) | (p.blocking ? 64 : 0) | (p.armor[4] ? 128 : 0) | (p.inWater && !p.onGround && !p.flying ? 256 : 0) | (p.sprinting ? 512 : 0);
-    const P = [r2(p.x), r2(p.y), r2(p.z), r2(p.yaw), r2(p.pitch), h ? (p.drawT > 0.55 ? I.bow_p2 : p.drawT > 0.02 ? I.bow_p1 : h.id) : 0, fl, this.swingN, ui.entPos ? posKey(ui.entPos.x, ui.entPos.y, ui.entPos.z) : 0, this.world.dim, armorCode(p.armor)];
+    const fl = (p.sneaking ? 1 : 0) | (game.inBed ? 2 : 0) | (p.dead ? 4 : 0) | (p.flying ? 8 : 0) | (p.mode === 1 ? 16 : 0) | (p.eating > 0 ? 32 : 0) | (p.blocking ? 64 : 0) | (p.armor[4] ? 128 : 0) | (p.inWater && !p.onGround && !p.flying ? 256 : 0) | (p.sprinting ? 512 : 0) | (p.gliding ? 1024 : 0);
+    const P = [r2(p.x), r2(p.y), r2(p.z), r2(p.yaw), r2(p.pitch), h ? (p.drawT > 0.55 ? I.bow_p2 : p.drawT > 0.02 ? I.bow_p1 : h.id) : 0, fl, this.swingN, ui.entPos ? posKey(ui.entPos.x, ui.entPos.y, ui.entPos.z) : 0, this.world.dim, armorCode(p.armor), rideCode(p), p.ride ? r2(p.ride.yaw) : 0];   // 12番目＝乗り物と羽、13番目＝乗り物の向き
     const ps = P.join(',');
     let E = null, full = 0;
     if (this.peers.size && this.accEnt >= 0.2) {

@@ -16,6 +16,9 @@ const ACHS = [
   { id: 'bread', title: 'パンを焼く', hint: '育った小麦3つでパンになる', icon: I.bread },
   { id: 'breed', title: '動物をふやす', hint: '同じ動物2ひきに好物をあげると子どもが生まれる。ウシ・ヒツジ＝小麦、ブタ＝ニンジンかジャガイモ、ニワトリ＝種', icon: I.wheat },
   { id: 'dog', title: 'イヌとなかよくなる', hint: '森や雪の森にいるイヌに、肉をあげてみよう（何回か必要）。なつくと ついてきて、敵にかみつく', icon: I.cooked_pork },
+  { id: 'boat', title: 'ボートで 水の上を進む', hint: '板5まいで ボート。水に「使う」で うかべ、もう一度「使う」で 乗る。しゃがむ で おりる', icon: I.boat },
+  { id: 'horse', title: 'ウマを なつかせる', hint: '草原や サバンナの ウマに、何も持たずに「使う」で 乗る。ふり落とされても 何回か乗ると なつく。「くら」（羊毛3・糸2・鉄2）を つけると 走れる', icon: I.saddle },
+  { id: 'cart', title: 'トロッコで 走る', hint: '鉄6・棒1で レール16本。レールに トロッコ（鉄5）を置いて 乗る。金の「はやレール」で 速くなる', icon: I.cart },
   { id: 'village', title: '村を見つける', hint: '草原・砂漠・雪原などにある、道と家のある村', icon: B.path },
   { id: 'trade', title: 'サトビトと こうかんする', hint: '村人に「使う」。小麦16こ や 石炭12こ が 緑の石「ヒスイ」1こになり、ヒスイで いろいろな物と かえてもらえる', icon: I.jade },
   { id: 'armor', title: 'よろいを身につける', hint: '鉄で防具を作り、持ち物の左のマスに入れよう', icon: I.iron_chest },
@@ -40,7 +43,8 @@ const ACHS = [
   { id: 'eye', title: 'ほしの目をつくる', hint: 'ホムラの粉（芯1本から2つ）と カゲのかけらで作る。12こ必要', icon: I.hoshi_eye },
   { id: 'ring', title: 'ソラの門をひらく', hint: '「ソラの門のわく」12こを、地面に 5×5 の輪（かどの4つはなし）にならべる', icon: B.sora_frame },
   { id: 'crystal', title: 'ほしの結晶をこわす', hint: 'ソラのはての柱の上にある。残っていると、ボスの体力がもどってしまう', icon: B.hoshi_crystal },
-  { id: 'hoshikui', title: 'ホシクイをたおす', hint: 'とびかかってきた時と、まんなかの台にとまった時が たたくチャンス', icon: B.hoshi_egg }
+  { id: 'hoshikui', title: 'ホシクイをたおす', hint: 'とびかかってきた時と、まんなかの台にとまった時が たたくチャンス', icon: B.hoshi_egg },
+  { id: 'glide', title: 'ソラの羽で 滑空する', hint: 'ホシクイが落とす「ソラの羽」か、ソラのはての ホシカゲが落とす「ほしの羽根」7まいと 糸で作る。よろいのマスに入れ、高い所から とんで 空中で ジャンプ', icon: I.glider }
 ];
 const ACH_ITEM = {}; for (const id of TAGS['#log']) ACH_ITEM[id] = 'wood';
 for (const id of TAGS['#planks']) ACH_ITEM[id] = 'planks';
@@ -380,11 +384,15 @@ const game = {
     else if (kind === 'ench') this.unlock('ench');
     else if (kind === 'potion') this.unlock('potion');
     else if (kind === 'trade') this.unlock('trade');
+    else if (kind === 'ride') { if (id !== 'horse') this.unlock(id); }
+    else if (kind === 'tame') this.unlock('horse');
+    else if (kind === 'glide') this.unlock('glide');
     else if (kind === 'place' && id === B.torch) this.unlock('torch');
   },
   // みんなの世界では、全員がベッドに入るまで横になって待つ
   sleep(t) {
     if (this.sleeping || this.inBed) return;
+    if (player.ride) player.dismount();
     if (this.online) {
       const w = this.world, d = F4[t.meta & 3], hx = (t.meta & 4) ? t.x - d[0] : t.x, hz = (t.meta & 4) ? t.z - d[1] : t.z;
       player.x = hx + 0.5 + d[0] * 0.5; player.z = hz + 0.5 + d[1] * 0.5; player.y = t.y + 0.5725; player.vx = player.vy = player.vz = 0; player.yaw = Math.atan2(d[0], d[1]); if (player.yaw < 0) player.yaw += Math.PI * 2;
@@ -464,6 +472,7 @@ const game = {
   },
   // べつの世界へ移る。how：'gate'＝ホムラの門をくぐる、'sora'＝ソラの門にとびこむ、'home'＝もとの世界の復活地点へ（かえりの門・力つきたとき）
   travel(dim, how) {
+    if (player.ride) player.dismount();
     const w = this.world; if (!w || this.isDemo || (this.state !== 'playing' && this.state !== 'paused') || this.arrive) return;
     if (this.state === 'paused') this.resume(true);
     if (ui.screen) ui.close(true);
@@ -679,6 +688,7 @@ const game = {
     const alpha = sim ? this.acc / 0.05 : 1;
     drawEntities(w, cam, alpha);
     if (net.on) drawPeers(w, cam);
+    if (player.ride && !player.dead && this.state !== 'loading') drawRide(w, rideCode(player), player.ride.yaw, player.x, player.y, player.z, cam, player.ride.walk, player.ride.walkAmp);   // 自分の乗り物（自分の目線でも 見える）
     if (settings.view && !player.dead && this.state !== 'loading') drawSelf(w, cam);
     drawParticles(w, cam);
     const t = player.target;
@@ -707,5 +717,5 @@ function startApp(data) {
   game.boot();
 }
 try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => { if (game.world && !game.isDemo) { game.save(); return { resume: game.online ? '@' + net.code : game.worldId }; } return {}; }); } catch (e) { }
-window.__kk = { get selfPose() { return _self; }, tradesOf, VJOBS, spawnSato, VIL_CELL, lotXZ, walkPath, F4, POTIONS, itemDmg, enchOf, enchSet, enchAny, enchList, enchRoll, enchKind, ENCH, ENCH_NEED, xpNeed, spawnXp, holdKind, spawnShot, spawnPrimed, blast, blastAll, losTo, get MOB_USED() { return MOB_USED; }, mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
+window.__kk = { get selfPose() { return _self; }, tradesOf, VJOBS, spawnSato, VIL_CELL, lotXZ, walkPath, F4, rideCode, rideRec, RAIL_CON, mkMob, mobEx, hurtMob, mobUse, POTIONS, itemDmg, enchOf, enchSet, enchAny, enchList, enchRoll, enchKind, ENCH, ENCH_NEED, xpNeed, spawnXp, holdKind, spawnShot, spawnPrimed, blast, blastAll, losTo, get MOB_USED() { return MOB_USED; }, mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
 if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(startApp); else startApp((window.claude && window.claude.hot && window.claude.hot.data) || {});

@@ -75,7 +75,7 @@ function netTake(m) {
   if (e && e !== true && e.kind === 'mob' && !e.dead) { p.ents.set(m.n, true); e.remote = false; e.owner = null; e.nid = _nid++; e._ns = ''; }
   else e = spawnMob(a[0], a[1], a[2], a[3]);
   e.x = e.px = a[1]; e.y = e.py = a[2]; e.z = e.pz = a[3]; e.yaw = e.pyaw = a[5] || 0; e.awake = !!a[8]; e.hp = a[9] || a[4]; e.vx = e.vy = e.vz = 0;
-  e.sheared = false; e.color = 0; e.tamer = null; e.sit = false; e.home = null; if (e.baby > 0) setBaby(e, 0); applyEx(e, a[7]);
+  e.sheared = false; e.color = 0; e.tamer = null; e.sit = false; e.home = null; e.saddle = false; e.tameN = 0; if (e.baby > 0) setBaby(e, 0); applyEx(e, a[7]);
   if (MOBS[e.type].boss) bossSeen(e);
 }
 // ボスが自分の画面に現れた（体力バーを出す。暗くするのは カゲの王だけ）
@@ -88,7 +88,7 @@ function netShot(s) {
 }
 // ---- 送る側：自分が動かしているものの一覧 ----
 function entRec(e) {
-  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 || e.fuse > 0 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0) | (e.baby > 0 ? 64 : 0) | (e.sheared ? 128 : 0) | (e.sit ? 256 : 0) | (e.love > 0 ? 512 : 0) | (e.burnT > 0 ? 1024 : 0), e.type === 'sheep' ? e.color | 0 : e.type === 'dog' ? (e.tamer || 0) : e.type === 'sato' ? e.vs : 0];
+  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 || e.fuse > 0 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0) | (e.baby > 0 ? 64 : 0) | (e.sheared ? 128 : 0) | (e.sit ? 256 : 0) | (e.love > 0 ? 512 : 0) | (e.burnT > 0 ? 1024 : 0), e.type === 'sheep' ? e.color | 0 : e.type === 'dog' ? (e.tamer || 0) : e.type === 'sato' ? e.vs : e.type === 'horse' ? (e.color & 7) | (e.saddle ? 8 : 0) | (e.tamer ? 16 : 0) : 0];
   if (e.kind === 'item') return [e.nid, 1, e.id, e.n, e.d, r2(e.x), r2(e.y), r2(e.z)];
   if (e.kind === 'falling') return [e.nid, 2, e.id, r2(e.x), r2(e.y), r2(e.z)];
   if (e.kind === 'primed') return [e.nid, 4, e.fuse | 0, r2(e.x), r2(e.y), r2(e.z)];
@@ -142,7 +142,7 @@ function puppetLook(e, r) {
   const b = r[8] | 0, baby = !!(b & 64);
   if (baby !== (e.baby > 0)) setBaby(e, baby ? 1e9 : 0);
   e.sheared = !!(b & 128); e.sit = !!(b & 256); if ((b & 512) && !(e.love > 0)) heartFx(e, 5); e.love = (b & 512) ? 100 : 0;
-  if (e.type === 'sheep') e.color = clamp(r[9] | 0, 0, 15); else if (e.type === 'dog') e.tamer = typeof r[9] === 'string' ? r[9] : null; else if (e.type === 'sato') e.vs = (+r[9] || 0) >>> 0;
+  if (e.type === 'sheep') e.color = clamp(r[9] | 0, 0, 15); else if (e.type === 'dog') e.tamer = typeof r[9] === 'string' ? r[9] : null; else if (e.type === 'sato') e.vs = (+r[9] || 0) >>> 0; else if (e.type === 'horse') { const q = r[9] | 0; e.color = q & 7; e.saddle = !!(q & 8); e.tamer = (q & 16) ? (e.tamer || '?') : null; }
 }
 function updPuppet(e, r) {
   if (e.kind === 'mob') {
@@ -205,6 +205,18 @@ net.onDm = function (raw) {
     case 'hit': { const e = ownEnt(m.n); if (e && e.kind === 'mob' && e.hurt <= 5) { e.hurt = 0; e.lastBy = m.f; e.pk = 1; e.hb = clamp(m.b | 0, 0, 200); e.hl = clamp(m.l | 0, 0, 3); hurtMob(e, +m.d || 1, +m.x || 0, +m.z || 0, m.k); } break; }   // たたいた側で間隔は見ているので、こちらでは少しゆるく受け付ける
     case 'dmg': if (!player.dead) player.damage(+m.a || 0, +m.x || 0, +m.z || 0, +m.k || 0, String(m.s || '')); break;
     case 'pvp': if (game.rules.pvp && !player.dead) player.damage(+m.a || 0, +m.x || 0, +m.z || 0, +m.k || 0, from ? from.name : 'だれか'); break;
+    case 'ride': {   // ほかの人が、自分の動かしている乗り物・ウマに 乗りたい：ゆずる（こちらの一覧から消して、記録を わたす）
+      const e = ownEnt(m.n);
+      if (e && e.kind === 'mob' && !e.dead && e.hp > 0 && RIDE_EYE[e.type] && !(e.baby > 0)) { this.dm(m.f, { t: 'rode', r: rideRec(e), p: [r2(e.x), r2(e.y), r2(e.z)] }); e.dead = true; }
+      break;
+    }
+    case 'rode': {
+      const q = m.r, pos = m.p; if (!q || !RIDE_EYE[q.t] || !Array.isArray(pos)) break;
+      const r = { t: q.t, hp: +q.hp || 1, c: q.c | 0, s: q.s ? 1 : 0, tm: q.tm ? String(q.tm).slice(0, 40) : null, n: q.n | 0, yaw: +q.yaw || 0 };
+      if (!player.ride && !player.dead && Math.hypot(pos[0] - player.x, pos[1] - player.y, pos[2] - player.z) < 9) { player.x = +pos[0]; player.y = +pos[1]; player.z = +pos[2]; player.mount(r); }
+      else { const e = spawnMob(r.t, +pos[0], +pos[1], +pos[2]); e.yaw = e.pyaw = r.yaw; e.hp = r.hp; if (r.t === 'horse') { e.color = r.c || 1; e.saddle = !!r.s; e.tamer = r.tm; e.tameN = r.n; } }   // 乗れなかった：その場に もどす
+      break;
+    }
     case 'pick': { const e = ownEnt(m.n); if (e && e.kind === 'item' && e.age > e.delay) { e.dead = true; this.dm(m.f, { t: 'got', id: e.id, c: e.n, d: e.d }); } break; }
     case 'got': {
       if (!ITEMS[m.id]) break;
@@ -315,6 +327,7 @@ function drawPeers(world, cam) {
     if (p.dead || p.y < -900 || p.dim !== world.dim || !net.fresh(p)) continue;
     const x = p.x - cam.x, y = p.y - cam.y, z = p.z - cam.z;
     if (x * x + z * z > 100 * 100) continue;
+    if (p.rideC & 3) drawRide(world, p.rideC, p.rideYaw, p.x, p.y, p.z, cam, p.walk, p.walkAmp);
     drawHuman(world, MODELS['pl' + p.slot], p, x, y, z);
   }
 }
@@ -323,11 +336,12 @@ const _self = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, walk: 0, walkAmp: 0, swingT:
 function drawSelf(world, cam) {
   const p = player, s = _self, h = p.held();
   s.x = p.x; s.y = p.y; s.z = p.z; s.yaw = p.yaw + (R.dbgYaw || 0); s.pitch = p.pitch; s.walk = p.bob * 1.9; s.walkAmp = p.bobAmp; s.swingT = p.swingT; s.sneaking = p.sneaking; s.sleeping = game.inBed;   // dbgYaw＝試験で 横から見るため
-  s.armorC = armorCode(p.armor);
+  s.armorC = armorCode(p.armor); s.rideC = rideCode(p); s.gliding = p.gliding;
   s.sprinting = p.sprinting; s.swim += ((p.inWater && !p.onGround && !p.flying && Math.hypot(p.vx, p.vz) > 0.6 ? 1 : 0) - s.swim) * 0.14;   // 走っている／泳いでいる（0〜1 で なめらかに）
   s.held = h ? (p.drawT > 0.55 ? I.bow_p2 : p.drawT > 0.02 ? I.bow_p1 : h.id) : 0; s.hurtT = p.hurtT > 0 ? 1 : 0; s.eating = p.eating > 0; s.blocking = p.blocking; s.shield = !!p.armor[4];
   drawHuman(world, MODELS.pl0, s, p.x - cam.x, p.y - cam.y, p.z - cam.z);
 }
+const RIDE_SIT = [0, -0.36, -0.3, 0.7];   // すわる高さ（ボート・トロッコ・ウマ）
 // 人の形を描く。p: {x,y,z,yaw,pitch,walk,walkAmp,swingT,sneaking,sleeping,held,hurtT,eating}
 function drawHuman(world, model, p, x, y, z) {
   const sc = 0.9 / 16;
@@ -336,10 +350,12 @@ function drawHuman(world, model, p, x, y, z) {
   if (p.hurtT > 0) { r = Math.min(1.2, r * 1.6 + 0.2); g *= 0.45; b *= 0.45; }
   m4Translate(_hm, x, y, z); m4RotY(_mr, p.yaw); m4Mul(_hm, _hm, _mr);
   if (p.sleeping) { m4Translate(_mr, 0, 0.22, -0.9); m4Mul(_hm, _hm, _mr); m4RotX(_mr, Math.PI / 2); m4Mul(_hm, _hm, _mr); }
+  const rt = p.sleeping ? 0 : (p.rideC | 0) & 3, gl = !!p.gliding && !p.sleeping && !rt;   // 乗っている／滑空している
+  if (rt) { m4Translate(_mr, 0, RIDE_SIT[rt], 0); m4Mul(_hm, _hm, _mr); }
   m4Scale(_mr, sc, sc, sc); m4Mul(_hm, _hm, _mr);
-  const sk = p.sleeping ? 0 : (p.swim || 0), run = p.sprinting && !p.sleeping ? 1 : 0, st = R.time * 5.5;   // sk＝泳ぎの度合い、run＝走っている
+  const sk = p.sleeping ? 0 : gl ? 1 : (p.swim || 0), run = p.sprinting && !p.sleeping ? 1 : 0, st = R.time * 5.5;   // sk＝泳ぎの度合い、run＝走っている
   if (sk > 0.01) { m4Translate(_mr, 0, 13 - 5 * sk, 0); m4Mul(_hm, _hm, _mr); m4RotX(_mr, -1.25 * sk); m4Mul(_hm, _hm, _mr); m4Translate(_mr, 0, -13, 0); m4Mul(_hm, _hm, _mr); }   // 泳ぐ：こしを中心に 体を前へ ねかせる
-  const sw = p.sleeping ? 0 : Math.sin(p.walk) * p.walkAmp * (1 - sk), sn = p.sneaking && !p.sleeping && sk < 0.5, sp = p.swingT > 0 ? Math.sin((1 - p.swingT) * Math.PI) : 0;
+  const sw = p.sleeping || rt ? 0 : Math.sin(p.walk) * p.walkAmp * (1 - sk), sn = p.sneaking && !p.sleeping && sk < 0.5, sp = p.swingT > 0 ? Math.sin((1 - p.swingT) * Math.PI) : 0;
   let handM = null, shM = null;
   const aim = p.held === I.bow_p1 || p.held === I.bow_p2;   // 弓を引いている
   for (const pt of model) {
@@ -348,8 +364,10 @@ function drawHuman(world, model, p, x, y, z) {
     else if (id === 'body') { if (sn) rx = -0.45; else rx = -0.13 * run * p.walkAmp; }   // 走ると 少し前かがみ
     else if (id === 'arm0') { rx = -sw * (0.8 + run * 0.55) + sk * (2.7 + Math.sin(st) * 0.75); rz = -0.04 - sk * 0.12; if (aim) { rx = 1.3 + p.pitch * 0.8; rz = -0.35; } else if (p.blocking) { rx = 1.0; rz = -0.5; } if (sn) { oy -= 1; oz = -4; rx += 0.25; } }
     else if (id === 'arm1') { rx = sw * (0.8 + run * 0.55) + sk * (2.7 - Math.sin(st) * 0.75) + (p.held ? 0.32 * (1 - sk) : 0) + sp * 1.5 + (p.eating ? 1.2 + Math.sin(R.time * 22) * 0.12 : 0); rz = 0.04; if (aim) { rx = 1.45 + p.pitch * 0.8; rz = 0.1; } if (sn) { oy -= 1; oz = -4; rx += 0.25; } }
-    else if (id === 'leg0') rx = sw * (0.9 + run * 0.3) + sk * Math.sin(st * 1.7) * 0.5;
-    else if (id === 'leg1') rx = -sw * (0.9 + run * 0.3) - sk * Math.sin(st * 1.7) * 0.5;
+    else if (id === 'leg0') rx = sw * (0.9 + run * 0.3) + (gl ? 0 : sk * Math.sin(st * 1.7) * 0.5);
+    else if (id === 'leg1') rx = -sw * (0.9 + run * 0.3) - (gl ? 0 : sk * Math.sin(st * 1.7) * 0.5);
+    if (rt && (id === 'leg0' || id === 'leg1')) { rx = rt === 3 ? -0.4 : -1.45; rz = (id === 'leg0' ? -1 : 1) * (rt === 3 ? 0.55 : 0.1); }   // すわる（ウマは またがる）
+    if (gl && (id === 'arm0' || id === 'arm1')) { rx = 0.05; rz = (id === 'arm0' ? -1 : 1) * 0.3; }                                      // うでを 広げる
     let M = _hm;
     if (rx || rz || oy || oz) {
       m4Translate(_hp, pt.pv[0], pt.pv[1] + oy, pt.pv[2] + oz);
@@ -360,6 +378,11 @@ function drawHuman(world, model, p, x, y, z) {
     }
     if (id === 'arm1' && p.held && ITEMS[p.held]) { handM = _hi; m4Translate(_ht, 6, 12.8, -0.8); m4Mul(handM, M, _ht); }
     if (id === 'arm0' && p.shield && !p.sleeping) { shM = _hs; shM.set(p.blocking ? _hm : M); }
+    if (id === 'body' && ((p.rideC | 0) & 64)) {   // ソラの羽：ふだんは せなかに たたみ、滑空中は 左右に ひらく
+      const wr = 0.74 * r, wg = 0.8 * g, wb = 0.98 * b;
+      if (gl) { addColorBox(dynCol, M, -18, 13, 2.1, -1, 23.5, 2.9, wr, wg, wb, 1); addColorBox(dynCol, M, 1, 13, 2.1, 18, 23.5, 2.9, wr, wg, wb, 1); addColorBox(dynCol, M, -18, 12, 2.0, -12, 13, 3.0, wr * 0.8, wg * 0.8, wb * 0.85, 1); addColorBox(dynCol, M, 12, 12, 2.0, 18, 13, 3.0, wr * 0.8, wg * 0.8, wb * 0.85, 1); }
+      else { addColorBox(dynCol, M, -3.6, 12.6, 2.1, -0.3, 23, 3.1, wr, wg, wb, 1); addColorBox(dynCol, M, 0.3, 12.6, 2.1, 3.6, 23, 3.1, wr, wg, wb, 1); }
+    }
     if (p.armorC) {   // 身につけている防具：体のまわりに 少し大きい箱を かぶせる（かぶとは 顔の前を あける）
       const ac = p.armorC, bb = pt.b, box = (mi, x0, y0, z0, x1, y1, z1, k) => { const c = ARMOR_RGB[mi - 1], q = k || 1; if (c) addColorBox(dynCol, M, x0, y0, z0, x1, y1, z1, c[0] * r * q, c[1] * g * q, c[2] * b * q, 1); };   // k＝ふちどり用に 少し暗く
       if (id === 'head') { const m0 = ac & 3; if (m0) { box(m0, bb[0] - 0.6, bb[4] - 2.4, bb[2] - 0.6, bb[3] + 0.6, bb[4] + 0.7, bb[5] + 0.6); box(m0, bb[0] - 0.6, bb[1] + 1.2, bb[2] + 3, bb[3] + 0.6, bb[4] - 2.4, bb[5] + 0.6); box(m0, bb[0] - 0.8, bb[4] - 2.9, bb[2] - 0.8, bb[3] + 0.8, bb[4] - 2.2, bb[5] + 0.8, 0.72); } }

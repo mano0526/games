@@ -127,6 +127,9 @@ const MOBS = {
   bakudake: { name: 'バクダケ', hw: 0.42, h: 1.2, hp: 18, speed: 2.1, model: 'bakudake', voice: 'dake', hostile: true, dmg: 26, drops: () => [[I.pop_powder, 1 + rnd(2)]] },
   itohaki: { name: 'イトハキ', hw: 0.4, h: 0.75, hp: 14, speed: 2.7, model: 'itohaki', voice: 'ito', hostile: true, dmg: 3, drops: () => [[I.string, 1 + rnd(2)]] },
   sato: { name: 'サトビト', hw: 0.25, h: 1.8, hp: 20, speed: 1.25, model: 'sato', voice: 'sato', drops: () => [] },   // 村人。物を こうかんしてくれる
+  horse: { name: 'ウマ', hw: 0.5, h: 1.6, hp: 22, speed: 1.6, model: 'horse', voice: 'horse', drops: (e) => e && e.saddle ? [[I.saddle, 1]] : [] },   // なつかせて くらを つけると 乗って走れる
+  boat: { name: 'ボート', hw: 0.55, h: 0.5, hp: 3, speed: 0, model: 'boat', voice: 'boat', vehicle: true, drops: () => [[I.boat, 1]] },
+  cart: { name: 'トロッコ', hw: 0.45, h: 0.6, hp: 3, speed: 0, model: 'cart', voice: 'cart', vehicle: true, drops: () => [[I.cart, 1]] },
   dog: { name: 'イヌ', hw: 0.3, h: 0.78, hp: 20, speed: 1.9, model: 'dog', voice: 'dog', drops: () => [] },
   // ---- ホムラの底 ----
   homurabi: { name: 'ホムラビ', hw: 0.35, h: 1.5, hp: 20, speed: 2.2, model: 'homurabi', voice: 'homurabi', hostile: true, dmg: 5, fly: true, glow: true, fireproof: true, drops: () => Math.random() < 0.7 ? [[I.homura_rod, 1]] : [] },
@@ -134,8 +137,8 @@ const MOBS = {
   yakebone: { name: 'ヤケボネ', hw: 0.3, h: 1.9, hp: 26, speed: 2.4, model: 'yakebone', voice: 'bone', hostile: true, dmg: 6, fireproof: true, drops: () => [[I.coal, rnd(3)], [I.quartz, rnd(2)]] },
   magmadama: { name: 'マグマコロ', hw: 0.4, h: 0.8, hp: 12, speed: 0, model: 'magmadama', voice: 'magma', hostile: true, dmg: 4, hop: true, fireproof: true, glow: true, drops: () => Math.random() < 0.3 ? [[I.homura_powder, 1]] : [] },
   // ---- ソラのはて ----
-  hoshikage: { name: 'ホシカゲ', hw: 0.3, h: 1.9, hp: 30, speed: 2.8, model: 'hoshikage', voice: 'shade', hostile: true, dmg: 5, drops: () => [[I.shadow_shard, 1 + rnd(2)]] },
-  hoshikui: { name: 'ホシクイ', hw: 1.5, h: 2.2, hp: 260, speed: 0, model: 'hoshikui', voice: 'hoshi', hostile: true, dmg: 8, boss: true, fly: true, fireproof: true, deathT: 110, scale: 2.2, drops: () => [[I.diamond, 8], [I.golden_apple, 3], [I.quartz, 12]] }
+  hoshikage: { name: 'ホシカゲ', hw: 0.3, h: 1.9, hp: 30, speed: 2.8, model: 'hoshikage', voice: 'shade', hostile: true, dmg: 5, drops: () => [[I.shadow_shard, 1 + rnd(2)], [I.star_feather, Math.random() < 0.35 ? 1 : 0]] },
+  hoshikui: { name: 'ホシクイ', hw: 1.5, h: 2.2, hp: 260, speed: 0, model: 'hoshikui', voice: 'hoshi', hostile: true, dmg: 8, boss: true, fly: true, fireproof: true, deathT: 110, scale: 2.2, drops: () => [[I.diamond, 8], [I.golden_apple, 3], [I.quartz, 12], [I.glider, 2]] }
 };
 function rnd(n) { return Math.floor(Math.random() * n); }
 
@@ -168,6 +171,15 @@ function buildModels() {
   MODELS.dog.push(part('snout', -1.5, 8, -11, 1.5, 10.5, -8.5, 0, 10, -4.5), part('ear0', -3, 13, -6.5, -1.5, 15, -5, 0, 10, -4.5), part('ear1', 1.5, 13, -6.5, 3, 15, -5, 0, 10, -4.5),
     part('tail', -1, 9, 5.5, 1, 11, 10, 0, 10, 5.5), part('collar', -3.4, 7.6, -4.3, 3.4, 13.4, -3.3, 0, 10, -4.5));
   MODELS.yakebone = shade(); MODELS.hoshikage = shade();
+  // ウマ：首が長く、たてがみと しっぽ。くらは つけた時だけ描く
+  MODELS.horse = [part('body', -4.5, 12, -10, 4.5, 21, 10, 0, 16, 0), part('neck', -2.5, 16, -15, 2.5, 27, -9, 0, 19, -9), part('head', -3, 22, -21, 3, 29, -13, 0, 26, -12), part('muzzle', -2.5, 22, -25, 2.5, 26.5, -21, 0, 26, -12),
+    part('ear0', -2.6, 29, -15, -1.2, 31.5, -13.5, 0, 26, -12), part('ear1', 1.2, 29, -15, 2.6, 31.5, -13.5, 0, 26, -12), part('mane', -1, 19, -9.6, 1, 29.6, -8, 0, 19, -9), part('tail', -1.5, 9, 10, 1.5, 20, 12, 0, 20, 10),
+    part('leg0', -4, 0, -9.5, -1, 12, -6.5, -2.5, 12, -8), part('leg1', 1, 0, -9.5, 4, 12, -6.5, 2.5, 12, -8), part('leg2', -4, 0, 6.5, -1, 12, 9.5, -2.5, 12, 8), part('leg3', 1, 0, 6.5, 4, 12, 9.5, 2.5, 12, 8),
+    part('saddle', -5, 20.5, -4, 5, 22.5, 4, 0, 21, 0)];
+  // ボートと トロッコ（動かない形）
+  MODELS.boat = [part('bottom', -7, 0, -12, 7, 2, 12, 0, 0, 0), part('side0', -9, 2, -12, -7, 7, 12, 0, 0, 0), part('side1', 7, 2, -12, 9, 7, 12, 0, 0, 0), part('bow', -7, 2, -14, 7, 7, -12, 0, 0, 0), part('stern', -7, 2, 12, 7, 7, 14, 0, 0, 0), part('seat', -7, 3, 3, 7, 4.5, 6, 0, 0, 0)];
+  MODELS.cart = [part('floor', -7, 2, -9, 7, 4, 9, 0, 0, 0), part('side0', -8, 4, -9, -7, 10, 9, 0, 0, 0), part('side1', 7, 4, -9, 8, 10, 9, 0, 0, 0), part('end0', -7, 4, -10, 7, 10, -9, 0, 0, 0), part('end1', -7, 4, 9, 7, 10, 10, 0, 0, 0),
+    part('wheel0', -8, 0, -7, -6, 3, -4, 0, 0, 0), part('wheel1', 6, 0, -7, 8, 3, -4, 0, 0, 0), part('wheel2', -8, 0, 4, -6, 3, 7, 0, 0, 0), part('wheel3', 6, 0, 4, 8, 3, 7, 0, 0, 0)];
   // サトビト（村人）：長い上着と おび。しごとごとに かぶり物がちがう（j0＝むぎわら、j1＝はちまきと前かけ、j2＝羽根のぼうし、j3＝四角いぼうし）
   MODELS.sato = [part('leg0', -3.5, 0, -1.5, -0.5, 6, 1.5, -2, 6, 0), part('leg1', 0.5, 0, -1.5, 3.5, 6, 1.5, 2, 6, 0), part('body', -4, 6, -2.5, 4, 20, 2.5, 0, 13, 0), part('sash', -4.4, 11, -2.9, 4.4, 13, 2.9, 0, 12, 0),
     part('arm0', -6.5, 9, -1.5, -4, 20, 1.5, -5.25, 19, 0), part('arm1', 4, 9, -1.5, 6.5, 20, 1.5, 5.25, 19, 0), part('head', -3.5, 20, -3.5, 3.5, 27, 3.5, 0, 20, 0),
@@ -293,6 +305,21 @@ function paintMob(m, id, f, g) {
     if (isLeg) { if (f !== 2 && f !== 3) g.rect(0, g.h - 2, g.w, 2, cream[0]); return; }
     if (id === 'body') { if (f === 3) g.fill(cream); else if (!top) g.rect(0, g.h - 2, g.w, 2, cream[1]); }
     if (id === 'head' && front) { g.rect(1, 3, 4, 2, cream[0]); g.px(1, 1, C('#141414')); g.px(4, 1, C('#141414')); g.px(1, 0, C('#fffaf0')); g.px(4, 0, C('#fffaf0')); }
+  } else if (m === 'horse') {
+    const coat = CP(['#f1ece2', '#e8e2d6', '#f6f2ea', '#ece6da']), dark = CP(['#2e2622', '#28211d', '#352c27']);   // 体は 白っぽく描いて、毛色を かけ算する
+    if (id === 'saddle') { g.fill(CP(['#9a5a2c', '#8c5026', '#a66332'])); if (f !== 2 && f !== 3) g.rect(0, g.h - 1, g.w, 1, C('#5a3418')); return; }
+    if (id === 'mane' || id === 'tail') { g.fill(dark); return; }
+    g.fill(coat);
+    if (isLeg && f !== 2 && f !== 3) g.rect(0, g.h - 2, g.w, 2, dark[0]);
+    if (id === 'head') { if (f === 0 || f === 1) { const ex = f === 0 ? 3 : g.w - 4; g.px(ex, 2, C('#1b1b1b')); g.px(ex, 3, C('#1b1b1b')); g.px(ex + (f === 0 ? -1 : 1), 2, C('#f4f4f4')); } }
+    else if (id === 'muzzle') { g.rect(0, 0, g.w, g.h, C('#d9cfc0')); if (front) { g.px(1, 1, dark[0]); g.px(g.w - 2, 1, dark[0]); g.rect(1, g.h - 1, g.w - 2, 1, C('#8a7a6a')); } }
+  } else if (m === 'boat') {
+    g.fill(CP(['#b08a52', '#a88049', '#b9945c', '#a17a44']));
+    if (id === 'seat') g.fill(CP(['#8a6638', '#7e5c30'])); else if (!top && f !== 3) { g.rect(0, g.h - 1, g.w, 1, C('#6e4c29')); if (id !== 'bottom') g.rect(0, 0, g.w, 1, C('#caa66c')); }
+  } else if (m === 'cart') {
+    if (id.startsWith('wheel')) { g.fill(CP(['#2a2c30', '#33363b'])); return; }
+    g.fill(CP(['#8e949c', '#868c94', '#969ca4', '#80868e']));
+    if (!top && f !== 3) { g.rect(0, 0, g.w, 1, C('#c4c9d0')); g.rect(0, g.h - 1, g.w, 1, C('#5a6068')); }
   } else if (m === 'sato') {
     const cloth = CP(['#f2efe6', '#e9e5da', '#f7f4ec', '#ece8de']), skin = CP(['#e6b98c', '#dfb083', '#ecc296']), hair = CP(['#3b2a20', '#33241b', '#44322a']), dark = C('#2a2320');
     const straw = CP(['#dcc070', '#d0b262', '#e6cc82', '#c6a654']);
@@ -402,13 +429,16 @@ function paintMob(m, id, f, g) {
 }
 
 // ---------------- 生き物の生成と動き ----------------
-function spawnMob(type, x, y, z) {
+// 生き物の入れ物を作るだけ（一覧には入れない。乗っている乗り物を描く時にも使う）
+function mkMob(type, x, y, z) {
   const d = MOBS[type];
   const e = { kind: 'mob', type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, hw: d.hw, h: d.h, hp: d.hp, maxHp: d.hp, yaw: Math.random() * 6.28, pyaw: 0, headPitch: 0,
-    age: 0, hurt: 0, death: 0, atkCd: 0, walk: 0, walkAmp: 0, state: 0, timer: 0, moveYaw: 0, moving: false, panic: 0, kb: 0, dead: false, onGround: false, hitH: false, awake: type !== 'rock', swing: 0, burst: 0, love: 0, breedCd: 0, baby: 0, sheared: false, color: 0, owner: null, tamer: null, fuse: 0, see: false, sit: false, eggT: 6000 + rnd(6000), shotCd: 60, summonCd: 200, slam: 0, voiceCd: 100 + rnd(300), fire: 0, vs: 0, home: null, vst: 2, vt: 0, vin: 0, wt: 0, busy: 0, stk: 0, det: 0, path: null, pi: 0, spinOff0: Math.random() * 6.28, spinSeed0: Math.random() * 6.28 };
+    age: 0, hurt: 0, death: 0, atkCd: 0, walk: 0, walkAmp: 0, state: 0, timer: 0, moveYaw: 0, moving: false, panic: 0, kb: 0, dead: false, onGround: false, hitH: false, awake: type !== 'rock', swing: 0, burst: 0, love: 0, breedCd: 0, baby: 0, sheared: false, color: 0, owner: null, tamer: null, fuse: 0, see: false, sit: false, eggT: 6000 + rnd(6000), shotCd: 60, summonCd: 200, slam: 0, voiceCd: 100 + rnd(300), fire: 0, vs: 0, home: null, vst: 2, vt: 0, vin: 0, wt: 0, busy: 0, stk: 0, det: 0, path: null, pi: 0, saddle: false, tameN: 0, spinOff0: Math.random() * 6.28, spinSeed0: Math.random() * 6.28 };
   e.pyaw = e.yaw;
-  return addEnt(e);
+  if (type === 'horse') e.color = 1 + rnd(5);
+  return e;
 }
+function spawnMob(type, x, y, z) { return addEnt(mkMob(type, x, y, z)); }
 function hurtMob(e, dmg, fromX, fromZ, kb) {
   if (e.hurt > 0 || e.hp <= 0) return false;
   if (e.remote) {   // ほかの人が動かしている生き物：たたいたことを持ち主に伝える（体力は持ち主が決める）
@@ -441,10 +471,18 @@ function mobTick(world, e) {
       e.dead = true;
       if (e.type === 'hoshikui') hoshiReward(world, e);
       if (!(e.baby > 0)) for (const [id, n] of d.drops(e)) if (n > 0) spawnDrop(e.x, e.y + 0.4, e.z, id, n + (e.loot ? rnd(e.loot + 1) : 0), 0);
-      if (e.pk && !(e.baby > 0)) spawnXp(e.x, e.y + 0.4, e.z, e.type === 'hoshikui' ? 300 : d.boss ? 80 : d.hostile ? 5 : 1 + rnd(3));   // 人が たおした時だけ 経験値
+      if (e.pk && !(e.baby > 0) && !d.vehicle) spawnXp(e.x, e.y + 0.4, e.z, e.type === 'hoshikui' ? 300 : d.boss ? 80 : d.hostile ? 5 : 1 + rnd(3));   // 人が たおした時だけ 経験値
       fxPuff(e.x, e.y + e.h * 0.5, e.z, d.boss ? 60 : 10, 0.85, 0.85, 0.85, { speed: d.boss ? 5 : 1.5, life: 0.9, size: 0.1, spread: e.hw * 2 });
       if (e.lastBy && net.on && e.lastBy !== net.pid) net.dm(e.lastBy, { t: 'kill', ty: e.type }); else if (!e.noCredit) player.onKill(e);
     }
+    return;
+  }
+  if (d.vehicle) {   // ボート・トロッコ：考えない。水に うく・落ちる・すべって止まる だけ
+    const fw = fluidAt(world, e.x, e.y + 0.14, e.z);   // 底が 水面の高さに 来るように うく（中に 水が 見えないように）
+    if (fw === 1) e.vy = Math.min(e.vy * 0.8 + 0.6, 1.6); else if (fluidAt(world, e.x, e.y - 0.02, e.z) === 1) e.vy *= 0.5; else e.vy -= 1.4;
+    e.vx *= 0.8; e.vz *= 0.8;
+    moveStep(world, e, e.vx * 0.05, e.vy * 0.05, e.vz * 0.05, 0);
+    if (e.y < -20) e.dead = true;
     return;
   }
   const fl = fluidAt(world, e.x, e.y + 0.3, e.z);
@@ -799,12 +837,12 @@ function trySpawnHostile(world, R) {
 }
 // バイオームごとに出る動物。地面が草（や落ち葉の土・きんしの土）の明るい場所に出る
 const ANIMAL_POOL = [];
-ANIMAL_POOL[BIOME.PLAINS] = ANIMAL_POOL[BIOME.FLOWER] = ANIMAL_POOL[BIOME.MEADOW] = ['sheep', 'cow', 'pig', 'chicken', 'sheep'];
+ANIMAL_POOL[BIOME.PLAINS] = ANIMAL_POOL[BIOME.FLOWER] = ANIMAL_POOL[BIOME.MEADOW] = ['sheep', 'cow', 'pig', 'chicken', 'sheep', 'horse'];
 ANIMAL_POOL[BIOME.FOREST] = ANIMAL_POOL[BIOME.BIRCH] = ['pig', 'chicken', 'cow', 'dog'];
 ANIMAL_POOL[BIOME.CHERRY] = ['chicken', 'sheep', 'pig'];
 ANIMAL_POOL[BIOME.DARK] = ['pig', 'cow'];
 ANIMAL_POOL[BIOME.JUNGLE] = ['chicken', 'pig', 'chicken'];
-ANIMAL_POOL[BIOME.SAVANNA] = ['cow', 'sheep', 'chicken'];
+ANIMAL_POOL[BIOME.SAVANNA] = ['cow', 'sheep', 'chicken', 'horse', 'horse'];
 ANIMAL_POOL[BIOME.SWAMP] = ['pig', 'chicken'];
 ANIMAL_POOL[BIOME.SNOW] = ANIMAL_POOL[BIOME.TAIGA] = ANIMAL_POOL[BIOME.SNOW_TAIGA] = ANIMAL_POOL[BIOME.OLD_TAIGA] = ['sheep', 'sheep', 'chicken', 'dog'];
 ANIMAL_POOL[BIOME.MOUNTAIN] = ['sheep', 'cow'];
@@ -832,7 +870,7 @@ function spawnCycle(world) {
     if (e.kind !== 'mob' || e.dead) continue;
     const d = MOBS[e.type]; if (d.boss) continue;
     const dl = Math.hypot(e.x - player.x, e.y - player.y, e.z - player.z);
-    if (!d.hostile) { if (dl < 128 && e.type !== 'sato') passive++; continue; }   // 村人は 動物の数に入れない（村のまわりにも 動物が出るように）
+    if (!d.hostile) { if (dl < 128 && e.type !== 'sato' && !d.vehicle) passive++; continue; }   // 村人は 動物の数に入れない（村のまわりにも 動物が出るように）
     if (dl < 128) hostile++;
     if (e.remote) continue;
     if (game.diff === 0 || game.rules.mobs === false) { e.dead = true; e.noCredit = true; continue; }
@@ -910,6 +948,15 @@ function drawMob(world, e, x, y, z, alpha) {
     let rx = 0, ry = 0, rz = 0, ox = 0, oy = 0, oz = 0, pr = r, pg = g, pb = b;
     const id = p.id;
     if (wc && id === 'body') { pr = r * wc[0]; pg = g * wc[1]; pb = b * wc[2]; }   // 毛の色（かられた後は はだの色）
+    if (d.vehicle) { /* 動かない */ } else
+    if (d.model === 'horse') {
+      if (id === 'saddle') { if (!e.saddle) continue; }
+      else { const q = HORSE_RGB[(e.color | 0) % HORSE_RGB.length]; pr = r * q[0]; pg = g * q[1]; pb = b * q[2]; }
+      const gal = Math.min(1, e.walkAmp);
+      if (id === 'leg0' || id === 'leg3') rx = sw * 0.9; else if (id === 'leg1' || id === 'leg2') rx = -sw * 0.9;
+      else if (id === 'tail') { rx = 0.25 + gal * 0.5; rz = Math.sin(t * 0.09) * 0.12; }
+      else if (id === 'neck' || id === 'head' || id === 'muzzle' || id === 'mane' || id.startsWith('ear')) { rx = e.headPitch * 0.4 + Math.sin(e.walk) * 0.06 * gal + (e.swing > 0 ? -0.5 * Math.sin(e.swing / 14 * Math.PI) : 0); }
+    } else
     if (d.model === 'sato') {
       const job = e.vs & 3;
       if (id.charCodeAt(0) === 106 && id.charCodeAt(1) - 48 !== job) continue;   // j0〜j3：そのしごとの かぶり物だけ
@@ -997,6 +1044,7 @@ function drawMob(world, e, x, y, z, alpha) {
   }
 }
 const SHEARED_RGB = [0.93, 0.72, 0.66];
+const HORSE_RGB = [[0.62, 0.42, 0.26], [0.62, 0.42, 0.26], [0.36, 0.25, 0.18], [0.93, 0.86, 0.72], [0.62, 0.62, 0.64], [0.2, 0.19, 0.2]];   // 毛色：くり毛・こげ茶・クリーム・あし毛・黒
 const SATO_RGB = [[0.56, 0.78, 0.46], [0.56, 0.52, 0.56], [0.86, 0.6, 0.36], [0.46, 0.56, 0.92]];   // 上着の色：はたけ・かじや・かりうど・ものしり
 // 視線が当たる生き物を探す
 function pickMob(ox, oy, oz, dx, dy, dz, maxDist) {
@@ -1254,6 +1302,18 @@ function drawHoshi(world, e, x, y, z, alpha) {
 }
 
 // ================= 動物を飼う・ふやす =================
+// 乗り物の記録（乗っている間は 生き物の一覧から はずして、乗っている人が これを持つ）
+const RIDE_EYE = { boat: 1.15, cart: 1.2, horse: 2.28 }, RIDE_T = ['', 'boat', 'cart', 'horse'];
+function rideRec(e) { return { t: e.type, hp: e.hp, c: e.color | 0, s: e.saddle ? 1 : 0, tm: e.tamer || null, n: e.tameN | 0, yaw: e.yaw }; }
+// ほかの人・自分の姿に そえる 番号：下2ビット＝乗り物、その上3ビット＝ウマの毛色、32＝くら、64＝ソラの羽を つけている
+function rideCode(p) { const r = p.ride, a = p.armor[1]; return (r ? RIDE_T.indexOf(r.t) | ((r.c & 7) << 2) | (r.s ? 32 : 0) : 0) | (a && ITEMS[a.id].glide ? 64 : 0); }
+const _rideE = {};
+function drawRide(world, code, ryaw, wx, wy, wz, cam, walk, walkAmp) {
+  const type = RIDE_T[code & 3]; if (!type) return;
+  const e = _rideE[type] || (_rideE[type] = mkMob(type, 0, 0, 0));
+  e.x = wx; e.y = wy; e.z = wz; e.yaw = e.pyaw = ryaw; e.color = (code >> 2) & 7; e.saddle = !!(code & 32); e.tamer = 'x'; e.walk = walk || 0; e.walkAmp = walkAmp || 0; e.age = (R.time * 20) | 0; e.hp = 1; e.hurt = 0; e.headPitch = 0;
+  drawMob(world, e, wx - cam.x, wy - cam.y, wz - cam.z, 0);
+}
 function meId() { return net.on ? net.pid : 'me'; }
 function heartFx(e, n) { for (let i = 0; i < (n || 2); i++) fxPuff(e.x + (Math.random() - 0.5) * 0.8, e.y + e.h + 0.2 + Math.random() * 0.3, e.z + (Math.random() - 0.5) * 0.8, 1, 1, 0.35, 0.5, { glow: true, speed: 0.2, life: 0.9, size: 0.09, up: 0.9, grav: 0 }); }
 function setBaby(e, ticks) { const d = MOBS[e.type]; e.baby = ticks; if (ticks > 0) { e.hw = d.hw * 0.55; e.h = d.h * 0.55; } else { e.hw = d.hw; e.h = d.h; } }
@@ -1263,12 +1323,14 @@ function mobEx(e) {
   if (e.baby > 0) { o.b = e.baby; any = true; } if (e.sheared) { o.s = 1; any = true; } if (e.color) { o.c = e.color; any = true; }
   if (e.tamer) { o.o = e.tamer; any = true; } if (e.sit) { o.t = 1; any = true; } if (e.breedCd > 0) { o.cd = e.breedCd; any = true; }
   if (e.type === 'sato') { o.v = e.vs; if (e.home) o.hm = e.home; any = true; }
+  if (e.saddle) { o.sd = 1; any = true; } if (e.tameN > 0) { o.tn = e.tameN; any = true; }
   return any ? o : 0;
 }
 function applyEx(e, o) {
   if (!o || typeof o !== 'object') return;
   if (o.b > 0) setBaby(e, Math.min(24000, o.b | 0)); if (o.s) e.sheared = true; if (o.c > 0 && o.c < 16) e.color = o.c | 0;
   if (typeof o.o === 'string') e.tamer = o.o.slice(0, 40); if (o.t) e.sit = true; if (o.cd > 0) e.breedCd = Math.min(12000, o.cd | 0);
+  if (o.sd) e.saddle = true; if (o.tn > 0) e.tameN = Math.min(9, o.tn | 0);
   if (o.v > 0) e.vs = o.v >>> 0; if (Array.isArray(o.hm) && o.hm.length === 5) e.home = o.hm.map(n => n | 0);
   if (e.type === 'sato' && e.home) { e.vst = (e.home[4] !== 1 && Math.abs(e.x - e.home[0] - 0.5) < 2.6 && Math.abs(e.z - e.home[2] - 0.5) < 2.6) ? 0 : 2; e.vt = 100 + rnd(500); e.vin = 0; }   // 家の中で しまわれたなら、家の中から
 }
@@ -1455,6 +1517,13 @@ function mobUse(e, it) {
   if (!e || e.kind !== 'mob' || e.hp <= 0) return null;
   const id = it ? it.id : 0, baby = e.baby > 0, me = meId();
   if (e.type === 'sato') return 'trade';
+  if (MOBS[e.type].vehicle) return 'ride';
+  if (e.type === 'horse') {
+    if (baby) return MOB_FOOD.horse.indexOf(id) >= 0 ? 'grow' : null;
+    if (MOB_FOOD.horse.indexOf(id) >= 0) return e.hp < e.maxHp ? 'heal' : (e.tamer && !(e.love > 0) && !(e.breedCd > 0)) ? 'love' : 'wait';
+    if (id === I.saddle && e.tamer && !e.saddle) return 'saddle';
+    return 'ride';
+  }
   if (e.type === 'dog') {
     const meat = MEATS.indexOf(id) >= 0;
     if (!e.tamer) return meat ? 'tame' : null;
@@ -1483,6 +1552,7 @@ function applyMobUse(e, act, who, arg) {
     else fxPuff(e.x, e.y + e.h, e.z, 6, 0.4, 0.4, 0.4, { speed: 0.8, life: 0.6, size: 0.08, up: 0.6 });
   }
   else if (act === 'heal') { e.hp = Math.min(e.maxHp, e.hp + 6); heartFx(e, 3); }
+  else if (act === 'saddle') { if (e.type === 'horse' && !e.saddle) { e.saddle = true; e.swing = 14; sfxAt('equip', e.x, e.y, e.z); heartFx(e, 3); } }
   else if (act === 'busy') { if (e.type === 'sato') e.busy = 50; }
   else if (act === 'traded') { if (e.type === 'sato') { e.busy = 50; e.swing = 12; sfxAt('say_sato', e.x, e.y, e.z); fxPuff(e.x, e.y + e.h + 0.1, e.z, 6, 0.4, 0.95, 0.5, { glow: true, speed: 0.5, life: 0.8, size: 0.07, up: 0.8, grav: 0, spread: 0.5 }); } }
   else if (act === 'sit') { if (e.tamer === who) { e.sit = !e.sit; sfxAt('say_dog', e.x, e.y, e.z); } }

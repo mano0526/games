@@ -62,6 +62,7 @@ function initMesher() {
 }
 
 // 任意の4点の面
+const RAIL_UV = [[0, 16, 16, 16, 16, 0, 0, 0], [16, 16, 16, 0, 0, 0, 0, 16], [16, 0, 0, 0, 0, 16, 16, 16], [0, 0, 0, 16, 16, 16, 16, 0]];
 function quadP(buf, p, layer, uv, sky, blk, shade, flags, anim, both) {
   buf.ensure(8);
   for (let k = 0; k < 4; k++) buf.vert(p[k * 3], p[k * 3 + 1], p[k * 3 + 2], layer, uv[k * 2], uv[k * 2 + 1], sky, blk, shade, (flags && flags.length) ? flags[k] : (flags || 0), anim || 0);
@@ -353,6 +354,13 @@ function meshSection(world, c, sy) {
           if (meta === 2) quadP(mbT, [bx, by + 12, bz + 16, bx + 16, by + 12, bz + 16, bx + 16, by + 12, bz, bx, by + 12, bz], layer, uv, sky, 240, 255, 2, 4, true);
           else if (meta === 1) quadP(mbT, [bx + 8, by, bz, bx + 8, by, bz + 16, bx + 8, by + 16, bz + 16, bx + 8, by + 16, bz], layer, uv, sky, 240, 255, 2, 4, true);
           else quadP(mbT, [bx, by, bz + 8, bx + 16, by, bz + 8, bx + 16, by + 16, bz + 8, bx, by + 16, bz + 8], layer, uv, sky, 240, 255, 2, 4, true);
+          break;
+        }
+        case S_RAIL: {   // レール：地面すれすれの1まい。坂は 片がわを 1マス上げる
+          const cv = meta >= 6, r = cv ? meta - 6 : meta >= 2 ? (meta - 2) & 1 : meta & 1, up = meta >= 2 && meta <= 5 ? meta - 2 : -1;
+          const uvs = RAIL_UV[r], y0 = by + 1, h = 16;
+          const yS = y0 + (up === 0 ? h : 0), yW = y0 + (up === 1 ? h : 0), yN = y0 + (up === 2 ? h : 0), yE = y0 + (up === 3 ? h : 0);
+          quadP(mbC, [bx, yS + yW - y0, bz + 16, bx + 16, yS + yE - y0, bz + 16, bx + 16, yN + yE - y0, bz, bx, yN + yW - y0, bz], cv ? tl[0] : tl[2], uvs, sky, blk, 255, 0, 0, true);
           break;
         }
         case S_FLAT: {   // 水面に浮かぶ葉。向きは場所ごとに変える

@@ -81,6 +81,8 @@ const audio = {
         case 'bone': for (let i = 0; i < 3; i++) T(0.05, 'square', (260 + i * 70) * p, 180 * p, 0.14 * v, 0.003, null, i * 0.07 * L); N(0.2 * L, 'bandpass', 1500, 900, 2, 0.12 * v); break;
         case 'magma': T(0.22 * L, 'sine', 150 * p, 70, 0.4 * v); N(0.25 * L, 'lowpass', 600 * p, 200, 1, 0.4 * v, 0.01); break;
         case 'hoshi': T(1.3 * L, 'sawtooth', 110 * p, 52 * p, 0.42 * v, 0.2, [3, 7]); T(1.1 * L, 'sine', 330 * p, 160 * p, 0.2 * v, 0.2, [5, 20]); N(1.0 * L, 'bandpass', 500, 180, 1.5, 0.35 * v, 0.25); break;
+        case 'horse': T(0.5 * L, 'sawtooth', 620 * p, 330 * p, 0.2 * v, 0.02, [14, 40]); N(0.4 * L, 'bandpass', 1500, 900, 2, 0.1 * v, 0.03); break;
+        case 'boat': case 'cart': T(0.06, 'triangle', 200 * p, 120 * p, 0.3 * v); N(0.06, 'lowpass', 1200, 500, 1, 0.25 * v); break;
         case 'sato': T(0.12 * L, 'triangle', 300 * p, 345 * p, 0.24 * v, 0.02); T(0.17 * L, 'triangle', 385 * p, 450 * p, 0.22 * v, 0.02, null, 0.15 * L); break;
         case 'dog': T(0.09 * L, 'square', 520 * p, 330 * p, 0.22 * v, 0.004); T(0.11 * L, 'sawtooth', 430 * p, 260 * p, 0.18 * v, 0.004, null, 0.13 * L); break;
         case 'yumi': T(0.25 * L, 'triangle', 520 * p, 390 * p, 0.14 * v, 0.02, [9, 25]); N(0.3 * L, 'highpass', 2600, 1800, 0.8, 0.1 * v, 0.03); break;

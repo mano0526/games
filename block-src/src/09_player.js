@@ -16,6 +16,7 @@ class Player {
     this.stats = { broken: 0, placed: 0, kills: 0, deaths: 0, crafted: 0, dist: 0 };
     this.burnT = 0; this.gateT = 0; this.gateWait = false;   // 火がついている残り時間／門の中にいる時間／門から出るまで待つ
     this.fx = { regen: 0, speed: 0, str: 0, fire: 0, night: 0 };   // くすりの効き目の のこり（20＝1秒）
+    this.ride = null; this.gliding = false; this.airT = 0; this.jumpWas = false; this.sneakHold = false; this.glAcc = 0; this.glWear = 0; this.h = 1.8;   // 乗り物（ride＝{t, hp, c, s, tm, n, yaw, …}）と 滑空
     this.trades = {};   // 村人との こうかん：{村人の番号: [日にち, 1つ目を使った回数, …]}
     this.xpLv = 0; this.xpPt = 0; this.enchSeed = (Math.random() * 0x7fffffff) | 0;   // 経験値：レベルと、そのレベルの中で ためた数
     this.drawT = 0; this.autoBow = 0; this.blocking = false; this.blockK = 0; this.noBlockT = 0; this.webT = 0; this.noArrowT = 0;   // 弓を引いている時間／タップで自動で引く残り／盾をかまえているか／糸にからまっている残り
@@ -82,8 +83,145 @@ class Player {
     this.interact(world, dt);
     input.usePressed = input.breakPressed = false;
     this.sprintK = (this.sprintK || 0) + ((this.sprinting ? 1 : 0) - (this.sprintK || 0)) * Math.min(1, dt * 8);   // 走り出すと 画面が なめらかに広がる
-    const want = this.sneaking ? 1.47 : 1.62; this.eyeOff += (want - this.eyeOff) * Math.min(1, dt * 14);
+    const want = this.ride ? RIDE_EYE[this.ride.t] : this.gliding ? 0.6 : this.sneaking ? 1.47 : 1.62; this.eyeOff += (want - this.eyeOff) * Math.min(1, dt * 14);
     if (this.stepLift) { this.stepLift -= Math.max(this.stepLift * dt * 16, dt * 1.2); if (this.stepLift < 0.004) this.stepLift = 0; }
+  }
+  // ---- 乗り物 ----
+  mount(r) {
+    r.wild = 0; r.rv = 0; r.walk = 0; r.walkAmp = 0; if (r.yaw === undefined) r.yaw = this.yaw;
+    this.ride = r; this.flying = false; this.vx = this.vy = this.vz = 0; this.fallDist = 0; this.sprinting = false; this.sneaking = false; this.gliding = false; this.sneakHold = true;
+    this.h = r.t === 'horse' ? 2.5 : 1.8;
+    if (r.t === 'horse' && !r.tm) { r.wild = 2 + Math.random() * 2.5; sfx('say_horse', 0.8); ui.toast('ウマが あばれている！ ふり落とされずに いられるかな', 3); }
+    else ui.toast(r.t === 'horse' && !r.s ? '「くら」を つけると、思いどおりに 走れる。しゃがむ で おりる' : 'しゃがむ で おりる', 3);
+    sfx(r.t === 'horse' ? 'equip' : 'place_wood', 0.6); game.onStat('ride', r.t);
+  }
+  // おりる：その場に 乗り物を もどす
+  dismount() {
+    const r = this.ride; if (!r) return null; this.ride = null; this.h = 1.8; this.sneakHold = false;
+    const e = spawnMob(r.t, this.x, this.y + 0.02, this.z); e.yaw = e.pyaw = r.yaw; e.hp = Math.max(1, r.hp);
+    if (r.t === 'horse') { e.color = r.c || 1; e.saddle = !!r.s; e.tamer = r.tm || null; e.tameN = r.n | 0; }
+    const world = game.world, sx = Math.cos(r.yaw), sz = -Math.sin(r.yaw);   // 横へ 1歩 おりる（ふさがっていたら その場で 上へ）
+    if (r.t !== 'boat') for (const k of [1, -1]) {
+      const nx = this.x + sx * k * 0.95, nz = this.z + sz * k * 0.95; _cb.length = 0;
+      world.collectBoxes(nx - this.hw, this.y + 0.1, nz - this.hw, nx + this.hw, this.y + 1.9, nz + this.hw, _cb);
+      if (!_cb.length) { this.x = nx; this.z = nz; break; }
+    }
+    this.vx = this.vz = 0; this.vy = r.t === 'boat' ? 5 : 3; this.fallDist = 0;
+    return e;
+  }
+  ridePhysics(world, dt, f, s, jump) {
+    const r = this.ride, fx = Math.floor(this.x), fz = Math.floor(this.z);
+    this.sneaking = false; this.sprinting = false; this.blocking = false; this.inLava = false;
+    this.headIn = FLUID[world.getBlock(fx, Math.floor(this.eyeY()), fz)];
+    this.inWater = FLUID[world.getBlock(fx, Math.floor(this.y + 0.9), fz)] === 1;
+    if (r.t === 'cart') { this.rideCart(world, dt, f); return; }
+    const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw), ox = this.x, oy = this.y, oz = this.z;
+    if (r.t === 'boat') {
+      let top = null;
+      for (let yy = Math.floor(this.y + 1.2); yy >= Math.floor(this.y - 0.7); yy--) if (FLUID[world.getBlock(fx, yy, fz)] === 1) { top = yy + 0.88; break; }
+      const speed = top !== null ? 7.4 : 0.9, k = 1 - Math.exp(-(top !== null ? 1.7 : 7) * dt);
+      this.vx += ((-sy * f + cy * s * 0.45) * speed - this.vx) * k; this.vz += ((-cy * f - sy * s * 0.45) * speed - this.vz) * k;
+      if (top !== null) { this.vy += ((top - 0.02 - this.y) * 34 - this.vy * 8) * dt; this.vy = clamp(this.vy, -4, 4); } else this.vy = Math.max(this.vy - 30 * dt, -40);
+      moveStep(world, this, this.vx * dt, this.vy * dt, this.vz * dt, 0);
+      const hs = Math.hypot(this.vx, this.vz);
+      if (hs > 0.6) r.yaw = lerpAngle(r.yaw, Math.atan2(-this.vx, -this.vz), 1 - Math.exp(-5 * dt));
+      if (top !== null && hs > 1.5) { this.stepAcc += hs * dt; if (this.stepAcc > 3.2) { this.stepAcc = 0; sfx('swim', 0.25); fxPuff(this.x, top, this.z, 4, 0.75, 0.88, 1, { speed: 1.2, life: 0.5, grav: 6, up: 1 }); } }
+      this.fallDist = 0;
+    } else {   // ウマ
+      const inW = FLUID[world.getBlock(fx, Math.floor(this.y + 0.9), fz)] === 1;
+      let wx, wz;
+      if (r.wild > 0) {   // まだ なついていない：かってに 走り回って はねる
+        r.wild -= dt; r.yaw += Math.sin(R.time * 3.1) * 2.6 * dt;
+        wx = -Math.sin(r.yaw) * 6.5; wz = -Math.cos(r.yaw) * 6.5;
+        if (this.onGround && Math.random() < dt * 2.2) { this.vy = 6.4; this.onGround = false; sfxAt('hop', this.x, this.y, this.z); }
+        if (r.wild <= 0) { this.tameEnd(); if (!this.ride) return; }
+      } else {
+        const speed = (r.s ? 9.2 : 2.3) * (inW ? 0.4 : 1);
+        wx = (-sy * f + cy * s * 0.6) * speed; wz = (-cy * f - sy * s * 0.6) * speed;
+        if (jump && this.onGround) { this.vy = r.s ? 10.6 : 7.4; this.onGround = false; if (r.s) sfxAt('hop', this.x, this.y, this.z); }
+      }
+      const k = this.onGround ? 1 - Math.exp(-5 * dt) : 1 - Math.exp(-1.4 * dt);
+      this.vx += (wx - this.vx) * k; this.vz += (wz - this.vz) * k;
+      if (inW) this.vy = clamp(this.vy + 12 * dt, -3, 2.2); else this.vy = Math.max(this.vy - 30 * dt, -60);
+      moveStep(world, this, this.vx * dt, this.vy * dt, this.vz * dt, inW ? 0 : 1.05);
+      if (inW) this.fallDist = 0; else if (this.y < oy) this.fallDist += oy - this.y;
+      if (this.onGround) { if (this.fallDist > 7 && this.mode === 0) this.damage(Math.floor(this.fallDist - 6), this.x, this.z, 0, '落下', true); this.fallDist = 0; }
+      const hd = Math.hypot(this.x - ox, this.z - oz), hs = hd / dt;
+      r.walk += hd * 2.2; r.walkAmp += ((this.onGround && hs > 0.3 ? Math.min(1, hs / 5) : 0) - r.walkAmp) * Math.min(1, dt * 8);
+      if (!(r.wild > 0)) r.yaw = lerpAngle(r.yaw, hs > 0.8 ? Math.atan2(-this.vx, -this.vz) : this.yaw, 1 - Math.exp(-6 * dt));
+      if (this.onGround && hs > 1) { this.stepAcc += hd; if (this.stepAcc > 2.6) { this.stepAcc = 0; const below = world.getBlock(Math.floor(this.x), Math.floor(this.y - 0.2), Math.floor(this.z)); if (below) sfx('step_' + BLOCKS[below].sound, 0.45); } }
+    }
+    this.stats.dist += Math.hypot(this.x - ox, this.z - oz); this.bobAmp = 0;
+  }
+  // あばれるウマに 乗りきった：なつくか、ふり落とされるか（乗るたびに なつきやすくなる）
+  tameEnd() {
+    const r = this.ride; r.wild = 0; r.n = (r.n | 0) + 1;
+    if (Math.random() < 0.2 + 0.22 * r.n) {
+      r.tm = meId(); sfx('levelup', 0.6); sfx('say_horse', 0.8);
+      for (let i = 0; i < 8; i++) fxPuff(this.x + (Math.random() - 0.5) * 1.2, this.y + 1.6 + Math.random() * 0.6, this.z + (Math.random() - 0.5) * 1.2, 1, 1, 0.35, 0.5, { glow: true, speed: 0.2, life: 0.9, size: 0.09, up: 0.9, grav: 0 });
+      ui.toast('ウマが なついた！「くら」を つけると、思いどおりに 走れる', 6); game.onStat('tame', 'horse');
+    } else {
+      this.dismount(); this.vy = 7; this.vx = (Math.random() - 0.5) * 6; this.vz = (Math.random() - 0.5) * 6; sfx('hit', 0.5);
+      ui.toast('ふり落とされた！ もう一度 乗ってみよう（乗るたびに なつきやすくなる）', 4);
+    }
+  }
+  // トロッコ：レールの線の上を すべる。前で おす・後ろで ブレーキ。坂と「はやレール」で 速くなる
+  rideCart(world, dt, f) {
+    const r = this.ride, bx = Math.floor(this.x), bz = Math.floor(this.z), by = Math.floor(this.y + 0.4);
+    const ry = world.railAt(bx, by, bz) ? by : world.railAt(bx, by - 1, bz) ? by - 1 : world.railAt(bx, by + 1, bz) ? by + 1 : null;
+    const lx = -Math.sin(this.yaw), lz = -Math.cos(this.yaw);
+    if (ry === null) {   // レールの外：ほとんど進めない
+      const k = 1 - Math.exp(-5 * dt); r.rv = 0;
+      this.vx += (lx * f * 0.8 - this.vx) * k; this.vz += (lz * f * 0.8 - this.vz) * k; this.vy = Math.max(this.vy - 30 * dt, -40);
+      moveStep(world, this, this.vx * dt, this.vy * dt, this.vz * dt, 0); this.fallDist = 0;
+      return;
+    }
+    const id = world.getBlock(bx, ry, bz), c = RAIL_CON[world.getMeta(bx, ry, bz)] || RAIL_CON[0], A = F4[c[0]], Bd = F4[c[1]];
+    const ax = bx + 0.5 + A[0] * 0.5, az = bz + 0.5 + A[1] * 0.5, ay = ry + (c[2] === c[0] ? 1 : 0);   // レールの両はし（マスのふちの まん中）
+    const ex = bx + 0.5 + Bd[0] * 0.5, ez = bz + 0.5 + Bd[1] * 0.5, ey = ry + (c[2] === c[1] ? 1 : 0);
+    const len = Math.hypot(ex - ax, ez - az), ux = (ex - ax) / len, uz = (ez - az) / len;
+    const dot = this.vx * ux + this.vz * uz;
+    let v = (dot < 0 ? -1 : 1) * r.rv;   // A→B を正とした速さ（まがっても 速さは そのまま）
+    const look = lx * ux + lz * uz;
+    if (f > 0.1 && Math.abs(v) < 4.5) v += (Math.abs(v) > 0.3 ? Math.sign(v) : (look < 0 ? -1 : 1)) * 6 * dt;   // 止まっている時は 見ている向きへ
+    else if (f < -0.1) v -= Math.sign(v) * Math.min(Math.abs(v), 9 * dt);
+    v -= (ey - ay) / len * 15 * dt;   // 坂
+    if (id === B.rail_fast && Math.abs(v) > 0.25) v += Math.sign(v) * 16 * dt;
+    v *= Math.exp(-(id === B.rail_fast ? 0.05 : 0.2) * dt); v = clamp(v, -11, 11);
+    let t = clamp(((this.x - ax) * ux + (this.z - az) * uz) / len, 0, 1) + v * dt / len;
+    if (t < 0 || t > 1) {   // 次のマスへ
+      const out = t > 1 ? Bd : A, oy = t > 1 ? ey : ay, nx = bx + out[0], nz = bz + out[1], over = Math.max(0.02, (t > 1 ? t - 1 : -t) * len);
+      if (world.railAt(nx, oy, nz) || world.railAt(nx, oy - 1, nz)) {
+        this.x = bx + 0.5 + out[0] * (0.5 + over); this.z = bz + 0.5 + out[1] * (0.5 + over); this.y = oy;
+        this.vx = out[0] * Math.abs(v); this.vz = out[1] * Math.abs(v); r.rv = Math.abs(v);
+        if (Math.abs(v) > 1) sfx('step_metal', Math.min(0.5, Math.abs(v) / 20));
+      } else { t = clamp(t, 0, 1); v = 0; }   // 行き止まり
+    }
+    if (t >= 0 && t <= 1) { this.x = ax + (ex - ax) * t; this.z = az + (ez - az) * t; this.y = ay + (ey - ay) * t; this.vx = ux * v; this.vz = uz * v; r.rv = Math.abs(v); }
+    this.vy = 0; this.onGround = true; this.fallDist = 0;
+    if (r.rv > 0.4) r.yaw = lerpAngle(r.yaw, Math.atan2(-this.vx, -this.vz), 1 - Math.exp(-10 * dt));
+    this.stats.dist += r.rv * dt;
+  }
+  // 滑空（本家の羽と同じ式を 1/20秒きざみで）：下を向くと 速くなり、上を向くと その速さで のぼる
+  glide(world, dt) {
+    this.sneaking = false; this.sprinting = false; this.fallDist = 0;
+    this.glAcc += dt;
+    while (this.glAcc >= 0.05) {
+      this.glAcc -= 0.05;
+      let vx = this.vx / 20, vy = this.vy / 20, vz = this.vz / 20;
+      const pm = -this.pitch, cp = Math.cos(pm), sq = cp * cp, lx = -Math.sin(this.yaw) * cp, lz = -Math.cos(this.yaw) * cp, hv = Math.hypot(vx, vz);
+      vy += -0.08 + sq * 0.06;
+      if (vy < 0 && cp > 0) { const d = vy * -0.1 * sq; vy += d; vx += lx * d / cp; vz += lz * d / cp; }
+      if (pm < 0 && cp > 0) { const d = hv * -Math.sin(pm) * 0.04; vy += d * 3.2; vx -= lx * d / cp; vz -= lz * d / cp; }
+      if (cp > 0) { vx += (lx / cp * hv - vx) * 0.1; vz += (lz / cp * hv - vz) * 0.1; }
+      this.vx = vx * 0.99 * 20; this.vy = vy * 0.98 * 20; this.vz = vz * 0.99 * 20;
+    }
+    const ox = this.x, oz = this.z, sp0 = Math.hypot(this.vx, this.vz);
+    moveStep(world, this, this.vx * dt, this.vy * dt, this.vz * dt, 0);
+    if (this.hitH && sp0 > 14 && this.mode === 0) this.damage(Math.floor((sp0 - 12) * 0.6), this.x, this.z, 0, 'しょうとつ', true);   // かべに 速く ぶつかった
+    this.stats.dist += Math.hypot(this.x - ox, this.z - oz);
+    this.glWear += dt;
+    if (this.glWear >= 1 && this.mode === 0) { this.glWear = 0; const a = this.armor[1]; if (a) { a.d = (a.d || 0) + 1; if (itemDmg(a.d) >= ITEMS[a.id].armor.dur) { this.armor[1] = null; this.gliding = false; sfx('toolbreak'); ui.toast('ソラの羽 がこわれた'); } this.invDirty = true; } }
   }
   hasFloor(world, x, z) {
     _cb.length = 0;
@@ -102,6 +240,17 @@ class Player {
     if (inW && !this.inWater && this.vy < -4) { sfx('splash'); fxPuff(this.x, this.y + 0.5, this.z, 14, 0.7, 0.85, 1, { speed: 3, life: 0.6, grav: 12, up: 2 }); }
     this.inWater = inW; this.inLava = inL; this.headIn = FLUID[world.getBlock(fx, Math.floor(this.eyeY()), fz)];
     const ladder = SHAPE[feet] === S_LADDER || SHAPE[body] === S_LADDER;
+    if (this.ride) {   // 乗り物：しゃがむ で おりる
+      if (sneak && !this.sneakHold) this.dismount();
+      else { if (!sneak) this.sneakHold = false; this.ridePhysics(world, dt, f, s, jump); return; }
+    }
+    // 滑空：「ソラの羽」を つけて、空中で ジャンプ
+    this.airT = this.onGround || inW || inL || ladder || this.flying ? 0 : this.airT + dt;
+    const wing = this.armor[1] && ITEMS[this.armor[1].id].glide;
+    if (this.gliding && (!wing || this.airT === 0)) this.gliding = false;
+    else if (!this.gliding && wing && jump && !this.jumpWas && this.airT > 0.22) { this.gliding = true; this.glAcc = 0; sfx('glide', 0.5); game.onStat('glide', 0); }
+    this.jumpWas = jump;
+    if (this.gliding) { this.glide(world, dt); return; }
     this.sneaking = sneak && !this.flying;
     if (input.sprint && f > 0.5 && !this.sneaking && (this.mode === 1 || this.food > 6)) this.sprinting = true;
     if (f <= 0.1 || this.sneaking || (this.mode === 0 && this.food <= 6)) this.sprinting = false;
@@ -323,12 +472,18 @@ class Player {
   onKill(e) { this.stats.kills++; this.stat('kill', e.type); }
   // 動物に 手に持った物を使う（えさ・ハサミ・バケツ・染料・おすわり）
   useOnMob(e, act, it) {
+    if (act === 'ride') {
+      if (this.ride || this.dead) return true;
+      if (e.remote) { const now = performance.now(); if (!this.rideAsk || now - this.rideAsk > 1200) { this.rideAsk = now; net.dm(e.owner, { t: 'ride', n: e.rnid }); } return true; }   // ほかの人が動かしている：ゆずってもらう
+      this.x = e.x; this.y = e.y; this.z = e.z; e.dead = true; this.mount(rideRec(e)); return true;
+    }
     if (act === 'trade') { ui.open('trade', e); sfx('click'); sfxAt('say_sato', e.x, e.y, e.z); return true; }
     this.swing();
     if (act === 'wait') return true;
     const me = meId(), arg = act === 'dye' ? DYE.indexOf(it.id) : 0;
     if (e.remote) net.dm(e.owner, { t: 'use', n: e.rnid, a: act, c: arg }); else applyMobUse(e, act, me, arg);
-    if (act === 'love' || act === 'grow' || act === 'tame' || act === 'heal' || act === 'dye') { this.useHeldOne(); sfx('eat', 0.4); }
+    if (act === 'saddle') this.useHeldOne();
+    else if (act === 'love' || act === 'grow' || act === 'tame' || act === 'heal' || act === 'dye') { this.useHeldOne(); sfx('eat', 0.4); }
     else if (act === 'shear') this.wearHeld(1);
     else if (act === 'milk') {
       sfx('splash', 0.5);
@@ -343,6 +498,7 @@ class Player {
     if (t && !this.sneaking) { const b = BLOCKS[t.id]; if (b.interact) { this.swing(); this.interactBlock(world, t, b.interact); return true; } }
     if (!it) return false;
     if (def.tool && def.tool.type === 'lighter') return t ? this.useLighter(world, t) : false;
+    if (def.vehicle) return this.useVehicle(world, it, def);
     if (def.bucket) return this.useBucket(world, it, def);
     if (def.bottle) return this.useBottle(world, it);
     if (def.tool && def.tool.type === 'shovel' && t && t.id === B.grass && t.ny === 1) {   // スコップで 草を たたくと 道になる
@@ -410,6 +566,7 @@ class Player {
     } else if (sh === S_SLAB) meta = upper ? 1 : 0;
     else if (sh === S_STAIR) meta = lf | (upper ? 4 : 0);            // のぼる先が 向いているほう
     else if (sh === S_GATE) meta = lf;
+    else if (sh === S_RAIL) { if (!world.hasSupport(id, 0, px, py, pz)) return false; meta = lf & 1; }
     else if (sh === S_TRAP) meta = toward | (upper ? 8 : 0);          // ちょうつがいは 手前がわ
     else if (sh === S_SIGN) { meta = toward; if (!world.hasSupport(id, meta, px, py, pz)) { ui.toast('看板は地面の上に立てます'); return false; } }
     else if (sh === S_LANTERN) {                                       // ブロックの下の面に置くと つるす。それ以外は床に置く
@@ -427,6 +584,7 @@ class Player {
     if (cur && !FLUID[cur]) world.breakNatural(px, py, pz);
     if (extra) { const ec = world.getBlock(extra[0], extra[1], extra[2]); if (ec && !FLUID[ec]) world.breakNatural(extra[0], extra[1], extra[2]); world.setBlock(px, py, pz, id, meta, 1); world.setBlock(extra[0], extra[1], extra[2], id, extra[3]); }
     else world.setBlock(px, py, pz, id, meta);
+    if (sh === S_RAIL) world.railFix(px, py, pz, meta);   // まわりのレールと つなぐ
     const be = BLOCKS[id].ent;
     if (be === 'chest') world.setEnt(px, py, pz, { t: 'chest', items: new Array(27).fill(null) });
     else if (be === 'furnace') world.setEnt(px, py, pz, { t: 'furnace', in: null, fuel: null, out: null, burn: 0, burnMax: 0, cook: 0 });
@@ -472,6 +630,18 @@ class Player {
     if (k === 'fire') this.burnT = 0;
     const c = C(P[1]); for (let i = 0; i < 16; i++) { const a = Math.random() * 6.283, rr = 0.5 + Math.random() * 0.25; fxPuff(this.x + Math.cos(a) * rr, this.y + 0.1 + Math.random() * 1.0, this.z + Math.sin(a) * rr, 1, c[0] / 255, c[1] / 255, c[2] / 255, { glow: true, speed: 0.3, life: 0.9, size: 0.045, up: 1, grav: 0 }); }   // 目の前に出すと 画面いっぱいに見えてしまうので、足もとのまわりに
     sfx('potion', 0.7); ui.toast(P[0] + '：' + P[4], 4); this.stat('potion', k); ui.fxKey = '';
+  }
+  // ボートは 水（か 地面）に、トロッコは レールに 置く
+  useVehicle(world, it, def) {
+    const t = this.target; let x, y, z;
+    if (def.vehicle === 'cart') { if (!t || SHAPE[t.id] !== S_RAIL) { ui.toast('トロッコは レールの上に 置きます'); return false; } x = t.x + 0.5; y = t.y; z = t.z + 0.5; }
+    else {
+      const ex = this.x, ey = this.eyeY(), ez = this.z, r = this.ray, maxT = t ? t.t : 5; let hit = false;
+      for (let d = 0.3; d <= maxT + 0.05 && !hit; d += 0.12) { const bx = Math.floor(ex + r[0] * d), by = Math.floor(ey + r[1] * d), bz = Math.floor(ez + r[2] * d); if (FLUID[world.getBlock(bx, by, bz)] === 1) { x = bx + 0.5; y = by + 0.6; z = bz + 0.5; hit = true; } }
+      if (!hit) { if (!t || t.ny !== 1) return false; x = t.x + 0.5; y = t.y + 1.02; z = t.z + 0.5; }
+    }
+    const e = spawnMob(def.vehicle, x, y, z); e.yaw = e.pyaw = this.yaw;
+    sfx('place_wood'); this.swing(); this.useHeldOne(); return true;
   }
   useBucket(world, it, def) {
     const ex = this.x, ey = this.eyeY(), ez = this.z, r = this.ray, t = this.target;
@@ -613,6 +783,7 @@ class Player {
     if (this.hp <= 0) { this.hp = 0; this.die(source); }
   }
   die(source) {
+    if (this.ride) this.dismount(); this.gliding = false;
     this.dead = true; this.stats.deaths++; this.burnT = 0; this.gateT = 0; this.drawT = 0; this.autoBow = 0; this.blocking = false; this.webT = 0; for (const k in this.fx) this.fx[k] = 0;
     this.deathPos = { x: Math.floor(this.x), y: Math.floor(this.y), z: Math.floor(this.z) };
     let dropped = false;
@@ -638,7 +809,7 @@ class Player {
   }
   serialize() {
     const day = game.world ? game.world.day : 0, tr = {}; for (const k in this.trades) if (this.trades[k][0] === day) tr[k] = this.trades[k];   // きょうの分だけ のこす
-    return { trades: tr, x: this.x, y: this.y, z: this.z, yaw: this.yaw, pitch: this.pitch, hp: this.hp, food: this.food, sat: this.sat, air: this.air, inv: this.inv, armor: this.armor, sel: this.sel, spawn: this.spawn, flying: this.flying, stats: this.stats, dead: this.dead, deathPos: this.deathPos, xpLv: this.xpLv, xpPt: this.xpPt, enchSeed: this.enchSeed, fx: this.fx };
+    return { trades: tr, ride: this.ride, x: this.x, y: this.y, z: this.z, yaw: this.yaw, pitch: this.pitch, hp: this.hp, food: this.food, sat: this.sat, air: this.air, inv: this.inv, armor: this.armor, sel: this.sel, spawn: this.spawn, flying: this.flying, stats: this.stats, dead: this.dead, deathPos: this.deathPos, xpLv: this.xpLv, xpPt: this.xpPt, enchSeed: this.enchSeed, fx: this.fx };
   }
   load(o) {
     for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'hp', 'food', 'sat', 'air', 'sel', 'spawn', 'flying', 'deathPos', 'xpLv', 'xpPt', 'enchSeed']) if (o[k] !== undefined) this[k] = o[k];
@@ -647,6 +818,7 @@ class Player {
     if (o.inv) this.inv = o.inv.map(s => s ? { id: s.id, n: s.n, d: s.d || 0 } : null); while (this.inv.length < 36) this.inv.push(null);
     if (o.armor) this.armor = o.armor.map(s => s ? { id: s.id, n: s.n, d: s.d || 0 } : null); while (this.armor.length < 5) this.armor.push(null);   // 昔のセーブには 盾のマスがない
     if (o.stats) Object.assign(this.stats, o.stats);
+    this.ride = null; this.h = 1.8; if (o.ride && RIDE_EYE[o.ride.t]) { const q = o.ride; this.ride = { t: q.t, hp: +q.hp || 1, c: q.c | 0, s: q.s ? 1 : 0, tm: q.tm ? String(q.tm) : null, n: q.n | 0, yaw: +q.yaw || 0, wild: 0, rv: 0, walk: 0, walkAmp: 0 }; if (q.t === 'horse') this.h = 2.5; }
     this.trades = {}; if (o.trades && typeof o.trades === 'object') for (const k in o.trades) { const r = o.trades[k]; if (Array.isArray(r) && r.length === 7) this.trades[k] = r.map(n => n | 0); }
     if (o.dead) { this.hp = 20; this.food = 20; }
     this.invDirty = true;
@@ -662,12 +834,12 @@ class Player {
     cam.fov = settings.fov * (this.sprintK === undefined ? 1 : 1 + 0.13 * this.sprintK) * (this.flying && this.sprinting ? 1.05 : 1) * (this.drawT > 0 ? 1 - 0.15 * Math.min(1, this.drawT) : 1);   // 弓を引くと 少し ねらいやすく
     if (this.dead) { cam.roll = 0.5; cam.y = this.y + 0.4; }
     else if (settings.view) {   // うしろから／前から見る：かべにめりこまないよう、ぶつかる手前で止める
-      const back = settings.view === 1 ? 1 : -1, cp = Math.cos(this.pitch);
-      const dx = Math.sin(this.yaw) * cp * back, dy = -Math.sin(this.pitch) * back, dz = Math.cos(this.yaw) * cp * back;
+      const back = settings.view === 1 ? 1 : -1, cp = Math.cos(this.pitch), cyaw = this.yaw + (R.dbgCam || 0);   // dbgCam＝試験で 横から撮るため（カメラだけ 回す）
+      const dx = Math.sin(cyaw) * cp * back, dy = -Math.sin(this.pitch) * back, dz = Math.cos(cyaw) * cp * back;
       let dist = 4; const hit = game.world.raycast(cam.x, cam.y, cam.z, dx, dy, dz, dist + 0.4);
       if (hit && SOLID[hit.id]) dist = Math.max(0.2, hit.t - 0.4);
       cam.x += dx * dist; cam.y += dy * dist; cam.z += dz * dist;
-      if (back < 0) { cam.yaw = this.yaw + Math.PI; cam.pitch = -this.pitch; }
+      if (back < 0) { cam.yaw = cyaw + Math.PI; cam.pitch = -this.pitch; } else cam.yaw = cyaw;
     }
     return cam;
   }

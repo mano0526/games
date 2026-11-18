@@ -183,6 +183,19 @@ function buildTextures() {
   newTex('mud', p => { p.blot(CP(['#3d3531', '#46403a', '#352e2a', '#4a433d', '#403832']), 4); p.dash(4, 3, C('#5a524b')); p.dots(6, C('#2a2421')); });
   newTex('path_top', p => { p.speckle(CP(['#b0915c', '#a88852', '#b89a66', '#a07f4a', '#ad8d58'])); p.dots(10, C('#8a6c3e')); p.dots(8, C('#c9ae7c')); p.dash(3, 2, C('#96784a')); });
   newTex('path_side', p => { p.copy('dirt'); for (let x = 0; x < 16; x++) { p.px(x, 0, C(x % 3 ? '#b0915c' : '#a07f4a')); if (p.rng() < 0.5) p.px(x, 1, C('#96784a')); } });
+  // レール：鉄の2本と まくら木。まがりは 左下のかどを まん中にした 円
+  const railPaint = (p, rc, rd, tie) => { for (const y of [1, 5, 9, 13]) for (let x = 1; x < 15; x++) p.px(x, y, tie[(x + y) % tie.length]); for (let y = 0; y < 16; y++) { p.px(3, y, rc); p.px(4, y, rd); p.px(11, y, rd); p.px(12, y, rc); } };
+  const tiePal = CP(['#7a5630', '#6e4c29', '#86603a']);
+  newTex('rail', p => railPaint(p, C('#c9cdd4'), C('#8a9099'), tiePal));
+  newTex('rail_fast', p => { railPaint(p, C('#f6cf3e'), C('#c99a1e'), tiePal); for (const y of [3, 7, 11, 15]) { p.px(7, y, C('#ff7a4a')); p.px(8, y, C('#ffd0a0')); } });
+  newTex('rail_curve', p => {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const dx = x + 0.5, dy = 15.5 - y, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+      if (d > 1.6 && d < 13.6 && (Math.abs(a - 0.26) < 0.075 || Math.abs(a - 0.785) < 0.06 || Math.abs(a - 1.31) < 0.075)) p.px(x, y, tiePal[(x + y) % 3]);
+      if (Math.abs(d - 3.5) < 1) p.px(x, y, d < 3.5 ? C('#c9cdd4') : C('#8a9099'));
+      else if (Math.abs(d - 11.5) < 1) p.px(x, y, d < 11.5 ? C('#8a9099') : C('#c9cdd4'));
+    }
+  });
   newTex('coarse_dirt', p => { p.speckle(CP(['#7a5234', '#6c482c', '#86603f', '#5e3f27'])); p.dots(12, C('#9a8d80')); p.dots(8, C('#4a3220')); p.dots(5, C('#b3a698')); });
   newTex('moss', p => { p.blot(CP(['#5d8a3a', '#527e33', '#689642', '#487229', '#5d8a3a']), 2); p.dots(9, C('#7aa84f')); p.dots(6, C('#3c6222')); });
   const mycPal = CP(['#7a6a80', '#70617a', '#857590', '#695a72']);
@@ -672,6 +685,11 @@ function buildIcons() {
   S(I.diamond, R_GEM, { l: '#c8fbf6', m: '#5fe0d8', s: '#2fa59e', d: '#145e5a', w: '#ffffff' });
   S(I.jade, ['', '', '......ddddd.....', '....ddllmmmd....', '...dllwlmmmmd...', '...dlld.dmmmsd..', '...dlmdddmmmsd..', '...dmmmmmmmssd..', '....dmmmmmmssd..', '.....ddmmmmssd..', '.......dmmssd...', '......dmmssd....', '....ddmssdd.....', '....dsddd.......', '.....dd.........', ''],
     { l: '#c9f5d2', m: '#62c98a', s: '#3a9a62', d: '#1c5e3a', w: '#ffffff' });   // ヒスイ（まがたまの形）
+  S(I.boat, ['', '', '', '', '', '.d............d.', '.dm..........md.', '.dmllllllllllmd.', '.dmmmmmmmmmmmmd.', '..dmmssssssmmd..', '...dssssssssd...', '....dddddddd....'], { d: '#5a3d1e', m: '#b08a52', l: '#caa66c', s: '#8a6638' });
+  S(I.cart, ['', '', '', '', '..dddddddddddd..', '..dllllllllllsd.', '..dlmmmmmmmmmsd.', '..dlmmmmmmmmmsd.', '..dmmmmmmmmmmsd.', '..dsssssssssssd.', '..dddddddddddd..', '...ww......ww...', '...ww......ww...'], { d: '#3c3f44', m: '#8e949c', l: '#c4c9d0', s: '#6a7078', w: '#2a2c30' });
+  S(I.saddle, ['', '', '', '', '....dddddddd....', '...dllmmmmmmd...', '..dllmmmmmmmsd..', '..dmmmmmmmmmsd..', '..dddmmmmmsddd..', '..dyd.dddd.dyd..', '..dyd......dyd..', '...d........d...', '..ddd......ddd..', '..ddd......ddd..'], { d: '#4a2c14', m: '#9a5a2c', l: '#c07a44', s: '#7a4420', y: '#c9c9cf' });
+  S(I.glider, ['', '', '..d..........d..', '.dld........dld.', '.dlld......dlld.', '.dllmd....dmlld.', '.dllmmd..dmmlld.', '.dlmmmmddmmmmld.', '.dlmmmmmmmmmmld.', '..dmmsmmmmsmmd..', '..dmsdmmmmdsmd..', '...dd.dmmd.dd...', '.......dd.......'], { d: '#4a5a8a', m: '#b9c8f0', l: '#f2f6ff', s: '#8a9cd8' });
+  S(I.star_feather, ['', '...........dd...', '.........ddlld..', '........dllllmd.', '.......dlllmmd..', '......dlllmmd...', '.....dllmmmd....', '....dllmmmd.....', '....dlmmdd......', '...dqmdd........', '..dq.d..........', '.dq.............', '.q..............'], { l: '#fffbe0', m: '#ffe08a', d: '#c99a2e', q: '#a8c8ff' });
   S(I.glow_dust, R_PILE, { m: '#ffd45c', l: '#fff6cf', d: '#c98a22' });
   const dyeC = { red: ['#d63a2f', '#f0705f', '#8a1f18'], yellow: ['#f0cc3a', '#fff0a0', '#a8851a'], blue: ['#3f66c9', '#7f9df0', '#22408a'], green: ['#5a8f3a', '#8cc060', '#355a20'], black: ['#2e2e33', '#5a5a62', '#101012'], pink: ['#f0a0bd', '#fbd3e0', '#b8607f'] };
   _dyes.forEach(([k], i) => S(286 + i, R_PILE, { m: dyeC[k][0], l: dyeC[k][1], d: dyeC[k][2] }));
