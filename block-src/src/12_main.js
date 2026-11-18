@@ -564,10 +564,11 @@ const game = {
     w.randomTicks(Math.floor(player.x / 16), Math.floor(player.z / 16));
     w.tickFurnaces();
     tickEntities(w);
+    // ボスがたおれたかは、ここ（生き物を動かしたすぐ後）で見る。あとの「ボスがいなければ出す」より先に見ないと、たおした瞬間に 次のボスが出てしまう
+    if (this.boss && this.boss.dead) { if (this.boss.hp <= 0) this.bossDefeated(this.boss.type); else { this.boss = null; this.bossLost = 120; } }   // 倒した以外で消えた＝ほかの人の端末に移った
     if (w.tick % 20 === 0) { spawnCycle(w); if (w.dim) this.dimTick(); }
     if (w.tick % 10 === 0) map.mark();
     player.tick(); net.tick();
-    if (this.boss && this.boss.dead) { if (this.boss.hp <= 0) this.bossDefeated(this.boss.type); else { this.boss = null; this.bossLost = 120; } }   // 倒した以外で消えた＝ほかの人の端末に移った
     if (this.bossLost > 0 && --this.bossLost === 0 && !this.boss) ui.dark(false);
     if (this.inBed && !w.isNight()) this.wake();
     if (++this.saveT >= 400) { this.saveT = 0; this.save(); }
@@ -672,5 +673,5 @@ function startApp(data) {
   game.boot();
 }
 try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => { if (game.world && !game.isDemo) { game.save(); return { resume: game.online ? '@' + net.code : game.worldId }; } return {}; }); } catch (e) { }
-window.__kk = { DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
+window.__kk = { CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
 if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(startApp); else startApp((window.claude && window.claude.hot && window.claude.hot.data) || {});

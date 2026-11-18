@@ -37,7 +37,14 @@ class MeshBuf {
     this.n++;
   }
 }
-const mbO = new MeshBuf(16384), mbC = new MeshBuf(8192), mbT = new MeshBuf(4096);
+const mbO = new MeshBuf(16384), mbC = new MeshBuf(8192), mbT = new MeshBuf(4096), mbD = new MeshBuf(4096);   // D＝両面から見える切り抜き（葉と葉のさかい目）
+// そのマスの まわり6つが 全部「葉か、すき間のないブロック」か（うもれている葉）。作業用の箱のはしのマスは 分からないので false
+function leafBuried(pi) {
+  const px = pi % 18, pz = ((pi - px) / 18) % 18, py = (pi - px - pz * 18) / 324;
+  if (px === 0 || px === 17 || pz === 0 || pz === 17 || py === 0 || py === 17) return false;
+  for (let f = 0; f < 6; f++) { const q = mB[pi + NOFF[f]]; if (!ISLEAF[q] && !OPAQUE[q]) return false; }
+  return true;
+}
 const mB = new Uint16Array(5832), mM = new Uint8Array(5832), mL = new Uint8Array(5832);
 const CUBE_TL = new Uint16Array(NB * 6);
 let TL_GRASS_TOP = [], TL_GRASS_SIDE = [], TL_TALL = [], TL_SNOWSIDE = 0, TL_WHEAT = [], TL_LEAF_FAST = {};
@@ -125,8 +132,42 @@ function meshLinks(pi, sh) {
 }
 
 // 1つの区画（16x16x16）を面データにする。何もなければ null
+// ---- 見えない区画をはぶくための下ごしらえ ----
+// 区画の中を「すき間のないブロック」以外でつながっている かたまりに分け、それぞれが どの面にふれているかを調べる。
+// 結果：vis[sy*6 + 面] ＝ その面から入ったとき、ぬけられる面（6ビット）。面の番号は 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z
+const _vSeen = new Uint8Array(4096), _vStack = new Int16Array(4096);
+let VIS_VER = 0;   // どこかの区画の つうじ方が変わるたびに増える
+function sectionVis(c, sy) {
+  const vis = c.vis, o = sy * 6;
+  let solid = 0;
+  for (let y = 0; y < 16; y++) for (let z = 0; z < 16; z++) { let pi = ((y + 1) * 18 + z + 1) * 18 + 1; for (let x = 0; x < 16; x++, pi++) if (OPAQUE[mB[pi]]) solid++; }
+  let r0 = 0, r1 = 0, r2 = 0, r3 = 0, r4 = 0, r5 = 0;
+  if (solid === 0) r0 = r1 = r2 = r3 = r4 = r5 = 63;
+  else if (solid < 4096) {
+    _vSeen.fill(0);
+    for (let start = 0; start < 4096; start++) {
+      if (_vSeen[start]) continue;
+      const sx = start & 15, sz = (start >> 4) & 15, syy = start >> 8;
+      if (OPAQUE[mB[((syy + 1) * 18 + sz + 1) * 18 + sx + 1]]) { _vSeen[start] = 1; continue; }
+      let n = 0, faces = 0; _vStack[n++] = start; _vSeen[start] = 1;
+      while (n > 0) {
+        const i = _vStack[--n], x = i & 15, z = (i >> 4) & 15, y = i >> 8;
+        if (x === 15) faces |= 1; if (x === 0) faces |= 2; if (y === 15) faces |= 4; if (y === 0) faces |= 8; if (z === 15) faces |= 16; if (z === 0) faces |= 32;
+        const pi = ((y + 1) * 18 + z + 1) * 18 + x + 1;
+        if (x < 15 && !_vSeen[i + 1]) { _vSeen[i + 1] = 1; if (!OPAQUE[mB[pi + 1]]) _vStack[n++] = i + 1; }
+        if (x > 0 && !_vSeen[i - 1]) { _vSeen[i - 1] = 1; if (!OPAQUE[mB[pi - 1]]) _vStack[n++] = i - 1; }
+        if (z < 15 && !_vSeen[i + 16]) { _vSeen[i + 16] = 1; if (!OPAQUE[mB[pi + 18]]) _vStack[n++] = i + 16; }
+        if (z > 0 && !_vSeen[i - 16]) { _vSeen[i - 16] = 1; if (!OPAQUE[mB[pi - 18]]) _vStack[n++] = i - 16; }
+        if (y < 15 && !_vSeen[i + 256]) { _vSeen[i + 256] = 1; if (!OPAQUE[mB[pi + 324]]) _vStack[n++] = i + 256; }
+        if (y > 0 && !_vSeen[i - 256]) { _vSeen[i - 256] = 1; if (!OPAQUE[mB[pi - 324]]) _vStack[n++] = i - 256; }
+      }
+      if (faces & 1) r0 |= faces; if (faces & 2) r1 |= faces; if (faces & 4) r2 |= faces; if (faces & 8) r3 |= faces; if (faces & 16) r4 |= faces; if (faces & 32) r5 |= faces;
+    }
+  }
+  if (vis[o] !== r0 || vis[o + 1] !== r1 || vis[o + 2] !== r2 || vis[o + 3] !== r3 || vis[o + 4] !== r4 || vis[o + 5] !== r5) { vis[o] = r0; vis[o + 1] = r1; vis[o + 2] = r2; vis[o + 3] = r3; vis[o + 4] = r4; vis[o + 5] = r5; VIS_VER++; }
+}
 function meshSection(world, c, sy) {
-  if (sy * 16 > c.maxY + 1) return null;
+  if (sy * 16 > c.maxY + 1) { const o = sy * 6; if (c.vis[o] !== 63 || c.vis[o + 1] !== 63 || c.vis[o + 2] !== 63 || c.vis[o + 3] !== 63 || c.vis[o + 4] !== 63 || c.vis[o + 5] !== 63) { c.vis.fill(63, o, o + 6); VIS_VER++; } return null; }
   const ch3 = [];
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) ch3.push(world.getChunk(c.cx + dx, c.cz + dz));
   for (let py = 0; py < 18; py++) {
@@ -143,7 +184,8 @@ function meshSection(world, c, sy) {
       mB[pi + 17] = cr.blocks[rowBase]; mM[pi + 17] = cr.meta[rowBase]; mL[pi + 17] = cr.light[rowBase];
     }
   }
-  mbO.n = mbC.n = mbT.n = 0;
+  sectionVis(c, sy);
+  mbO.n = mbC.n = mbT.n = mbD.n = 0;
   const fancy = meshOpts.fancyLeaves, biome = c.biome;
   const wx0 = c.cx * 16, wz0 = c.cz * 16, wy0 = sy * 16;
   for (let y = 0; y < 16; y++) for (let z = 0; z < 16; z++) {
@@ -156,14 +198,21 @@ function meshSection(world, c, sy) {
       if (sh === S_CUBE) {
         const rc = RCLASS[id], leaf = ISLEAF[id];
         const buf = rc === 2 ? mbT : (rc === 1 && !(leaf && !fancy)) ? mbC : mbO;
-        const meta = mM[pi];
-        let front = -1, tint = -1;
+        const meta = mM[pi], lf = leaf && fancy;
+        let front = -1, tint = -1, bur = -1;
         if (BLOCKS[id].facing) front = F4_TO_FACE[meta & 3];
         if (id === 2) tint = BIOME_TINT[biome[(z << 4) | x]];
         for (let f = 0; f < 6; f++) {
           const ni = pi + NOFF[f], nb = mB[ni];
           if (OPAQUE[nb]) continue;
           if (nb === id && rc !== 0 && !(leaf && fancy)) continue;
+          let fb = buf;
+          if (lf && ISLEAF[nb]) {   // 葉と葉のさかい目：面は片方（+の向き）だけ作り、両面から見えるように描く。どちらも葉にうもれていれば作らない
+            if (f & 1) continue;
+            if (bur < 0) bur = leafBuried(pi) ? 1 : 0;
+            if (bur && leafBuried(ni)) continue;
+            fb = mbD;
+          }
           let layer = CUBE_TL[id * 6 + f];
           if (front >= 0 && f !== 2 && f !== 3) layer = f === front ? CUBE_TL[id * 6 + 4] : CUBE_TL[id * 6];
           else if (tint >= 0) { if (f === 2) layer = TL_GRASS_TOP[tint]; else if (f !== 3) { const ab = mB[pi + 324]; layer = (ab === 34 || ab === 35) ? TL_SNOWSIDE : TL_GRASS_SIDE[tint]; } }
@@ -182,22 +231,22 @@ function meshSection(world, c, sy) {
             sky = (sky * 16 / cnt) | 0; blk = (blk * 16 / cnt) | 0;
             if (k === 0) { a0 = ao; s0 = sky; b0 = blk; } else if (k === 1) { a1 = ao; s1 = sky; b1 = blk; } else if (k === 2) { a2 = ao; s2 = sky; b2 = blk; } else { a3 = ao; s3 = sky; b3 = blk; }
           }
-          buf.ensure(4);
+          fb.ensure(4);
           const cp = f * 12, st = f * 4;
           const x0 = bx + CPOS[cp] * 16, y0 = by + CPOS[cp + 1] * 16, z0 = bz + CPOS[cp + 2] * 16;
           const x1 = bx + CPOS[cp + 3] * 16, y1 = by + CPOS[cp + 4] * 16, z1 = bz + CPOS[cp + 5] * 16;
           const x2 = bx + CPOS[cp + 6] * 16, y2 = by + CPOS[cp + 7] * 16, z2 = bz + CPOS[cp + 8] * 16;
           const x3 = bx + CPOS[cp + 9] * 16, y3 = by + CPOS[cp + 10] * 16, z3 = bz + CPOS[cp + 11] * 16;
           if (a0 + a2 + (s0 + s2 + b0 + b2) / 512 < a1 + a3 + (s1 + s3 + b1 + b3) / 512) {
-            buf.vert(x1, y1, z1, layer, 16, 16, s1, b1, SHTAB[st + a1], 0, 0);
-            buf.vert(x2, y2, z2, layer, 16, 0, s2, b2, SHTAB[st + a2], 0, 0);
-            buf.vert(x3, y3, z3, layer, 0, 0, s3, b3, SHTAB[st + a3], 0, 0);
-            buf.vert(x0, y0, z0, layer, 0, 16, s0, b0, SHTAB[st + a0], 0, 0);
+            fb.vert(x1, y1, z1, layer, 16, 16, s1, b1, SHTAB[st + a1], 0, 0);
+            fb.vert(x2, y2, z2, layer, 16, 0, s2, b2, SHTAB[st + a2], 0, 0);
+            fb.vert(x3, y3, z3, layer, 0, 0, s3, b3, SHTAB[st + a3], 0, 0);
+            fb.vert(x0, y0, z0, layer, 0, 16, s0, b0, SHTAB[st + a0], 0, 0);
           } else {
-            buf.vert(x0, y0, z0, layer, 0, 16, s0, b0, SHTAB[st + a0], 0, 0);
-            buf.vert(x1, y1, z1, layer, 16, 16, s1, b1, SHTAB[st + a1], 0, 0);
-            buf.vert(x2, y2, z2, layer, 16, 0, s2, b2, SHTAB[st + a2], 0, 0);
-            buf.vert(x3, y3, z3, layer, 0, 0, s3, b3, SHTAB[st + a3], 0, 0);
+            fb.vert(x0, y0, z0, layer, 0, 16, s0, b0, SHTAB[st + a0], 0, 0);
+            fb.vert(x1, y1, z1, layer, 16, 16, s1, b1, SHTAB[st + a1], 0, 0);
+            fb.vert(x2, y2, z2, layer, 16, 0, s2, b2, SHTAB[st + a2], 0, 0);
+            fb.vert(x3, y3, z3, layer, 0, 0, s3, b3, SHTAB[st + a3], 0, 0);
           }
         }
         continue;
@@ -322,11 +371,12 @@ function meshSection(world, c, sy) {
       }
     }
   }
-  const total = mbO.n + mbC.n + mbT.n;
+  const total = mbO.n + mbC.n + mbD.n + mbT.n;
   if (!total) return null;
-  const data = new Uint8Array(total * 16);
+  const data = new Uint8Array(total * 16);   // ならび：不透明 → 切り抜き → 切り抜き（両面）→ 半透明
   data.set(mbO.u8.subarray(0, mbO.n * 16), 0);
   data.set(mbC.u8.subarray(0, mbC.n * 16), mbO.n * 16);
-  data.set(mbT.u8.subarray(0, mbT.n * 16), (mbO.n + mbC.n) * 16);
-  return { data, nO: mbO.n, nC: mbC.n, nT: mbT.n };
+  data.set(mbD.u8.subarray(0, mbD.n * 16), (mbO.n + mbC.n) * 16);
+  data.set(mbT.u8.subarray(0, mbT.n * 16), (mbO.n + mbC.n + mbD.n) * 16);
+  return { data, nO: mbO.n, nC: mbC.n, nD: mbD.n, nT: mbT.n };
 }

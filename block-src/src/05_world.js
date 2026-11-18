@@ -170,6 +170,7 @@ class Chunk {
     this.stage = 0; this.maxY = 0;
     this.ents = new Map();
     this.meshes = new Array(NSEC).fill(null);
+    this.vis = new Uint8Array(NSEC * 6).fill(63);   // 区画ごと・面ごとに「その面から入って、どの面へ ぬけられるか」（6ビット）。まだ調べていない間は 全部つうじる あつかい
     this.dirty = 0xFF; this.meshed = false;
     this.modified = false; this.saveDirty = false;
     this.requested = false;

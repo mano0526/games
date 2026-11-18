@@ -234,7 +234,7 @@ function uploadSection(c, sy, m) {
   let s = c.meshes[sy];
   if (!m) { if (s) { gl.deleteBuffer(s.vbo); gl.deleteVertexArray(s.vao); c.meshes[sy] = null; } return; }
   if (!s) {
-    s = c.meshes[sy] = { vao: gl.createVertexArray(), vbo: gl.createBuffer(), nO: 0, nC: 0, nT: 0 };
+    s = c.meshes[sy] = { vao: gl.createVertexArray(), vbo: gl.createBuffer(), nO: 0, nC: 0, nD: 0, nT: 0 };
     gl.bindVertexArray(s.vao); gl.bindBuffer(gl.ARRAY_BUFFER, s.vbo);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.SHORT, false, 16, 0);
     gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 1, gl.UNSIGNED_SHORT, false, 16, 6);
@@ -244,7 +244,7 @@ function uploadSection(c, sy, m) {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, R.quadIdx);
   } else { gl.bindVertexArray(s.vao); gl.bindBuffer(gl.ARRAY_BUFFER, s.vbo); }
   gl.bufferData(gl.ARRAY_BUFFER, m.data, gl.STATIC_DRAW);
-  s.nO = m.nO; s.nC = m.nC; s.nT = m.nT;
+  s.nO = m.nO; s.nC = m.nC; s.nD = m.nD || 0; s.nT = m.nT;
   gl.bindVertexArray(null);
 }
 function freeChunkMeshes(c) {
@@ -281,6 +281,40 @@ function updateMeshes(world, px, py, pz, viewR, budgetMs) {
   return true;
 }
 
+// ---- 見えない区画をはぶく ----
+// カメラのいる区画から、となりの区画へ「つうじている面」をたどっていく。たどり着けない区画（かべの向こうの洞くつ、地上から見えない地下など）は描かない。
+// たどるのは カメラから遠ざかる向きだけ（まっすぐな視線は 行ったり来たりしない）。カメラの向きには関係しないので、カメラが同じ区画にいる間は 結果を使い回す。
+const CULL = { on: true, key: '', seen: new Uint8Array(0), q: new Int32Array(0), W: 0, ok: false, n: 0 };
+function cullUpdate(world, cam, viewR) {
+  const pcx = Math.floor(cam.x / 16), pcz = Math.floor(cam.z / 16), ps = Math.floor(cam.y / 16);
+  if (!CULL.on || ps < 0 || ps >= NSEC) { CULL.ok = false; return; }
+  const key = pcx + ',' + ps + ',' + pcz + ',' + viewR + ',' + VIS_VER + ',' + world.token + ',' + world.chunks.size;
+  if (key === CULL.key) { CULL.ok = true; return; }
+  CULL.key = key;
+  const W = viewR * 2 + 1, N = W * W * NSEC;
+  if (CULL.seen.length < N) { CULL.seen = new Uint8Array(N); CULL.q = new Int32Array(N * 7 + 8); }
+  const seen = CULL.seen, q = CULL.q; seen.fill(0, 0, N); CULL.W = W;
+  let qh = 0, qt = 0;
+  const start = (viewR * W + viewR) * NSEC + ps;
+  seen[start] = 64; q[qt++] = start * 8 + 6;
+  while (qh < qt) {
+    const v = q[qh++], from = v & 7, idx = v >> 3, s = idx % NSEC, col = (idx - s) / NSEC, ix = col % W, iz = (col - ix) / W;
+    const c = world.getChunk(pcx + ix - viewR, pcz + iz - viewR);
+    const cv = c && c.stage >= 2 ? c.vis : null, conn = from < 6 && cv ? cv[s * 6 + from] : 63;
+    for (let f = 0; f < 6; f++) {
+      if (!(conn & (1 << f))) continue;
+      let nx = ix, ns = s, nz = iz;
+      if (f === 0) { if (ix < viewR) continue; nx++; } else if (f === 1) { if (ix > viewR) continue; nx--; }
+      else if (f === 2) { if (s < ps) continue; ns++; } else if (f === 3) { if (s > ps) continue; ns--; }
+      else if (f === 4) { if (iz < viewR) continue; nz++; } else { if (iz > viewR) continue; nz--; }
+      if (nx < 0 || nx >= W || nz < 0 || nz >= W || ns < 0 || ns >= NSEC) continue;
+      const ni = (nz * W + nx) * NSEC + ns, bit = 1 << (f ^ 1);
+      if (seen[ni] & bit) continue;
+      seen[ni] |= bit; q[qt++] = ni * 8 + (f ^ 1);
+    }
+  }
+  CULL.ok = true;
+}
 function extractPlanes(m, out) {
   const set = (i, a, b, c, d) => { const l = Math.hypot(a, b, c) || 1; out[i * 4] = a / l; out[i * 4 + 1] = b / l; out[i * 4 + 2] = c / l; out[i * 4 + 3] = d / l; };
   set(0, m[3] + m[0], m[7] + m[4], m[11] + m[8], m[15] + m[12]);
@@ -396,24 +430,30 @@ function renderFrame(world, cam, viewR, under, drawHand) {
   if (under) gl.uniform3fv(ps.u.u_hor, R.fogColor);
   gl.bindVertexArray(R.fsVao); gl.drawArrays(gl.TRIANGLES, 0, 3);
   // 見える区画を集める
-  const list = R.drawList; list.length = 0;
+  const list = R.drawList; let ln = 0;
   const pcx = Math.floor(cam.x / 16), pcz = Math.floor(cam.z / 16), pl = R.planes;
+  cullUpdate(world, cam, viewR);
+  const cOk = CULL.ok, cSeen = CULL.seen, cW = CULL.W; let hidden = 0;
   for (const c of world.chunks.values()) {
     const dx = c.cx - pcx, dz = c.cz - pcz;
     if (dx > viewR || dx < -viewR || dz > viewR || dz < -viewR) continue;
+    const cBase = cOk ? ((dz + viewR) * cW + dx + viewR) * NSEC : 0;
     const ox = c.cx * 16 - cam.x, oz = c.cz * 16 - cam.z;
     if (!boxVisible(pl, ox, -cam.y, oz, ox + 16, CH - cam.y, oz + 16)) continue;
     for (let s = 0; s < NSEC; s++) {
       const m = c.meshes[s];
       if (!m) continue;
+      if (cOk && !cSeen[cBase + s]) { hidden++; continue; }   // かべの向こうで 見えない
       const oy = s * 16 - cam.y;
       if (!boxVisible(pl, ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
       const cx2 = ox + 8, cy2 = oy + 8, cz2 = oz + 8;
-      list.push({ m, ox, oy, oz, d: cx2 * cx2 + cy2 * cy2 + cz2 * cz2 });
+      let e = list[ln]; if (!e) e = list[ln] = { m: null, ox: 0, oy: 0, oz: 0, d: 0 };   // 入れ物は使い回す（毎コマ 作り直さない）
+      e.m = m; e.ox = ox; e.oy = oy; e.oz = oz; e.d = cx2 * cx2 + cy2 * cy2 + cz2 * cz2; ln++;
     }
   }
+  list.length = ln;
   list.sort((a, b) => a.d - b.d);
-  R.stats.sections = list.length;
+  R.stats.sections = list.length; R.stats.hidden = hidden;
   gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
   // 不透明
   let pr = R.prog.opaque; terrainUniforms(pr, cam);
@@ -429,8 +469,14 @@ function renderFrame(world, cam, viewR, under, drawHand) {
     gl.uniform3f(pr.u.u_off, e.ox, e.oy, e.oz); gl.bindVertexArray(e.m.vao);
     gl.drawElements(gl.TRIANGLES, (e.m.nC >> 2) * 6, gl.UNSIGNED_INT, (e.m.nO >> 2) * 24);
   }
-  // 動く物
+  // 切り抜きのうち、両面から見える分（葉と葉のさかい目）
   gl.disable(gl.CULL_FACE);
+  for (let i = 0; i < list.length; i++) {
+    const e = list[i]; if (!e.m.nD) continue;
+    gl.uniform3f(pr.u.u_off, e.ox, e.oy, e.oz); gl.bindVertexArray(e.m.vao);
+    gl.drawElements(gl.TRIANGLES, (e.m.nD >> 2) * 6, gl.UNSIGNED_INT, ((e.m.nO + e.m.nC) >> 2) * 24);
+  }
+  // 動く物
   dynUniforms(R.vp, 2, true); dynEnt.drawQuads();
   dynUniforms(R.vp, 1, true); dynTex.drawQuads();
   dynUniforms(R.vp, 0, true); dynCol.drawQuads();
@@ -455,7 +501,7 @@ function renderFrame(world, cam, viewR, under, drawHand) {
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i]; if (!e.m.nT) continue;
     gl.uniform3f(pr.u.u_off, e.ox, e.oy, e.oz); gl.bindVertexArray(e.m.vao);
-    gl.drawElements(gl.TRIANGLES, (e.m.nT >> 2) * 6, gl.UNSIGNED_INT, ((e.m.nO + e.m.nC) >> 2) * 24);
+    gl.drawElements(gl.TRIANGLES, (e.m.nT >> 2) * 6, gl.UNSIGNED_INT, ((e.m.nO + e.m.nC + e.m.nD) >> 2) * 24);
   }
   // 光る粒（加算）
   gl.disable(gl.CULL_FACE);

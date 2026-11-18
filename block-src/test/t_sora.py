@@ -78,10 +78,13 @@ async def main():
     # 5. たおす → かえりの門・たまご・おわりの画面
     await s.ev(f"() => {{ const k = {K}, w = k.world, p = k.player, b = k.game.boss; for (const q of k.soraPillars()) w.setBlock(q.x, q.top + 2, q.z, 0, 0); p.mode = 0; p.flying = false; p.x = 9.5; p.z = 4.5; p.y = w.surfaceY(9, 4) + 1.01; p.hp = 20; b.hp = 3; b.hurt = 0; k.hurtMob(b, 10, p.x, p.z, 0); }}")
     await s.wait(2500); await s.shot('sora_dying')
+    # たおれる瞬間が「1秒ごとの見回り」と同じ回に重なっても、次のボスが出ない（前はここで出てしまうことがあった）
+    await s.ev(f"() => {{ const k = {K}, b = k.game.boss, w = k.world; if (b) {{ b.death = 110; w.tick = w.tick - (w.tick % 20) + 19; }} }}")
     await until(s, f"{K}.game.soraDone === true", 30000)
     await s.wait(600)
     r = await s.ev(f"() => {{ const k = {K}, w = k.world, B = k.B, Y = k.SORA_PED_Y; let n = 0; for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (w.getBlock(dx, Y + 1, dz) === B.sora_gate) n++; return [n, w.getBlock(0, Y + 5, 0) === B.hoshi_egg, k.game.ended, k.game.soraDone, k.ents.filter(e => e.kind === 'item').map(e => k.ITEMS[e.id].name + '×' + e.n)]; }}")
-    check('たおすと かえりの門・たまご・ごほうび', r[0] == 20 and r[1] and r[2] and r[3] and len(r[4]) >= 2, r)
+    nb = await s.ev(f"() => {K}.ents.filter(e => e.kind === 'mob' && e.type === 'hoshikui' && !e.dead).length")
+    check('たおすと かえりの門・たまご・ごほうび（次のボスは出ない）', r[0] == 20 and r[1] and r[2] and r[3] and len(r[4]) >= 2 and nb == 0, [r, nb])
     await s.ev(f"() => {{ const p = {K}.player; p.x = 9.5; p.z = 0.5; p.yaw = Math.PI / 2; p.pitch = -0.2; }}"); await s.wait(700); await s.shot('sora_gate')
     await until(s, f"{K}.ui.menu === 'mEnd'", 20000)
     await s.shot('sora_end')
