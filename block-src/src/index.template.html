@@ -43,6 +43,29 @@ p { margin: 0 0 8px; }
 #cross::before { left: 10px; top: 2px; width: 2px; height: 18px; }
 #cross::after { left: 2px; top: 10px; width: 18px; height: 2px; }
 #info { position: absolute; left: var(--gl); top: 8px; font-family: var(--font-display); font-size: 13px; line-height: 1.35; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000; white-space: pre; font-variant-numeric: tabular-nums; }
+#mini { position: absolute; right: var(--gr); top: 8px; width: calc(112px * var(--hud)); height: calc(112px * var(--hud)); image-rendering: pixelated; border: 2px solid #000; box-shadow: 0 0 0 2px rgba(255,255,255,.5); background: #16130f; pointer-events: auto; cursor: pointer; }
+#app.touch #mini { right: auto; left: var(--gl); top: 50px; width: min(calc(104px * var(--hud)), 24vh); height: min(calc(104px * var(--hud)), 24vh); }
+#mapScr { position: absolute; inset: 0; display: none; background: #1a1612; }
+#mapScr.on { display: block; }
+#mapCv { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#mapBar { position: absolute; left: 0; right: 0; top: 0; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 6px var(--gr) 6px var(--gl); background: rgba(14,11,9,.8); border-bottom: 2px solid #000; }
+#mapBar strong { font-size: 18px; }
+#mapBar .grow { flex: 1; }
+#mapBar .btn.sm { min-width: 44px; min-height: 40px; }
+#mapPos { font-family: var(--font-display); font-size: 13px; opacity: .85; font-variant-numeric: tabular-nums; }
+#mapHint { position: absolute; left: 0; right: 0; bottom: 34px; text-align: center; font-family: var(--font-display); font-size: 12px; opacity: .8; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000; padding: 0 16px; pointer-events: none; }
+#mapPanel { position: absolute; left: 50%; bottom: 56px; transform: translateX(-50%); width: min(calc(100% - 32px), 420px); display: flex; flex-direction: column; gap: 8px; }
+#mapPanel[hidden] { display: none; }
+#mapSelText { font-family: var(--font-display); font-size: 14px; }
+#mapPinEdit { display: flex; flex-direction: column; gap: 8px; }
+#mapPinEdit[hidden] { display: none; }
+#mapHint[hidden] { display: none; }
+@media (max-width: 560px) { #mapPos { display: none; } }
+@media (max-height: 480px) {
+  #mapPanel { bottom: 8px; padding: 8px 10px; gap: 6px; width: min(calc(100% - 32px), 560px); }
+  #mapPinEdit { flex-direction: row; align-items: center; }
+  #mapPinEdit input { flex: 1 1 120px; min-width: 0; }
+}
 #toasts { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(92%, 520px); }
 .toast { font-family: var(--font-display); background: rgba(18,15,13,.82); padding: 6px 14px; border: 2px solid var(--panel-hi); animation: toastIn .18s ease-out; text-align: center; }
 .toast.out { opacity: 0; transition: opacity .5s; }
@@ -241,6 +264,7 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
   <div id="hud" class="off">
     <div id="cross"></div>
     <div id="info"></div>
+    <canvas id="mini" width="112" height="112" hidden></canvas>
     <div id="bossbar" hidden><div id="bossName">カゲの王</div><div class="bar"><i id="bossFill"></i></div></div>
     <div id="daybanner"></div>
     <div id="ntags"></div>
@@ -265,6 +289,27 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
       <div class="tbtn" id="tUse">つかう</div>
       <div class="tbtn" id="tBreak">こわす</div>
       <div class="tbtn" id="tJump">ジャンプ</div>
+    </div>
+  </div>
+
+  <div id="mapScr">
+    <canvas id="mapCv"></canvas>
+    <div id="mapBar">
+      <strong class="disp">地図</strong><span id="mapPos"></span><span class="grow"></span>
+      <button class="btn sm" id="mapOut" type="button" aria-label="小さくする">−</button>
+      <button class="btn sm" id="mapIn" type="button" aria-label="大きくする">＋</button>
+      <button class="btn sm" id="mapMe" type="button">自分の場所</button>
+      <button class="btn sm pri" id="mapClose" type="button">とじる</button>
+    </div>
+    <div id="mapHint"></div>
+    <div id="mapPanel" class="panel" hidden>
+      <div id="mapSelText"></div>
+      <div id="mapPinEdit"><input type="text" id="mapPinName" maxlength="10" placeholder="しるしの名前（なくてもよい）" autocomplete="off"><div id="mapPinCols" class="seg"></div></div>
+      <div class="rowf">
+        <button class="btn sm pri" id="mapPinAdd" type="button">ここに しるしを置く</button>
+        <button class="btn sm bad" id="mapPinDel" type="button">この しるしを消す</button>
+        <button class="btn sm" id="mapPinCancel" type="button">やめる</button>
+      </div>
     </div>
   </div>
 
@@ -372,6 +417,7 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
       <h2>ひとやすみ</h2>
       <div class="col">
         <button class="btn pri" id="bResume" type="button">ゲームにもどる</button>
+        <button class="btn" id="bMap" type="button">地図</button>
         <div id="netBox" class="wslot" hidden><div><strong id="netCode"></strong><span class="dim" id="netWho"></span></div><button class="btn sm" id="bInvite" type="button">招待リンクをコピー</button></div>
         <button class="btn" id="bNotes" type="button">開拓ノート</button>
         <button class="btn" id="bHow2" type="button">遊び方</button>

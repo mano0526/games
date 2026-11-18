@@ -47,7 +47,11 @@ async def main():
     await m.ev(1, f"(a) => {{ const p = {K}.player; p.x = a[0] - 3.5; p.z = a[2] + 3.5; p.y = a[1] + 0.2; {K}.game.needSafeSpot = 2; }}", base)
     await m.wait(1500)
     print('6 pick p1 inv', await m.ev(1, f"() => {K}.player.inv.filter(s => s).map(s => [s.id, s.n])"), 'p0 items left', await m.ev(0, f"() => {K}.ents.filter(e => e.kind === 'item').length"))
-    print('end hash0', await m.ev(0, HASH, base), 'hash1', await m.ev(1, HASH, base))
+    for t in range(10):   # 水などが動き終わって、2人の世界が同じになるまで待つ
+        h0 = await m.ev(0, HASH, base); h1 = await m.ev(1, HASH, base)
+        if h0 == h1: break
+        await m.wait(4000)
+    print('end hash0', h0, 'hash1', h1, 'same', h0 == h1)
     print('errs', [e for e in m.errs() if '404' not in e][:8])
     await m.close()
 asyncio.run(main())

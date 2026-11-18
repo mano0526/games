@@ -44,12 +44,12 @@ const meshOpts = { fancyLeaves: true };
 
 function initMesher() {
   for (let id = 1; id < 256; id++) { const b = BLOCKS[id]; if (b && b.tl) for (let f = 0; f < 6; f++) CUBE_TL[id * 6 + f] = b.tl[f]; }
-  TL_GRASS_TOP = [0, 1, 2, 3].map(i => TEX['grass_top_' + i]);
-  TL_GRASS_SIDE = [0, 1, 2, 3].map(i => TEX['grass_side_' + i]);
-  TL_TALL = [0, 1, 2, 3].map(i => TEX['tallgrass_' + i]);
+  TL_GRASS_TOP = GRASS_PALS.map((p, i) => TEX['grass_top_' + i]);
+  TL_GRASS_SIDE = GRASS_PALS.map((p, i) => TEX['grass_side_' + i]);
+  TL_TALL = GRASS_PALS.map((p, i) => TEX['tallgrass_' + i]);
   TL_WHEAT = [0, 1, 2, 3].map(i => TEX['wheat_' + i]);
   TL_SNOWSIDE = TEX.grass_side_snow;
-  for (const k of ['oak', 'birch', 'spruce', 'cherry']) TL_LEAF_FAST[B['leaves_' + k]] = TEX['leaves_' + k + '_f'];
+  for (const w of _woods) TL_LEAF_FAST[w[3]] = TEX['leaves_' + w[0] + '_f'];
 }
 
 // 任意の4点の面
@@ -257,6 +257,12 @@ function meshSection(world, c, sy) {
           const b = doorBox(meta);
           _tl6.fill((meta & 8) ? TEX.door_top : TEX.door_bottom);
           emitBox(mbC, bx, by, bz, b[0] * 16, 0, b[2] * 16, b[3] * 16, 16, b[5] * 16, _tl6, pi, 2, true); break;
+        }
+        case S_FLAT: {   // 水面に浮かぶ葉。向きは場所ごとに変える
+          const r = hash3(wx0 + x, wy0 + y, wz0 + z, 31) & 3, yy = by - 1;
+          const uvs = [[0, 16, 16, 16, 16, 0, 0, 0], [16, 16, 16, 0, 0, 0, 0, 16], [16, 0, 0, 0, 0, 16, 16, 16], [0, 0, 0, 16, 16, 16, 16, 0]][r];
+          quadP(mbC, [bx, yy, bz + 16, bx + 16, yy, bz + 16, bx + 16, yy, bz, bx, yy, bz], tl[0], uvs, sky, blk, 255, 0, 0, true);
+          break;
         }
         case S_LADDER: {
           const f = meta & 3, layer = tl[0], uv = [0, 16, 16, 16, 16, 0, 0, 0];

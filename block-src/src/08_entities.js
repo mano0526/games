@@ -444,9 +444,10 @@ function trySpawnHostile(world, R) {
   if (y === null || !spawnSpot(world, x, y, z) || !darkEnough(world, x, y, z)) return false;
   if (nearestPlayerDist(x + 0.5, y, z + 0.5) < 24) return false;
   const ws = game.worldSpawn; if (Math.hypot(ws.x - x, ws.y - y, ws.z - z) < 24) return false;
+  if (world.biomeAt(x, z) === BIOME.MUSHROOM) return false;   // キノコの島には敵が出ない
   const under = (world.getLightRaw(x, y, z) >> 4) < 4, below = world.getBlock(x, y - 1, z), rr = Math.random();
   let type = 'shade';
-  if (under) type = (rr < 0.35 && y < 46 && (below === B.stone || below === B.cobble || below === B.gravel)) ? 'rock' : (rr > 0.88 && y < 34) ? 'wisp' : 'shade';
+  if (under) type = (rr < 0.35 && y < 46 && (below === B.stone || below === B.cobble || below === B.gravel || (below >= B.granite && below <= B.andesite))) ? 'rock' : (rr > 0.88 && y < 34) ? 'wisp' : 'shade';
   else type = rr > 0.9 ? 'wisp' : 'shade';
   const n = type === 'shade' ? 1 + rnd(3) : type === 'rock' ? 1 + rnd(2) : 1;
   let made = 0;
@@ -458,18 +459,31 @@ function trySpawnHostile(world, R) {
   }
   return made > 0;
 }
+// バイオームごとに出る動物。地面が草（や落ち葉の土・きんしの土）の明るい場所に出る
+const ANIMAL_POOL = [];
+ANIMAL_POOL[BIOME.PLAINS] = ANIMAL_POOL[BIOME.FLOWER] = ANIMAL_POOL[BIOME.MEADOW] = ['sheep', 'cow', 'pig', 'chicken', 'sheep'];
+ANIMAL_POOL[BIOME.FOREST] = ANIMAL_POOL[BIOME.BIRCH] = ['pig', 'chicken', 'cow'];
+ANIMAL_POOL[BIOME.CHERRY] = ['chicken', 'sheep', 'pig'];
+ANIMAL_POOL[BIOME.DARK] = ['pig', 'cow'];
+ANIMAL_POOL[BIOME.JUNGLE] = ['chicken', 'pig', 'chicken'];
+ANIMAL_POOL[BIOME.SAVANNA] = ['cow', 'sheep', 'chicken'];
+ANIMAL_POOL[BIOME.SWAMP] = ['pig', 'chicken'];
+ANIMAL_POOL[BIOME.SNOW] = ANIMAL_POOL[BIOME.TAIGA] = ANIMAL_POOL[BIOME.SNOW_TAIGA] = ANIMAL_POOL[BIOME.OLD_TAIGA] = ['sheep', 'sheep', 'chicken'];
+ANIMAL_POOL[BIOME.MOUNTAIN] = ['sheep', 'cow'];
+ANIMAL_POOL[BIOME.MUSHROOM] = ['cow'];
+const ANIMAL_GROUND = new Uint8Array(256); ANIMAL_GROUND[B.grass] = ANIMAL_GROUND[B.podzol] = ANIMAL_GROUND[B.mycelium] = 1;
 function trySpawnPassive(world, R) {
   const a = Math.random() * 6.283, r = 24 + Math.random() * Math.max(8, Math.min(R, 96) - 24), x = Math.floor(player.x + Math.cos(a) * r), z = Math.floor(player.z + Math.sin(a) * r);
   if (!world.isLoaded(x, z)) return false;
   const sy = world.surfaceY(x, z);
-  if (sy < SEA || world.getBlock(x, sy, z) !== B.grass || world.lightLevel(x, sy + 1, z) < 9) return false;
+  if (sy < SEA || !ANIMAL_GROUND[world.getBlock(x, sy, z)] || world.lightLevel(x, sy + 1, z) < 9) return false;
   if (nearestPlayerDist(x + 0.5, sy + 1, z + 0.5) < 24) return false;
   const bio = world.biomeAt(x, z);
-  const pool = bio === BIOME.PLAINS || bio === BIOME.FLOWER ? ['sheep', 'cow', 'pig', 'chicken', 'sheep'] : bio === BIOME.FOREST ? ['pig', 'chicken', 'cow'] : bio === BIOME.CHERRY ? ['chicken', 'sheep', 'pig'] : bio === BIOME.SNOW || bio === BIOME.TAIGA ? ['sheep'] : bio === BIOME.MOUNTAIN ? ['sheep', 'cow'] : null;
+  const pool = ANIMAL_POOL[bio];
   if (!pool) return false;
   const type = pool[rnd(pool.length)], cnt = 2 + rnd(3);
   let made = 0;
-  for (let k = 0; k < cnt; k++) { const mx = x + rnd(7) - 3, mz = z + rnd(7) - 3, my = findFloor(world, mx, sy + 3, mz); if (my !== null && world.isLoaded(mx, mz) && world.getBlock(mx, my - 1, mz) === B.grass) { spawnMob(type, mx + 0.5, my, mz + 0.5); made++; } }
+  for (let k = 0; k < cnt; k++) { const mx = x + rnd(7) - 3, mz = z + rnd(7) - 3, my = findFloor(world, mx, sy + 3, mz); if (my !== null && world.isLoaded(mx, mz) && ANIMAL_GROUND[world.getBlock(mx, my - 1, mz)]) { spawnMob(type, mx + 0.5, my, mz + 0.5); made++; } }
   return made > 0;
 }
 function spawnCycle(world) {

@@ -22,8 +22,11 @@ async def main():
             x = base[0] + rnd.randint(-8, 8); y = base[1] + rnd.randint(0, 6); z = base[2] + rnd.randint(-8, 8)
             await m.ev(i, EDIT, [x, y, z, rnd.randint(0, 50)])
         if k % 10 == 9: await m.wait(400)
-    await m.wait(9000)
-    hs = [await m.ev(i, HASH, base) for i in range(3)]
+    # 水が流れ終わるまで待つ（場所によって長さがちがうので、時間ではなく「3人とも同じになったか」で待つ）
+    for t in range(12):
+        await m.wait(5000)
+        hs = [await m.ev(i, HASH, base) for i in range(3)]
+        if hs[0] == hs[1] == hs[2]: break
     print('hash', hs, 'same', hs[0] == hs[1] == hs[2])
     if not (hs[0] == hs[1] == hs[2]):
         # どこがちがうか

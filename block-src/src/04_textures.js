@@ -54,14 +54,21 @@ function P(obj) { const o = {}; for (const k in obj) o[k] = C(obj[k]); return o;
 
 const GRASS_PALS = [
   CP(['#6fb64a', '#64aa42', '#7bc254', '#5a9e3b']), CP(['#4f9a3e', '#458f37', '#5aa647', '#3d8431']),
-  CP(['#5f9f6a', '#559560', '#6aaa74', '#4c8a58']), CP(['#a3b24d', '#98a745', '#aebd58', '#8c9b3e'])
+  CP(['#5f9f6a', '#559560', '#6aaa74', '#4c8a58']), CP(['#a3b24d', '#98a745', '#aebd58', '#8c9b3e']),
+  // 4 ジャングル  5 サバンナ  6 湿地  7 暗い森
+  CP(['#4fc03c', '#45b433', '#5bcc47', '#3aa32b']), CP(['#aaa550', '#9d9848', '#b6b15b', '#908b3f']),
+  CP(['#5c7a45', '#52703d', '#66844e', '#496636']), CP(['#3a8040', '#327538', '#448c49', '#2a6a31'])
 ];
 const WOOD_COL = {
   oak: { m: '#b08a55', d: '#8f6d40', l: '#c09a63', bark: ['#6b4f2f', '#5c4327', '#7a5a37', '#4f3920'], leaf: ['#4f9a38', '#438a2f', '#5aa842', '#3b7b2a'], hole: '#2c5a22' },
   birch: { m: '#d9c896', d: '#bfad7d', l: '#e6d7a8', bark: ['#e8e4d8', '#dcd8cc', '#f1eee4', '#e3dfd2'], leaf: ['#7fb24a', '#72a541', '#8cbe56', '#659638'], hole: '#4a7a2c' },
   spruce: { m: '#7a5a38', d: '#5f4428', l: '#8a6843', bark: ['#4a3423', '#3d2a1b', '#57402c', '#33231a'], leaf: ['#3a6e4a', '#2f6040', '#457a55', '#28543a'], hole: '#1d3f2c' },
-  cherry: { m: '#e0a3a8', d: '#c98489', l: '#ecb7ba', bark: ['#4d2f33', '#402629', '#5c3a3e', '#35201f'], leaf: ['#f2a7c3', '#ec93b4', '#f7bdd2', '#e27fa6'], hole: '#b85f86' }
+  cherry: { m: '#e0a3a8', d: '#c98489', l: '#ecb7ba', bark: ['#4d2f33', '#402629', '#5c3a3e', '#35201f'], leaf: ['#f2a7c3', '#ec93b4', '#f7bdd2', '#e27fa6'], hole: '#b85f86' },
+  mahog: { m: '#a8623f', d: '#864a2c', l: '#ba734e', bark: ['#5e5234', '#4f4529', '#6b5e3c', '#443b22'], leaf: ['#3fa82f', '#339a26', '#4cb83a', '#2a8a1f'], hole: '#1f6a18' },
+  acacia: { m: '#c26d3f', d: '#9f552d', l: '#d07f50', bark: ['#6e6a62', '#5f5b54', '#7b776e', '#55514a'], leaf: ['#7a9a3a', '#6c8c30', '#88a845', '#5e7e28'], hole: '#4a6620' },
+  walnut: { m: '#4f3320', d: '#3a2416', l: '#5c3d27', bark: ['#3a2a1c', '#2e2115', '#463322', '#261b11'], leaf: ['#2f6a2a', '#275c23', '#387832', '#1f4f1c'], hole: '#173d15' }
 };
+const TERRA_COL = { '': '#9c5e45', _white: '#d2b1a1', _yellow: '#ba8524', _orange: '#a25426', _red: '#8e3c2e', _brown: '#4d3324' };
 const WOOL_COL = { white: '#ececec', red: '#c9413a', yellow: '#f0cc3a', blue: '#3f66c9', green: '#5a8f3a', black: '#2e2e33', pink: '#f0a0bd' };
 const ORE_SPOTS = [[3, 3], [4, 3], [3, 4], [10, 2], [11, 2], [11, 3], [12, 3], [6, 7], [7, 7], [7, 8], [8, 8], [6, 8], [12, 9], [13, 9], [12, 10], [2, 11], [3, 11], [3, 12], [4, 12], [8, 12], [9, 12], [9, 13], [10, 13]];
 const ORE_HL = [[3, 3], [10, 2], [6, 7], [12, 9], [2, 11], [8, 12]];
@@ -156,6 +163,46 @@ function buildTextures() {
       p.d.set(s);
     });
   }
+  // ---- 版2の地形で使うブロックの絵 ----
+  newTex('red_sand', p => { p.speckle(CP(['#c96f33', '#c0672e', '#d2783a', '#bb6229'])); p.dots(6, C('#a9541f')); });
+  for (const k in TERRA_COL) newTex('terracotta' + k, p => {
+    const c = C(TERRA_COL[k]);
+    p.blot([shadeC(c, 0.95), c, shadeC(c, 1.04), c, shadeC(c, 0.98)], 4);
+    p.dash(3, 5, shadeC(c, 0.9)); p.dash(2, 4, shadeC(c, 1.08));
+  });
+  newTex('packed_ice', p => {
+    p.blot(CP(['#86b0e8', '#8fb8ee', '#9cc2f3', '#8fb8ee', '#7ea8e2']), 4);
+    for (let k = 0; k < 4; k++) { let x = Math.floor(p.rng() * 16), y = Math.floor(p.rng() * 16); for (let i = 0; i < 6; i++) { p.px(x, y, C('#c4dcfa')); x++; if (p.rng() < 0.55) y++; } }
+    p.dots(5, C('#6f98d6'));
+  });
+  newTex('podzol_top', p => { p.blot(CP(['#6a4a25', '#5a3d1d', '#7a5a2f', '#4f351a', '#83622f']), 2); p.dots(9, C('#9a7a3f')); p.dots(7, C('#3d2913')); p.dash(4, 2, C('#a0522d')); });
+  newTex('podzol_side', p => {
+    p.copy('dirt'); const pal = CP(['#6a4a25', '#5a3d1d', '#7a5a2f']);
+    for (let x = 0; x < 16; x++) { const dep = 2 + Math.floor(p.rng() * 2); for (let y = 0; y < dep; y++) p.px(x, y, pal[Math.floor(p.rng() * 3)]); p.px(x, dep, C('#3d2913')); }
+  });
+  newTex('mud', p => { p.blot(CP(['#3d3531', '#46403a', '#352e2a', '#4a433d', '#403832']), 4); p.dash(4, 3, C('#5a524b')); p.dots(6, C('#2a2421')); });
+  newTex('coarse_dirt', p => { p.speckle(CP(['#7a5234', '#6c482c', '#86603f', '#5e3f27'])); p.dots(12, C('#9a8d80')); p.dots(8, C('#4a3220')); p.dots(5, C('#b3a698')); });
+  newTex('moss', p => { p.blot(CP(['#5d8a3a', '#527e33', '#689642', '#487229', '#5d8a3a']), 2); p.dots(9, C('#7aa84f')); p.dots(6, C('#3c6222')); });
+  const mycPal = CP(['#7a6a80', '#70617a', '#857590', '#695a72']);
+  newTex('mycelium_top', p => { p.speckle(mycPal); p.dots(9, C('#a79bb0')); p.dots(6, C('#544660')); });
+  newTex('mycelium_side', p => {
+    p.copy('dirt');
+    for (let x = 0; x < 16; x++) { const dep = 2 + Math.floor(p.rng() * 3); for (let y = 0; y < dep; y++) p.px(x, y, mycPal[Math.floor(p.rng() * 4)]); p.px(x, dep, C('#544660')); }
+  });
+  newTex('mush_brown', p => { p.blot(CP(['#9a7352', '#8f694a', '#a67d5b', '#94704f']), 4); p.dots(8, C('#b38a66')); p.dots(5, C('#7d5a3e')); });
+  newTex('mush_red', p => {
+    p.blot(CP(['#c23a30', '#b8332a', '#cc4338', '#bd372d']), 4);
+    for (const [x, y, w, h] of [[2, 2, 3, 2], [10, 1, 2, 2], [6, 6, 3, 3], [12, 8, 2, 2], [1, 10, 2, 2], [5, 12, 2, 2], [10, 12, 3, 2]]) { p.rect(x, y, w, h, C('#f6ece6')); p.px(x + w - 1, y + h - 1, C('#dccbc2')); }
+  });
+  newTex('mush_stem', p => {
+    for (let x = 0; x < 16; x++) { const c = C(['#d9ccb4', '#cfc2a9', '#e3d7c0', '#d9ccb4'][Math.floor(p.rng() * 4)]); for (let y = 0; y < 16; y++) p.px(x, y, p.rng() < 0.12 ? C('#c4b69c') : c); }
+    p.dash(4, 1, C('#b5a78c'));
+  });
+  newTex('mush_pore', p => { p.speckle(CP(['#c9b18a', '#c2aa83', '#d0b992'])); for (let y = 1; y < 16; y += 2) for (let x = (y >> 1) & 1; x < 16; x += 2) p.px(x, y, C('#a48c66')); });
+  const rock = (name, pal, lt, dk) => newTex(name, p => { p.blot(CP(pal), 2); p.dots(14, C(lt)); p.dots(12, C(dk)); });
+  rock('granite', ['#9a6b5c', '#a07363', '#8f6455', '#a87d6e', '#96685a'], '#c9a79a', '#6e4a40');
+  rock('diorite', ['#cfcfd1', '#bdbdc0', '#dcdcde', '#c4c4c7', '#b2b2b6'], '#efeff0', '#7e7e84');
+  rock('andesite', ['#8a8d8a', '#828582', '#939693', '#7b7e7b', '#8a8d8a'], '#a9aca9', '#666966');
   const oreDef = { coal: ['#2b2b2e', '#4f4f56'], iron: ['#c9a383', '#ecd2ba'], gold: ['#f2c53d', '#fff0a0'], diamond: ['#5fe0d8', '#d2fffb'], glow: ['#ffb84a', '#fff6c8'] };
   for (const k in oreDef) newTex('ore_' + k, p => {
     p.copy('stone');
@@ -293,6 +340,16 @@ function buildTextures() {
   flower('deadbush', ['', '', '', '', '...b......b.....', '....b..b.b......', '.b...b.b.b...b..', '..b..b.bb...b...', '...b..bb...b....', '....b.bb..b.....', '.....bbb.b......', '......bbb.......', '.......bb.......', '.......b........', '.......b........', '.......b........'], { b: '#8a6a3a' });
   flower('mushroom_brown', ['', '', '', '', '', '', '', '', '.....cccccc.....', '....cCCcCCCc....', '...cCCCCCCcCc...', '...cccccccccc...', '......ssss......', '......sSss......', '......sSss......', '.....ssssss.....'], { c: '#7a5236', C: '#a67650', s: '#d9ccb4', S: '#f1e8d6' });
   flower('mushroom_red', ['', '', '', '', '', '', '', '.....rrrrrr.....', '....rRRwRRRr....', '...rRwRRRRwRr...', '...rRRRRwRRRr...', '...rrrrrrrrrr...', '......ssss......', '......sSss......', '......sSss......', '.....ssssss.....'], { r: '#a8261e', R: '#d63a2f', w: '#fbeeea', s: '#d9ccb4', S: '#f1e8d6' });
+  flower('flower_purple', ['', '', '.......p........', '......pPp.......', '......PpP.......', '.....pPPp.......', '......PpP..p....', '......pPp.pPp...', '.......s..PpP...', '.......s..pPp...', '....ll.s...s....', '...lLLls..s.....', '....lLss.s......', '......sss.......', '.......s........', '.......s........'],
+    { p: '#7a4fc4', P: '#a583ea', s: '#3f8a35', l: '#3f8a35', L: '#5aa842' });
+  flower('flower_orange', ['', '', '', '.....o.o.o......', '.....oOoOo......', '.....oOOOo......', '.....oOOOo......', '......ooo.......', '.......s........', '.......s........', '...l...s...l....', '...lL..s..Ll....', '....lL.s.Ll.....', '.....lLsLl......', '......lsl.......', '.......s........'],
+    { o: '#d9651e', O: '#f58a3a', s: '#3f8a35', l: '#3f8a35', L: '#5aa842' });
+  flower('fern', ['', '', '', '.......g........', '..g....G....g...', '...g...G...g....', '.g..G..G..G..g..', '..g..G.G.G..g...', '...G..GGG..G....', '.g..G..G..G..g..', '..gG.G.G.G.Gg...', '....G.GGG.G.....', '.....GGGGG......', '......GGG.......', '.......G........', '.......G........'],
+    { g: '#57a84c', G: '#2f7a35' });
+  flower('lily_pad', ['', '', '.....dddddd.....', '...ddllllllddd..', '..dllllllllllld.', '..dlllvllllvlld.', '.dlllllvllvllld.', '.dllllllvvlllld.', '.dlllvvvvdd.....', '.dllllllvvlllld.', '.dlllllvllvllld.', '..dlllvllllvlld.', '..dllllllllllld.', '...ddllllllddd..', '.....dddddd.....', ''],
+    { d: '#2a6a2c', l: '#3f8f3a', v: '#57a84c' });
+  flower('vine', ['..g....g.....g..', '..gl...g....lg..', '.lg....gl....g..', '..g...lg.....gl.', '..gl...g....lg..', '..g....gl....g..', '.lg....g.....g..', '..g...lg....lg..', '..gl...g.....gl.', '..g....gl....g..', '.lg...lg....lg..', '..g....g.....g..', '..gl...gl....gl.', '..g....g....lg..', '.lg...lg.....g..', '..g....g.....g..'],
+    { g: '#2f7a2c', l: '#4fa03f' });
   flower('crown', ['', '', '', '', '', '', '', '..g...gg...g....', '.gGg.gGGg.gGg...', '.gGg.gGGg.gGg...', '.gGGgGrGGgGGg...', '.gGGGGGGGGGGg...', '.gbGGGrrGGGbg...', '.gGGGGGGGGGGg...', '.ggggggggggggg..', '..dddddddddd....'], { g: '#c99a1e', G: '#f6cf3e', r: '#d63a2f', b: '#6ee6de', d: '#8c6a12' });
   newTex('farmland_dry', p => { p.speckle(CP(['#6f4a2e', '#7d5535', '#644227'])); for (let y = 2; y < 16; y += 4) for (let x = 0; x < 16; x++) p.px(x, y, C('#553720')); p.dots(6, C('#946a45')); });
   newTex('farmland_wet', p => { p.speckle(CP(['#4a2f1c', '#553722', '#412817'])); for (let y = 2; y < 16; y += 4) for (let x = 0; x < 16; x++) p.px(x, y, C('#33200f')); p.dots(6, C('#6a4a30')); });

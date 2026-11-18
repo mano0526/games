@@ -5,7 +5,7 @@ const KEY_DEF = { fwd: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 
   hot1: 'Digit1', hot2: 'Digit2', hot3: 'Digit3', hot4: 'Digit4', hot5: 'Digit5', hot6: 'Digit6', hot7: 'Digit7', hot8: 'Digit8', hot9: 'Digit9' };
 const KEY_ACTS = [['fwd', '前へ進む'], ['back', '後ろへ下がる'], ['left', '左へ'], ['right', '右へ'], ['jump', 'ジャンプ（2回で飛ぶ／おりる）'], ['sneak', 'しゃがむ（飛んでいるときは下がる）'], ['sprint', '走る'], ['inv', '持ち物をひらく'], ['drop', '持っている物を1つ捨てる'],
   ['view', '視点を切りかえる'], ['map', '地図'], ['info', '座標の表示を切りかえる'], ['hot1', '持ち物らん 1'], ['hot2', '持ち物らん 2'], ['hot3', '持ち物らん 3'], ['hot4', '持ち物らん 4'], ['hot5', '持ち物らん 5'], ['hot6', '持ち物らん 6'], ['hot7', '持ち物らん 7'], ['hot8', '持ち物らん 8'], ['hot9', '持ち物らん 9']];
-const SET_DEF = { viewDist: 8, quality: 1, fov: 75, bright: 3, autoQ: false, fpsCap: 0, clouds: true, fancyLeaves: true, particles: 2, bobbing: true, handShow: true, hudScale: 1, showInfo: true, showFps: false, nameTags: true, view: 0,
+const SET_DEF = { viewDist: 8, quality: 1, fov: 75, bright: 3, autoQ: false, fpsCap: 0, clouds: true, fancyLeaves: true, particles: 2, bobbing: true, handShow: true, hudScale: 1, showInfo: true, showFps: false, nameTags: true, view: 0, minimap: true,
   sens: 12, touchSens: 12, invertY: false, autoJump: false, sprintTap: true, sneakToggle: false, swapMouse: false, touchSize: 1, holdMs: 330,
   master: 10, sfx: 7, music: 5, touchInit: false, look: [0, 0, 0, 1, 0] };
 const settings = Object.assign({}, SET_DEF, { look: SET_DEF.look.slice(), keys: Object.assign({}, KEY_DEF) });
@@ -50,6 +50,7 @@ const SET_TABS = [
     { k: 'handShow', t: 'tog', name: '手と持ち物を表示' },
     { k: 'hudScale', t: 'range', name: '持ち物らんの大きさ', min: 0.8, max: 1.3, step: 0.1, fmt: v => Math.round(v * 100) + '%' },
     { k: 'showInfo', t: 'tog', name: '座標・時刻の表示' },
+    { k: 'minimap', t: 'tog', name: '小さな地図', desc: '画面のすみに まわりの地図を出します。押すと大きな地図が開きます' },
     { k: 'showFps', t: 'tog', name: 'コマ数の表示' },
     { k: 'nameTags', t: 'tog', name: '友だちの名前の札' },
     { t: 'act', name: '全画面の切りかえ', fn: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else { const p = document.documentElement.requestFullscreen(); if (p && p.catch) p.catch(() => ui.toast('この画面では全画面にできません')); } } catch (e) { ui.toast('この画面では全画面にできません'); } } }] },
@@ -205,6 +206,7 @@ const ui = {
     on('bLook', () => this.openLook());
     on('bInvite', () => this.copyInvite());
     on('bRules', () => this.openRules());
+    on('bMap', () => map.openMap());
     on('bMsgOk', () => { const f = this._msgOk; this._msgOk = null; if (f) f(); else this.back(); });
     $('inNick').addEventListener('change', () => { net.setName($('inNick').value); });
     $('segDiff2').addEventListener('click', (e) => { const b = e.target.closest('.btn'); if (!b || b.disabled) return; sfx('click'); game.setRule('diff', +b.dataset.v); this.paintRules(); });
@@ -477,6 +479,7 @@ const ui = {
   },
   close(silent) {
     if (!this.screen) return;
+    if (this.screen === 'map') { map.closeMap(silent); return; }
     for (let i = 0; i < this.craft.length; i++) { const s = this.craft[i]; if (s) { const left = player.give(s.id, s.n, s.d); if (left) spawnDrop(player.x, player.eyeY() - 0.3, player.z, s.id, left, s.d); this.craft[i] = null; } }
     this.craft = [];
     if (player.cursor) { const s = player.cursor; const left = player.give(s.id, s.n, s.d); if (left) this.dropStack({ id: s.id, n: left, d: s.d }); player.cursor = null; }
@@ -631,6 +634,7 @@ const ui = {
       if (c === 'Escape') { if (this.screen) this.close(); else if (this.menu && this.menuStack.length) this.back(); else if (game.state === 'playing') game.pause(); else if (game.state === 'paused' && performance.now() - game.pausedAt > 350) game.resume(); return; }
       if (game.state !== 'playing') return;
       if (c === K.inv) { this.toggleInv(); return; }
+      if (c === K.map && this.screen === 'map') { this.close(); return; }
       if (this.screen) return;
       let hot = -1; for (let i = 1; i <= 9; i++) if (K['hot' + i] === c) hot = i - 1;
       if (hot >= 0) player.sel = hot;
@@ -639,7 +643,7 @@ const ui = {
       else if (c === K.fwd) { const now = performance.now(); if (settings.sprintTap && now - lastWTap < 280) sprintLatch = true; lastWTap = now; }
       else if (c === K.sneak) { if (settings.sneakToggle) sneakLatch = !sneakLatch; }
       else if (c === K.view) { settings.view = (settings.view + 1) % 3; saveSettings(); this.toast(['自分の目から見ます', 'うしろから見ます', '前から見ます'][settings.view], 2); }
-      else if (c === K.map) { if (this.toggleMap) this.toggleMap(); }
+      else if (c === K.map) map.toggle();
       else if (c === K.info || c === 'F3') { if (c === 'F3') game.debug = !game.debug; else { settings.showInfo = !settings.showInfo; saveSettings(); } this.infoT = 0; }
     });
     window.addEventListener('keyup', (e) => { keys[e.code] = false; if (e.code === settings.keys.fwd) sprintLatch = false; });
@@ -752,11 +756,13 @@ function howtoHtml() {
 <dd>${settings.sprintTap ? k('fwd') + ' をすばやく2回、または ' : ''}${k('sprint')} を押しながら進むと走れます</dd>
 <dd>マウスで見回す ／ ${settings.swapMouse ? '右' : '左'}ボタンを押しっぱなしでこわす・攻撃 ／ ${settings.swapMouse ? '左' : '右'}ボタンで置く・使う（食べ物は押しっぱなし）</dd>
 <dd>${k('hot1')}〜${k('hot9')} かホイールで持ち物を選ぶ ／ ${k('inv')} 持ち物 ／ ${k('drop')} 捨てる ／ ${k('view')} 視点の切りかえ ／ <kbd>Esc</kbd> メニュー</dd>
+<dd>${k('map')} 地図（歩いた所が描かれていきます。クリックで しるしを置けます）</dd>
 <dd>キーの割り当ては「設定」の「キー」で変えられます</dd>
 <dt>スマホ・タブレット</dt>
 <dd>左下のスティックで歩き、画面をなぞって見回します</dd>
 <dd>ブロックを長押しでこわす、軽くタップで置く・使う。右下のボタンでも同じことができます</dd>
 <dd>食べ物は「つかう」を押しっぱなしで食べます</dd>
+<dd>左上の小さな地図をタップすると、大きな地図が開きます</dd>
 <dt>まずやること</dt>
 <dd>木をなぐって原木を集める → 持ち物を開いて「板」「作業台」を作る → 作業台を置いて道具を作る</dd>
 <dd>夜になると敵が出ます。たいまつで明るくした家にこもるか、ベッドで朝まで眠りましょう</dd>

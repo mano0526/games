@@ -1,7 +1,8 @@
 // ===== 05_world.js : 世界のデータ・明るさ・水の流れ・成長・セーブ用の圧縮 =====
 const DX6 = [1, -1, 0, 0, 0, 0], DY6 = [0, 0, 1, -1, 0, 0], DZ6 = [0, 0, 0, 0, 1, -1];
 const RTICK = new Uint8Array(256);
-for (const k of ['grass', 'sapling_oak', 'sapling_birch', 'sapling_spruce', 'sapling_cherry', 'wheat_crop', 'farmland', 'leaves_oak', 'leaves_birch', 'leaves_spruce', 'leaves_cherry', 'cactus']) RTICK[B[k]] = 1;
+for (const k of ['grass', 'wheat_crop', 'farmland', 'cactus']) RTICK[B[k]] = 1;
+for (const w of _woods) { RTICK[w[3]] = 1; RTICK[w[5]] = 1; }
 
 function posKey(x, y, z) { return ((x + 1048576) * 2097152 + (z + 1048576)) * 128 + y; }
 function rle(arr) {
@@ -29,6 +30,7 @@ function collisionBoxes(id, meta) {
     case S_CHEST: return [[0.0625, 0, 0.0625, 0.9375, 0.875, 0.9375]];
     case S_BED: return [[0, 0, 0, 1, 0.5625, 1]];
     case S_DOOR: return [doorBox(meta)];
+    case S_FLAT: return [[0, 0, 0, 1, 0.02, 1]];
     default: return BOX_NONE;
   }
 }
@@ -38,6 +40,7 @@ function selectionBoxes(id, meta) {
     case S_CROSS: return [[0.15, 0, 0.15, 0.85, 0.8, 0.85]];
     case S_CROP: return [[0, 0, 0, 1, 0.3 + 0.2 * (meta & 3), 1]];
     case S_LAYER: return [[0, 0, 0, 1, 0.125, 1]];
+    case S_FLAT: return [[0.06, 0, 0.06, 0.94, 0.08, 0.94]];
     case S_TORCH: {
       if (!meta) return [[0.4, 0, 0.4, 0.6, 0.65, 0.6]];
       const d = F4[(meta - 1) & 3], cx = 0.5 + d[0] * 0.35, cz = 0.5 + d[1] * 0.35;
@@ -56,7 +59,8 @@ function blockDrops(id, meta, toolDef, rng) {
   if (b.needTool && (!toolDef || toolDef.type !== b.tool || toolDef.tier < b.level)) return [];
   if (b.drop === undefined) return ITEMS[id] ? [[id, 1]] : [];
   if (typeof b.drop === 'number') return [[b.drop, 1]];
-  return b.drop(rng, meta);
+  const r = b.drop(rng, meta, toolDef);
+  return r === null ? (ITEMS[id] ? [[id, 1]] : []) : r;
 }
 
 class Chunk {
@@ -127,6 +131,11 @@ class World {
     return c.meta[(y << 8) | ((z & 15) << 4) | (x & 15)];
   }
   isLoaded(x, z) { const c = this.getChunk(x >> 4, z >> 4); return !!c && c.stage >= 2; }
+  // まわり r マスまでのブロックが全部読める状態か（読みこみ範囲のはしで、となりが無いのに「無い」と決めつけないため）
+  areaLoaded(x, z, r) {
+    for (let cz = (z - r) >> 4; cz <= (z + r) >> 4; cz++) for (let cx = (x - r) >> 4; cx <= (x + r) >> 4; cx++) { const c = this.getChunk(cx, cz); if (!c || c.stage < 1) return false; }
+    return true;
+  }
   getLightRaw(x, y, z) {
     if (y >= CH) return 0xF0; if (y < 0) return 0;
     const c = this.getChunk(x >> 4, z >> 4);
@@ -356,14 +365,19 @@ class World {
       if (!meta) return OPAQUE[below] === 1 || below === B.glass || SHAPE[below] === S_FARM;
       const d = F4[(meta - 1) & 3]; return OPAQUE[this.getBlock(x + d[0], y, z + d[1])] === 1;
     }
-    if (SHAPE[id] === S_LADDER) { const d = F4[meta & 3]; return OPAQUE[this.getBlock(x + d[0], y, z + d[1])] === 1; }
+    if (SHAPE[id] === S_LADDER) {
+      const d = F4[meta & 3], bk = this.getBlock(x + d[0], y, z + d[1]);
+      if (id === B.vine) return OPAQUE[bk] === 1 || ISLEAF[bk] === 1 || (this.getBlock(x, y + 1, z) === id && this.getMeta(x, y + 1, z) === meta);   // つたは葉にもつく。上のつたからぶら下がれる
+      return OPAQUE[bk] === 1;
+    }
     switch (b.support) {
-      case 'soil': return below === B.grass || below === B.dirt || below === B.farmland;
-      case 'sandy': return below === B.sand || below === B.dirt || below === B.grass;
+      case 'soil': return SOIL[below] === 1;
+      case 'sandy': return below === B.sand || below === B.red_sand || SOIL[below] === 1 || (below >= B.terracotta && below <= B.terracotta_brown);
+      case 'water': return below === B.water && this.getMeta(x, y - 1, z) === 0;
       case 'solid': return OPAQUE[below] === 1 || ISLEAF[below] === 1;
       case 'farmland': return below === B.farmland;
       case 'cactus':
-        if (below !== B.sand && below !== B.cactus) return false;
+        if (below !== B.sand && below !== B.red_sand && below !== B.cactus) return false;
         for (let d = 0; d < 4; d++) if (SOLID[this.getBlock(x + F4[d][0], y, z + F4[d][1])]) return false;
         return true;
     }
@@ -447,6 +461,7 @@ class World {
     }
   }
   leafHasLog(x, y, z) {
+    if (!this.areaLoaded(x, z, 4)) return true;   // となりのチャンクがまだ無いときは 枯らさない（幹がそちらにあるかもしれない）
     for (let dy = -4; dy <= 4; dy++) for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) if (ISLOG[this.getBlock(x + dx, y + dy, z + dz)]) return true;
     return false;
   }
@@ -522,14 +537,15 @@ class World {
       if (this.lightLevel(x, y + 1, z) < 9) return;
       const nx = x + ((Math.random() * 3) | 0) - 1, nz = z + ((Math.random() * 3) | 0) - 1, ny = y + ((Math.random() * 3) | 0) - 1;
       if (this.getBlock(nx, ny, nz) === B.dirt) { const a2 = this.getBlock(nx, ny + 1, nz); if (!OPAQUE[a2] && !FLUID[a2] && this.lightLevel(nx, ny + 1, nz) >= 4) this.setBlock(nx, ny, nz, B.grass, 0); }
-    } else if (id >= 46 && id <= 49) {
-      if (this.lightLevel(x, y, z) >= 9 && Math.random() < 0.3) { const nat = this.natural; this.natural = false; this.growTree(x, y, z, id - 46); this.natural = nat; }
+    } else if (SAP_TYPE[id] !== undefined) {
+      if (this.lightLevel(x, y, z) >= 9 && Math.random() < 0.3 && this.areaLoaded(x, z, 7)) { const nat = this.natural; this.natural = false; this.growTree(x, y, z, SAP_TYPE[id]); this.natural = nat; }
     } else if (id === B.wheat_crop) {
       if (meta < 3 && this.lightLevel(x, y, z) >= 9) {
         const wet = this.getMeta(x, y - 1, z) === 1;
         if (Math.random() < (wet ? 0.75 : 0.35)) this.setBlock(x, y, z, id, meta + 1);
       }
     } else if (id === B.farmland) {
+      if (!this.areaLoaded(x, z, 4)) return;
       let wet = false;
       for (let dz = -4; dz <= 4 && !wet; dz++) for (let dx = -4; dx <= 4; dx++) if (this.getBlock(x + dx, y, z + dz) === B.water || this.getBlock(x + dx, y + 1, z + dz) === B.water) { wet = true; break; }
       if (wet !== (meta === 1)) this.setBlock(x, y, z, id, wet ? 1 : 0);
@@ -547,10 +563,11 @@ class World {
     for (let k = 1; k <= 5; k++) { const b = this.getBlock(x, y + k, z); if (b !== 0 && !ISLEAF[b]) return false; }
     if (y > 100) return false;
     this.setBlock(x, y, z, 0, 0, 1);
-    genTreeShape(type, this.rng, (dx, dy, dz, id) => {
+    genTreeShape(type, this.rng, (dx, dy, dz, id, m) => {
+      if (y + dy < 1 || y + dy > 126) return;
       const cur = this.getBlock(x + dx, y + dy, z + dz);
-      if (ISLOG[id]) { if (cur === 0 || ISLEAF[cur] || (REPLACE[cur] && !FLUID[cur])) this.setBlock(x + dx, y + dy, z + dz, id, 0, 1); }
-      else if (cur === 0) this.setBlock(x + dx, y + dy, z + dz, id, 0, 1);
+      if (ISLOG[id]) { if (cur === 0 || ISLEAF[cur] || cur === B.vine || (REPLACE[cur] && !FLUID[cur])) this.setBlock(x + dx, y + dy, z + dz, id, 0, 1); }
+      else if (cur === 0) this.setBlock(x + dx, y + dy, z + dz, id, m || 0, 1);
     });
     return true;
   }

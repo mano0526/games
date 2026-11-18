@@ -141,6 +141,10 @@ const net = {
     sub(R.child('gv'), 'value', (s) => { const v = s.val() || {}; for (const k in v) { this.gvMap.set(k, v[k]); if (v[k] > GEN_CUR) this.old(); } this.gvReady = true; });
     sub(R.child('meta'), 'value', (s) => this.onMeta(s.val()));
     sub(R.child('fl'), 'value', (s) => { this.flags = s.val() || {}; });
+    // 地図の「しるし」は みんなで同じものを見る
+    sub(R.child('pins'), 'child_added', (s) => map.pinIn(s.key, s.val()));
+    sub(R.child('pins'), 'child_changed', (s) => map.pinIn(s.key, s.val()));
+    sub(R.child('pins'), 'child_removed', (s) => map.pinOut(s.key));
     // 自分の名札が（通信のゆらぎで）消されてしまったら、名のり直す
     sub(R.child('pl/' + this.pid), 'value', (s) => { if (s.val() === null && this.on && !this.leaving && this.connected && performance.now() - this.entered > 3000) this.announce(); });
     this.remember(code, meta.name, false);
@@ -187,11 +191,13 @@ const net = {
   async count(code) { try { return (await withTimeout(this.db.ref('np/block/w/' + code + '/pl').once('value'), 8000)).numChildren(); } catch (e) { return -1; } },
   async exists(code) { try { return (await withTimeout(this.db.ref('np/block/w/' + code + '/meta').once('value'), 8000)).val() !== null; } catch (e) { return null; } },
 
+  pinSet(id, v) { if (this.on) this.root.child('pins/' + id).set({ x: v.x, z: v.z, n: v.n, c: v.c, by: v.by }).catch((e) => this.fail(e)); },
+  pinDel(id) { if (this.on) this.root.child('pins/' + id).remove().catch((e) => this.fail(e)); },
   // ---------- 持ち物など（参加者ごと。端末に保存する） ----------
   loadPlayer(code) { try { return JSON.parse(localStorage.getItem('blk_pd_' + code) || 'null'); } catch (e) { return null; } },
   savePlayer() {
     if (!this.on || !this.world) return;
-    try { localStorage.setItem('blk_pd_' + this.code, JSON.stringify({ player: player.serialize(), ach: game.ach, ended: game.ended, t: Date.now() })); } catch (e) { }
+    try { localStorage.setItem('blk_pd_' + this.code, JSON.stringify({ player: player.serialize(), ach: game.ach, ended: game.ended, map: map.save(false), t: Date.now() })); } catch (e) { }
   },
 
   // ---------- 参加者 ----------

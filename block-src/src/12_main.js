@@ -23,7 +23,7 @@ const ACHS = [
   { id: 'altar', title: 'めざめの祭壇をつくる', hint: '黒曜石4・カゲのかけら4・ダイヤ1。置いて使うと…', icon: B.altar },
   { id: 'king', title: 'カゲの王をたおす', hint: '祭壇を使うと現れる。よろいと食べ物の準備を忘れずに', icon: B.crown_block }
 ];
-const ACH_ITEM = {}; ACH_ITEM[B.log_oak] = ACH_ITEM[B.log_birch] = ACH_ITEM[B.log_spruce] = ACH_ITEM[B.log_cherry] = 'wood';
+const ACH_ITEM = {}; for (const id of TAGS['#log']) ACH_ITEM[id] = 'wood';
 for (const id of TAGS['#planks']) ACH_ITEM[id] = 'planks';
 ACH_ITEM[B.cobble] = 'stone'; ACH_ITEM[I.iron_ingot] = 'iron'; ACH_ITEM[I.diamond] = 'diamond'; ACH_ITEM[B.obsidian] = 'obsidian';
 const ACH_CRAFT = {}; ACH_CRAFT[B.crafting_table] = 'table'; ACH_CRAFT[I.wood_pick] = 'wpick'; ACH_CRAFT[I.stone_pick] = 'spick'; ACH_CRAFT[B.furnace] = 'furnace'; ACH_CRAFT[B.torch] = 'torch';
@@ -111,7 +111,7 @@ const game = {
       if (!initRenderer($('gl'))) { ui.init(); ui.error('このブラウザでは3D表示（WebGL2）が使えないようです。新しめの Chrome・Safari・Edge・Firefox でお試しください。'); return; }
       initMesher(); buildIconUrls(); buildHudIcons(); uploadMobTexture(buildMobAtlas()); paintSkin(0, settings.look);
     } catch (e) { console.error(e); ui.init(); ui.error('準備中に問題が起きました：' + (e && e.message ? e.message : e)); return; }
-    ui.init(); applySettings();
+    ui.init(); map.bind(); applySettings();
     window.addEventListener('resize', resizeRenderer);
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'playing') { this.save(); if (!touchSt.touchUsed) this.pause(); } });
     window.addEventListener('pagehide', () => this.save());
@@ -142,7 +142,7 @@ const game = {
     for (let r = 0; r < 140; r++) for (let k = 0; k < Math.max(1, r * 6); k++) {
       const a = k / Math.max(1, r * 6) * Math.PI * 2, x = Math.round(Math.cos(a) * r * 12), z = Math.round(Math.sin(a) * r * 12);
       const h = gen.column(x, z), b = gen.colB;
-      if (!(h >= SEA + 2 && h < 76 && (b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.FLOWER || b === BIOME.CHERRY))) continue;
+      if (!(h >= SEA + 2 && h < 76 && (b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.FLOWER || b === BIOME.CHERRY || b === BIOME.BIRCH || b === BIOME.MEADOW))) continue;
       if (!fallback) fallback = { x: x + 0.5, y: h + 1.01, z: z + 0.5 };
       let lo = h, hi = h;
       for (let dz = -12; dz <= 12; dz += 4) for (let dx = -12; dx <= 12; dx += 4) { const hh = gen.column(x + dx, z + dz); if (hh < lo) lo = hh; if (hh > hi) hi = hh; }
@@ -158,9 +158,10 @@ const game = {
   showTitle() {
     if (ui.screen) ui.close(true);
     if (net.on) net.leave();
+    map.reset(); $('mini').hidden = true;
     this.online = false; this.inBed = false; ui.sleepHud(false);
     this.disposeWorld();
-    const w = this.world = new World(20261118); _activeWorld = w; w.onUnload = freeChunkMeshes; w.time = 2600;
+    const w = this.world = new World(20261118); _activeWorld = w; w.onUnload = freeChunkMeshes; w.time = 2600; w.setGen(GEN_CUR, null);
     startGenWorkers(w.seed);
     this.isDemo = true; this.state = 'title'; this.titlePos = this.findSpawn(w.gen);
     this.titlePos.y += 10;
@@ -187,7 +188,7 @@ const game = {
       const r = await net.join(code), m = r.meta, pd = net.loadPlayer(r.code) || {};
       net.enter(r.code, m, r.time);
       this.isFreshOnline = !!fresh;
-      this.beginWorld({ id: m.id || ('o' + r.code), name: m.name, seed: m.seed, mode: m.mode, diff: m.diff, day: 1, time: 600, tick: 0, player: pd.player || null, ach: pd.ach || {}, ended: !!pd.ended, rules: m.rules, gv0: m.gv0 || 1, online: true }, new Map());
+      this.beginWorld({ id: m.id || ('o' + r.code), name: m.name, seed: m.seed, mode: m.mode, diff: m.diff, day: 1, time: 600, tick: 0, player: pd.player || null, ach: pd.ach || {}, ended: !!pd.ended, rules: m.rules, gv0: m.gv0 || 1, online: true, map: pd.map }, new Map());
     } catch (e) { console.error(e); net.leave(true); ui.netError(e); }
   },
   async loadWorld(id) {
@@ -206,6 +207,7 @@ const game = {
     this.rules = Object.assign(this.defaultRules(meta.diff), meta.rules || {});
     if (this.online) net.applyTime();
     restoreMobs(w, meta.mobs);
+    map.load(meta.map);
     startGenWorkers(w.seed);
     this.worldId = meta.id; this.name = meta.name; this.diff = meta.diff; this.ach = meta.ach || {}; this.ended = !!meta.ended; this.isDemo = false;
     player.reset(); player.mode = meta.mode;
@@ -247,7 +249,7 @@ const game = {
         const c = w.getChunk(x >> 4, z >> 4);
         for (let y = Math.min(CH - 3, c.maxY + 1); y > 1; y--) {
           const id = w.getBlock(x, y, z);
-          if (!id || SHAPE[id] === S_CROSS || id === B.snow_layer) continue;
+          if (!id || SHAPE[id] === S_CROSS || id === B.snow_layer || ISLEAF[id] || id === B.vine) continue;   // 葉は地面に数えない（森では木の下に立つ）
           if (OPAQUE[id] && !ISLOG[id] && !SOLID[w.getBlock(x, y + 1, z)] && !SOLID[w.getBlock(x, y + 2, z)] && !FLUID[w.getBlock(x, y + 1, z)]) best = [x, y, z];
           break;
         }
@@ -270,10 +272,10 @@ const game = {
     $('bQuit').textContent = this.online ? 'この世界から出る' : 'セーブしてタイトルへ'; ui.paintNetBox();
     ui.showMenu('mPause', true);
   },
-  resume() {
+  resume(noLock) {
     if (this.state !== 'paused') return;
     this.state = 'playing'; ui.hideMenu(); $('app').classList.add('playing'); this.last = performance.now(); this.acc = 0;
-    requestLock(true);
+    if (!noLock) requestLock(true);
   },
   async quitToTitle() { await this.save(); this.showTitle(); },
   respawn() { player.respawn(); this.state = 'playing'; ui.hideMenu(); $('app').classList.add('playing'); ui.hp = ui.food = ui.air = -99; requestLock(true); },
@@ -282,7 +284,7 @@ const game = {
     if (this.online) { net.savePlayer(); return Promise.resolve(); }
     const w = this.world; w.flushAll();
     const meta = { id: this.worldId, name: this.name, seed: w.seed, mode: player.mode, diff: this.diff, day: w.day, time: w.time, tick: w.tick, player: JSON.parse(JSON.stringify(player.serialize())), ach: Object.assign({}, this.ach), ended: this.ended, savedAt: Date.now(), ver: 2,
-      rules: Object.assign({}, this.rules), gv0: w.gv0, mobs: collectMobs(w) };
+      rules: Object.assign({}, this.rules), gv0: w.gv0, mobs: collectMobs(w), map: map.save(true) };
     if (w.rgv) meta.rgv = Object.fromEntries(w.rgv);
     const entries = []; for (const k of w.savedDirty) entries.push([k, w.saved.get(k)]); w.savedDirty.clear();
     this.saveChain = this.saveChain.then(() => storage.save(meta, entries)).catch((e) => { for (const [k] of entries) w.savedDirty.add(k); if (!this.saveWarned) { this.saveWarned = true; ui.toast('セーブに失敗しました。ブラウザの空き容量が足りないのかもしれません', 6); } });
@@ -408,6 +410,7 @@ const game = {
     w.tickFurnaces();
     tickEntities(w);
     if (w.tick % 20 === 0) spawnCycle(w);
+    if (w.tick % 10 === 0) map.mark();
     player.tick(); net.tick();
     if (this.boss && this.boss.dead) { if (this.boss.hp <= 0) this.bossDefeated(); else { this.boss = null; this.bossLost = 120; } }   // 倒した以外で消えた＝ほかの人の端末に移った
     if (this.bossLost > 0 && --this.bossLost === 0 && !this.boss) ui.dark(false);
@@ -493,9 +496,13 @@ const game = {
       if (player.brk && player.brk.p > 0) addLayerBox(dynCrack, x0, y0, z0, x1, y1, z1, TEX['crack_' + clamp(Math.floor(player.brk.p * 8), 0, 7)], 1, 1, 1, 1);
     }
     if (settings.handShow && !settings.view) player.drawHand(w);
+    const skip = R.skip; if (map.open) R.skip = true;   // 大きな地図を開いている間は 3Dの絵を描かない（軽くするため）
     renderFrame(w, cam, vd, player.headIn, !player.dead && !this.inBed);
+    R.skip = skip;
     ui.updateHud(dt);
     if (net.on) updTags(cam);
+    map.work(map.open ? 7 : 1.5);
+    if (map.open) map.drawFull(); else if (map.frame % 3 === 0) map.drawMini();
   }
 };
 function onContextLost() { game.save(); ui.error('3D表示が止まってしまいました。ページを読みこみ直すと、セーブしたところから続けられます。'); }
@@ -506,5 +513,5 @@ function startApp(data) {
   game.boot();
 }
 try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => { if (game.world && !game.isDemo) { game.save(); return { resume: game.online ? '@' + net.code : game.worldId }; } return {}; }); } catch (e) { }
-window.__kk = { game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob };
+window.__kk = { game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
 if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(startApp); else startApp((window.claude && window.claude.hot && window.claude.hot.data) || {});

@@ -1,7 +1,10 @@
 // ===== 03_gen.js : 地形の自動生成（作業スレッドと共用） =====
-const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOW: 5, TAIGA: 6, MOUNTAIN: 7, CHERRY: 8, FLOWER: 9, RIVER: 10 };
-const BIOME_NAMES = ['海', '砂浜', '草原', '森', '砂漠', '雪原', '針葉樹の森', '山', 'サクラの丘', '花畑', '川'];
-const BIOME_TINT = [3, 3, 0, 1, 3, 2, 2, 2, 0, 0, 0];   // 草の色の種類
+// 0〜10 は版1から。11 以降は版2で増えた分（番号は変えない。セーブした世界で使うため）
+const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOW: 5, TAIGA: 6, MOUNTAIN: 7, CHERRY: 8, FLOWER: 9, RIVER: 10,
+  BIRCH: 11, DARK: 12, JUNGLE: 13, SAVANNA: 14, SWAMP: 15, BADLANDS: 16, ICE: 17, SNOW_TAIGA: 18, OLD_TAIGA: 19, MEADOW: 20, SNOW_PEAK: 21, DEEP: 22, FROZEN: 23, MUSHROOM: 24 };
+const BIOME_NAMES = ['海', '砂浜', '草原', '森', '砂漠', '雪原', '針葉樹の森', '山', 'サクラの丘', '花畑', '川',
+  'シラカバの森', '暗い森', 'ジャングル', 'サバンナ', '湿地', '荒野', '氷のとげの原', '雪の針葉樹林', '大きなマツの森', '高原', '雪山', '深い海', 'こおった海', 'キノコの島'];
+const BIOME_TINT = [3, 3, 0, 1, 3, 2, 2, 2, 0, 0, 0, 0, 7, 4, 5, 6, 5, 2, 2, 1, 0, 2, 3, 2, 1];   // 草の色の種類
 const TREE_DENS = [0, 0, 0.0025, 0.07, 0, 0.003, 0.06, 0.012, 0.045, 0.002, 0];
 const F4 = [[0, 1], [-1, 0], [0, -1], [1, 0]];   // 向き 0:南(+Z) 1:西(-X) 2:北(-Z) 3:東(+X)
 const F4_TO_FACE = [4, 1, 5, 0];
@@ -346,6 +349,7 @@ class WorldGen {
 
 // 木の形。put(dx, dy, dz, ブロック番号) を呼ぶ。苗木の成長でも使う
 function genTreeShape(type, rng, put) {
+  if (type >= 4) { genFeature(type, rng, put); return; }   // 版2で増えた木（03b_gen2.js）
   const LOG = [11, 13, 15, 17][type], LEAF = [12, 14, 16, 18][type];
   if (type === 0 || type === 1) {
     const H = (type === 0 ? 4 : 5) + Math.floor(rng() * 3);
@@ -387,6 +391,3 @@ function genTreeShape(type, rng, put) {
   }
 }
 
-// 地形の版。新しい版を足しても、古い場所は古い版のまま作れるように全部残す
-const GENS = { 1: WorldGen };
-const GEN_CUR = 1;

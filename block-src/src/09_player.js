@@ -414,6 +414,7 @@ class Player {
       this.inv.fill(null); this.armor = [null, null, null, null];
     }
     this.invDirty = true; this.brk = null;
+    if (ui.screen) ui.close(true);   // 持ち物や地図を開いたままにしない
     sfx('death');
     ui.showDeath(DEATH_MSG[source] || (source ? source + ' にやられてしまった' : '力尽きてしまった'), dropped);
   }

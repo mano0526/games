@@ -1,6 +1,6 @@
 // ===== 02_blocks.js : ブロック・アイテム・レシピの定義（作業スレッドと共用） =====
 const S_NONE = 0, S_CUBE = 1, S_CROSS = 2, S_TORCH = 3, S_FLUID = 4, S_LAYER = 5, S_FARM = 6, S_CACTUS = 7,
-  S_CROP = 8, S_CHEST = 9, S_DOOR = 10, S_BED = 11, S_LADDER = 12;
+  S_CROP = 8, S_CHEST = 9, S_DOOR = 10, S_BED = 11, S_LADDER = 12, S_FLAT = 13;
 
 const BLOCKS = new Array(256).fill(null);
 const B = {};
@@ -15,6 +15,7 @@ const FLUID = new Uint8Array(256);    // 1:水 2:溶岩
 const GRAVITY = new Uint8Array(256);
 const ISLEAF = new Uint8Array(256);
 const ISLOG = new Uint8Array(256);
+const SOIL = new Uint8Array(256);     // 草花や苗木を植えられる土
 
 function defBlock(id, key, name, o) {
   const d = Object.assign({ id, key, name, shape: S_CUBE, hard: 1, tool: null, level: 0, needTool: false, sound: 'stone', light: 0 }, o);
@@ -25,7 +26,7 @@ function defBlock(id, key, name, o) {
   OPAQUE[id] = d.opaque ? 1 : 0; SOLID[id] = d.solid ? 1 : 0; LOPAC[id] = d.opac; LEMIT[id] = d.light;
   RCLASS[id] = d.trans ? 2 : (d.cutout || (d.shape !== S_CUBE && d.shape !== S_FLUID && d.shape !== S_FARM && d.shape !== S_CACTUS && d.shape !== S_CHEST && d.shape !== S_LAYER && d.shape !== S_BED && d.shape !== S_NONE)) ? 1 : 0;
   SHAPE[id] = d.shape; REPLACE[id] = d.replace ? 1 : 0; FLUID[id] = d.fluid || 0; GRAVITY[id] = d.gravity ? 1 : 0;
-  ISLEAF[id] = d.leaves ? 1 : 0; ISLOG[id] = d.log ? 1 : 0;
+  ISLEAF[id] = d.leaves ? 1 : 0; ISLOG[id] = d.log ? 1 : 0; SOIL[id] = d.soil ? 1 : 0;
   return d;
 }
 
@@ -39,8 +40,8 @@ function defItem(id, key, name, o) {
 // ---------------- ブロック ----------------
 defBlock(0, 'air', '空気', { shape: S_NONE, hard: 0, replace: true, tex: null });
 defBlock(1, 'stone', '石', { tex: 'stone', hard: 1.5, tool: 'pick', level: 1, needTool: true, drop: 'cobble' });
-defBlock(2, 'grass', '草ブロック', { tex: { top: 'grass_top', side: 'grass_side', bottom: 'dirt' }, hard: 0.6, tool: 'shovel', sound: 'grass', drop: 'dirt', tint: true });
-defBlock(3, 'dirt', '土', { tex: 'dirt', hard: 0.5, tool: 'shovel', sound: 'dirt' });
+defBlock(2, 'grass', '草ブロック', { tex: { top: 'grass_top', side: 'grass_side', bottom: 'dirt' }, hard: 0.6, tool: 'shovel', sound: 'grass', drop: 'dirt', tint: true, soil: true });
+defBlock(3, 'dirt', '土', { tex: 'dirt', hard: 0.5, tool: 'shovel', sound: 'dirt', soil: true });
 defBlock(4, 'cobble', '丸石', { tex: 'cobble', hard: 2, tool: 'pick', level: 1, needTool: true });
 defBlock(5, 'planks_oak', 'オークの板', { tex: 'planks_oak', hard: 2, tool: 'axe', sound: 'wood' });
 defBlock(6, 'bedrock', '岩盤', { tex: 'bedrock', hard: -1 });
@@ -48,7 +49,10 @@ defBlock(7, 'water', '水', { shape: S_FLUID, tex: 'water_0', hard: -1, trans: t
 defBlock(8, 'lava', '溶岩', { shape: S_FLUID, tex: 'lava_0', hard: -1, light: 15, opac: 15, fluid: 2, replace: true, sound: 'water' });
 defBlock(9, 'sand', '砂', { tex: 'sand', hard: 0.5, tool: 'shovel', sound: 'sand', gravity: true });
 defBlock(10, 'gravel', '砂利', { tex: 'gravel', hard: 0.6, tool: 'shovel', sound: 'gravel', gravity: true });
-const _woods = [['oak', 'オーク', 11, 12, 5, 46], ['birch', 'シラカバ', 13, 14, 19, 47], ['spruce', 'マツ', 15, 16, 20, 48], ['cherry', 'サクラ', 17, 18, 21, 49]];
+const _woods = [['oak', 'オーク', 11, 12, 5, 46], ['birch', 'シラカバ', 13, 14, 19, 47], ['spruce', 'マツ', 15, 16, 20, 48], ['cherry', 'サクラ', 17, 18, 21, 49],
+  ['mahog', 'マホガニー', 74, 75, 76, 77], ['acacia', 'アカシア', 78, 79, 80, 81], ['walnut', 'クルミ', 82, 83, 84, 85]];
+const SAP_TYPE = {};   // 苗木の番号 → 木の種類（genTreeShape の type）
+_woods.forEach((w, i) => { SAP_TYPE[w[5]] = i; });
 for (const [k, n, logId, leafId, plankId, sapId] of _woods) {
   defBlock(logId, 'log_' + k, n + 'の原木', { tex: { top: 'log_' + k + '_top', bottom: 'log_' + k + '_top', side: 'log_' + k }, hard: 2, tool: 'axe', sound: 'wood', log: true });
   defBlock(leafId, 'leaves_' + k, n + 'の葉', {
@@ -88,7 +92,7 @@ defBlock(43, 'flower_blue', '青い花', { shape: S_CROSS, tex: 'flower_blue', h
 defBlock(44, 'flower_white', '白い花', { shape: S_CROSS, tex: 'flower_white', hard: 0, sound: 'grass', support: 'soil', sprite: 'flower_white' });
 defBlock(45, 'deadbush', '枯れ草', { shape: S_CROSS, tex: 'deadbush', hard: 0, sound: 'grass', replace: true, support: 'sandy', drop: (rng) => rng() < 0.6 ? [[I.stick, 1]] : [], sprite: 'deadbush' });
 for (const [k, n, , , , sapId] of _woods) defBlock(sapId, 'sapling_' + k, n + 'の苗木', { shape: S_CROSS, tex: 'sapling_' + k, hard: 0, sound: 'grass', support: 'soil', sprite: 'sapling_' + k });
-defBlock(50, 'farmland', '耕地', { shape: S_FARM, tex: { top: 'farmland_dry', bottom: 'dirt', side: 'dirt' }, hard: 0.6, tool: 'shovel', sound: 'dirt', drop: 'dirt' });
+defBlock(50, 'farmland', '耕地', { shape: S_FARM, tex: { top: 'farmland_dry', bottom: 'dirt', side: 'dirt' }, hard: 0.6, tool: 'shovel', sound: 'dirt', drop: 'dirt', soil: true });
 defBlock(51, 'wheat_crop', '小麦', {
   shape: S_CROP, tex: 'wheat_0', hard: 0, sound: 'grass', support: 'farmland',
   drop: (rng, meta) => meta >= 3 ? [[I.wheat, 1], [I.wheat_seeds, 1 + Math.floor(rng() * 3)]] : [[I.wheat_seeds, 1]]
@@ -110,6 +114,30 @@ defBlock(70, 'glow_block', 'ひかり石', { tex: 'glow_block', hard: 0.3, light
 defBlock(71, 'altar', 'めざめの祭壇', { tex: { top: 'altar_top', bottom: 'obsidian', side: 'altar_side' }, hard: 8, tool: 'pick', level: 3, needTool: true, light: 7, interact: 'altar' });
 defBlock(72, 'crown_block', 'カゲの王冠', { shape: S_CROSS, tex: 'crown', hard: 0.2, light: 12, sound: 'metal', support: 'solid', sprite: 'crown' });
 defBlock(73, 'cracked_bricks', 'ひびわれ石レンガ', { tex: 'cracked_bricks', hard: 1.5, tool: 'pick', level: 1, needTool: true });
+// ---- 版2の地形で使うブロック ----
+defBlock(86, 'red_sand', '赤い砂', { tex: 'red_sand', hard: 0.5, tool: 'shovel', sound: 'sand', gravity: true });
+defBlock(87, 'terracotta', '素焼き', { tex: 'terracotta', hard: 1.25, tool: 'pick', level: 1, needTool: true });
+const _terras = [['white', '白い'], ['yellow', '黄色い'], ['orange', 'オレンジの'], ['red', '赤い'], ['brown', '茶色い']];
+_terras.forEach(([k, n], i) => defBlock(88 + i, 'terracotta_' + k, n + '素焼き', { tex: 'terracotta_' + k, hard: 1.25, tool: 'pick', level: 1, needTool: true }));
+defBlock(93, 'packed_ice', 'かたい氷', { tex: 'packed_ice', hard: 0.6, tool: 'pick', sound: 'glass' });
+defBlock(94, 'podzol', '落ち葉の土', { tex: { top: 'podzol_top', side: 'podzol_side', bottom: 'dirt' }, hard: 0.5, tool: 'shovel', sound: 'dirt', drop: 'dirt', soil: true });
+defBlock(95, 'mud', 'どろ', { tex: 'mud', hard: 0.5, tool: 'shovel', sound: 'dirt', soil: true });
+defBlock(96, 'coarse_dirt', 'あらい土', { tex: 'coarse_dirt', hard: 0.5, tool: 'shovel', sound: 'gravel', soil: true });
+defBlock(97, 'moss', 'コケ', { tex: 'moss', hard: 0.1, sound: 'grass', soil: true });
+defBlock(98, 'mycelium', 'きんしの土', { tex: { top: 'mycelium_top', side: 'mycelium_side', bottom: 'dirt' }, hard: 0.6, tool: 'shovel', sound: 'grass', drop: 'dirt', soil: true });
+// 大きなキノコ：オノで壊すとブロックのまま、それ以外は小さなキノコになる
+const _capDrop = (small) => (rng, meta, tool) => (tool && tool.type === 'axe') ? null : (rng() < 0.6 ? [[small, 1 + Math.floor(rng() * 2)]] : []);
+defBlock(99, 'mush_brown', '茶色いキノコのかさ', { tex: { top: 'mush_brown', side: 'mush_brown', bottom: 'mush_pore' }, hard: 0.2, tool: 'axe', sound: 'wood', drop: _capDrop(52) });
+defBlock(100, 'mush_red', '赤いキノコのかさ', { tex: { top: 'mush_red', side: 'mush_red', bottom: 'mush_pore' }, hard: 0.2, tool: 'axe', sound: 'wood', drop: _capDrop(53) });
+defBlock(101, 'mush_stem', 'キノコの柄', { tex: { top: 'mush_pore', side: 'mush_stem', bottom: 'mush_pore' }, hard: 0.2, tool: 'axe', sound: 'wood' });
+defBlock(102, 'fern', 'シダ', { shape: S_CROSS, tex: 'fern', hard: 0, sound: 'grass', replace: true, support: 'soil', drop: (rng) => rng() < 0.1 ? [[I.wheat_seeds, 1]] : [], sprite: 'fern' });
+defBlock(103, 'lily_pad', 'スイレンの葉', { shape: S_FLAT, tex: 'lily_pad', hard: 0, sound: 'grass', solid: true, support: 'water', sprite: 'lily_pad' });
+defBlock(104, 'vine', 'つた', { shape: S_LADDER, tex: 'vine', hard: 0.2, sound: 'grass', drop: (rng) => rng() < 0.4 ? [[104, 1]] : [], sprite: 'vine' });
+defBlock(105, 'granite', '花こう岩', { tex: 'granite', hard: 1.5, tool: 'pick', level: 1, needTool: true });
+defBlock(106, 'diorite', 'せん緑岩', { tex: 'diorite', hard: 1.5, tool: 'pick', level: 1, needTool: true });
+defBlock(107, 'andesite', '安山岩', { tex: 'andesite', hard: 1.5, tool: 'pick', level: 1, needTool: true });
+defBlock(108, 'flower_purple', 'むらさきの花', { shape: S_CROSS, tex: 'flower_purple', hard: 0, sound: 'grass', support: 'soil', sprite: 'flower_purple' });
+defBlock(109, 'flower_orange', 'オレンジの花', { shape: S_CROSS, tex: 'flower_orange', hard: 0, sound: 'grass', support: 'soil', sprite: 'flower_orange' });
 for (let i = 0; i < 256; i++) if (BLOCKS[i] && typeof BLOCKS[i].drop === 'string') BLOCKS[i].drop = B[BLOCKS[i].drop];
 
 // ブロックをそのままアイテムとしても登録（持てないものは除く）
@@ -175,8 +203,8 @@ ARMOR_MATS.forEach((m, mi) => ARMOR_TYPES.forEach(([k, n], pi) => {
 
 // ---------------- 分類（どれでも使える材料） ----------------
 const TAGS = {
-  '#planks': [5, 19, 20, 21],
-  '#log': [11, 13, 15, 17],
+  '#planks': _woods.map(w => w[4]),
+  '#log': _woods.map(w => w[2]),
   '#wool': [54, 55, 56, 57, 58, 59, 60],
   '#coal': [257, 258]
 };
@@ -243,12 +271,17 @@ shapeless(I.dye_blue, 2, [B.flower_blue], 'misc');
 shapeless(I.dye_black, 2, ['#coal'], 'misc');
 shapeless(I.dye_pink, 2, [I.dye_red, B.flower_white], 'misc');
 _dyes.forEach(([k], i) => shapeless(B['wool_' + k], 1, [B.wool_white, 286 + i], 'block'));
+shaped(B.terracotta_red, 8, ['TTT', 'TDT', 'TTT'], { T: B.terracotta, D: I.dye_red }, 'block');
+shaped(B.terracotta_yellow, 8, ['TTT', 'TDT', 'TTT'], { T: B.terracotta, D: I.dye_yellow }, 'block');
+shaped(B.coarse_dirt, 4, ['DG', 'GD'], { D: B.dirt, G: B.gravel }, 'block');
+shapeless(B.mossy_cobble, 1, [B.cobble, B.vine], 'block');
+shapeless(B.mossy_cobble, 1, [B.cobble, B.moss], 'block');
 shaped(B.altar, 1, ['OSO', 'SDS', 'OSO'], { O: B.obsidian, S: I.shadow_shard, D: I.diamond }, 'block');
 
 // ---------------- かまど ----------------
 const SMELT = {};
 SMELT[B.ore_iron] = [I.iron_ingot, 1]; SMELT[B.ore_gold] = [I.gold_ingot, 1];
-SMELT[B.sand] = [B.glass, 1]; SMELT[B.cobble] = [B.stone, 1];
+SMELT[B.sand] = [B.glass, 1]; SMELT[B.red_sand] = [B.glass, 1]; SMELT[B.cobble] = [B.stone, 1]; SMELT[B.clay] = [B.terracotta, 1];
 for (const id of TAGS['#log']) SMELT[id] = [I.charcoal, 1];
 SMELT[I.clay_ball] = [I.brick, 1]; SMELT[B.cactus] = [I.dye_green, 1];
 SMELT[B.stone_bricks] = [B.cracked_bricks, 1];
@@ -259,7 +292,7 @@ const FUEL = {};   // 燃える時間（秒）。1こ焼くのに10秒
 FUEL[I.coal] = 80; FUEL[I.charcoal] = 80; FUEL[I.stick] = 5; FUEL[I.lava_bucket] = 1000;
 for (const id of TAGS['#planks']) FUEL[id] = 15;
 for (const id of TAGS['#log']) FUEL[id] = 15;
-for (const id of [46, 47, 48, 49]) FUEL[id] = 5;
+for (const w of _woods) FUEL[w[5]] = 5;
 FUEL[B.crafting_table] = 15; FUEL[B.chest] = 15; FUEL[B.ladder] = 15; FUEL[B.door] = 10; FUEL[I.bowl] = 5;
 for (let t = 0; t < 5; t++) FUEL[300 + t] = 10;
 const SMELT_TIME = 200;   // 1こ焼くのにかかる時間（1秒=20）
