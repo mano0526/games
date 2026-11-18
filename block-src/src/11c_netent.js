@@ -3,10 +3,12 @@
 
 // ---- 消えない生き物（動物）をしまう・もどす ----
 function keepsMob(e) { return e.kind === 'mob' && !MOBS[e.type].hostile && e.hp > 0; }
-function mobRec(e) { return [e.type, r2(e.x), r2(e.y), r2(e.z), Math.max(1, Math.ceil(e.hp)), r2(e.yaw)]; }
+// 生き物ひとつ分の記録：[種類, x, y, z, 体力, 向き, 世界(dim), その動物だけの状態]
+function mobRec(e) { return [e.type, r2(e.x), r2(e.y), r2(e.z), Math.max(1, Math.ceil(e.hp)), r2(e.yaw), 0, mobEx(e)]; }
 function spawnFromRec(r) {
   if (!r || !MOBS[r[0]]) return null;
   const e = spawnMob(r[0], +r[1], +r[2], +r[3]); e.hp = Math.min(e.maxHp, +r[4] || e.maxHp); e.yaw = e.pyaw = +r[5] || 0;
+  applyEx(e, r[7]);
   return e;
 }
 function stashMob(world, e) {
@@ -20,8 +22,8 @@ function stashMob(world, e) {
 // セーブ用：動いている動物と、しまってある動物をまとめる
 function collectMobs(world) {
   const out = [];
-  for (const e of ents) if (!e.remote && !e.dead && keepsMob(e)) out.push(world.dim ? mobRec(e).concat([world.dim]) : mobRec(e));
-  world.stashes.forEach((st, d) => { for (const a of st.values()) for (const r of a) out.push(d && r.length < 7 ? r.concat([d]) : r); });
+  for (const e of ents) if (!e.remote && !e.dead && keepsMob(e)) { const r = mobRec(e); r[6] = world.dim; out.push(r); }
+  world.stashes.forEach((st, d) => { for (const a of st.values()) for (const r of a) { if (d) r[6] = d; out.push(r); } });
   return out;
 }
 function restoreMobs(world, list) {
@@ -64,7 +66,7 @@ function handOver(e) {
   if (net._npd + 10 < dl && dl > 18) netGive(e, p.pid);
 }
 function netGive(e, pid) {
-  net.dm(pid, { t: 'give', n: e.nid, m: mobRec(e).concat([e.awake ? 1 : 0, Math.ceil(e.hp)]) });
+  net.dm(pid, { t: 'give', n: e.nid, m: mobRec(e).concat([e.awake ? 1 : 0, Math.ceil(e.hp)]) });   // 8番目＝起きているか、9番目＝体力
   e.dead = true; e.given = true;
 }
 function netTake(m) {
@@ -72,7 +74,8 @@ function netTake(m) {
   let e = p ? p.ents.get(m.n) : null;
   if (e && e !== true && e.kind === 'mob' && !e.dead) { p.ents.set(m.n, true); e.remote = false; e.owner = null; e.nid = _nid++; e._ns = ''; }
   else e = spawnMob(a[0], a[1], a[2], a[3]);
-  e.x = e.px = a[1]; e.y = e.py = a[2]; e.z = e.pz = a[3]; e.yaw = e.pyaw = a[5] || 0; e.awake = !!a[6]; e.hp = a[7] || a[4]; e.vx = e.vy = e.vz = 0;
+  e.x = e.px = a[1]; e.y = e.py = a[2]; e.z = e.pz = a[3]; e.yaw = e.pyaw = a[5] || 0; e.awake = !!a[8]; e.hp = a[9] || a[4]; e.vx = e.vy = e.vz = 0;
+  e.sheared = false; e.color = 0; e.tamer = null; e.sit = false; if (e.baby > 0) setBaby(e, 0); applyEx(e, a[7]);
   if (MOBS[e.type].boss) bossSeen(e);
 }
 // ボスが自分の画面に現れた（体力バーを出す。暗くするのは カゲの王だけ）
@@ -80,7 +83,7 @@ function bossSeen(e) { game.boss = e; game.bossLost = 0; ui.dark(e.type === 'kin
 
 // ---- 送る側：自分が動かしているものの一覧 ----
 function entRec(e) {
-  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0)];
+  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0) | (e.baby > 0 ? 64 : 0) | (e.sheared ? 128 : 0) | (e.sit ? 256 : 0) | (e.love > 0 ? 512 : 0), e.type === 'sheep' ? e.color | 0 : e.type === 'dog' ? (e.tamer || 0) : 0];
   if (e.kind === 'item') return [e.nid, 1, e.id, e.n, e.d, r2(e.x), r2(e.y), r2(e.z)];
   if (e.kind === 'falling') return [e.nid, 2, e.id, r2(e.x), r2(e.y), r2(e.z)];
   return [e.nid, 3, e.dark | 0, r2(e.x), r2(e.y), r2(e.z), r2(e.vx), r2(e.vy), r2(e.vz), e.dmg];
@@ -118,13 +121,20 @@ function mkPuppet(p, r) {
   const k = r[1]; let e = null;
   if (k === 0) {
     if (!MOBS[r[2]]) return null;
-    e = spawnMob(r[2], r[3], r[4], r[5]); e.yaw = e.pyaw = r[6]; e.hp = r[7]; e.awake = !!(r[8] & 1); e.onGround = !!(r[8] & 8);
+    e = spawnMob(r[2], r[3], r[4], r[5]); e.yaw = e.pyaw = r[6]; e.hp = r[7]; e.awake = !!(r[8] & 1); e.onGround = !!(r[8] & 8); puppetLook(e, r);
     if (MOBS[r[2]].boss && r[7] > 0) bossSeen(e);
   } else if (k === 1) { e = spawnDrop(r[5], r[6], r[7], r[2], r[3], r[4], 0, 0, 0, 0); if (!e) return null; }
   else if (k === 2) { e = addEnt({ kind: 'falling', x: r[3], y: r[4], z: r[5], px: r[3], py: r[4], pz: r[5], vx: 0, vy: 0, vz: 0, hw: 0.49, h: 0.98, id: r[2], age: 0, dead: false, onGround: false }); }
   else { const s = spawnShot(r[3] + r[6] * 0.15, r[4] + r[7] * 0.15, r[5] + r[8] * 0.15, r[6], r[7], r[8], r[9], r[2]); s.foreign = true; return true; }   // 弾は、見えた人それぞれの画面で飛ばす（よけやすいように）
   e.remote = true; e.owner = p.pid; e.rnid = r[0]; e.tx = e.x; e.ty = e.y; e.tz = e.z; e.tyaw = e.yaw || 0;
   return e;
+}
+// 影の見た目（子ども・毛・おすわり・毛の色・飼い主）
+function puppetLook(e, r) {
+  const b = r[8] | 0, baby = !!(b & 64);
+  if (baby !== (e.baby > 0)) setBaby(e, baby ? 1e9 : 0);
+  e.sheared = !!(b & 128); e.sit = !!(b & 256); if ((b & 512) && !(e.love > 0)) heartFx(e, 5); e.love = (b & 512) ? 100 : 0;
+  if (e.type === 'sheep') e.color = clamp(r[9] | 0, 0, 15); else if (e.type === 'dog') e.tamer = typeof r[9] === 'string' ? r[9] : null;
 }
 function updPuppet(e, r) {
   if (e.kind === 'mob') {
@@ -134,7 +144,7 @@ function updPuppet(e, r) {
     e.hp = hp; e.awake = !!(b & 1); e.onGround = !!(b & 8);
     if ((b & 2) && !e._sw) e.swing = d.boss ? 20 : 8; e._sw = !!(b & 2);
     if ((b & 4) && !e._sl) e.slam = 20; e._sl = !!(b & 4);
-    e.breath = !!(b & 16); e.land = (b & 32) ? 1 : 0;
+    e.breath = !!(b & 16); e.land = (b & 32) ? 1 : 0; puppetLook(e, r);
   } else if (e.kind === 'item') { e.n = r[3]; e.tx = r[5]; e.ty = r[6]; e.tz = r[7]; }
   else { e.tx = r[3]; e.ty = r[4]; e.tz = r[5]; }
 }
@@ -188,6 +198,7 @@ net.onDm = function (raw) {
       break;
     }
     case 'give': netTake(m); break;
+    case 'use': { const e = ownEnt(m.n); if (e && e.kind === 'mob' && typeof m.a === 'string') applyMobUse(e, m.a, m.f, m.c | 0); break; }   // ほかの人が、自分の動かしている動物に えさ・ハサミなどを使った
     case 'adopted': if (Array.isArray(m.ids)) for (const nid of m.ids) { const e = ownEnt(nid); if (e) { e.dead = true; e._ns = ''; } } break;   // 通信が切れている間に、ほかの人が引き取った分
     case 'kill': player.onKill({ type: m.ty }); break;
   }

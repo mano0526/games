@@ -559,6 +559,26 @@ function buildTextures() {
     for (let i = 3; i < 13; i++) { p.px(i, 7, C('#ffffff')); p.px(7, i, C('#ffffff')); }
   });
   newTex('hoshi_egg', p => { p.blot(CP(['#1a1038', '#231648', '#120a2a', '#2c1c58', '#1a1038']), 4); const r = mulberry32(99); for (let k = 0; k < 9; k++) p.px(Math.floor(r() * 16), Math.floor(r() * 16), C(k % 3 ? '#c8b6ff' : '#fff3a0')); });
+  // ---- 畑の作物 ----
+  const rootCrop = (name, leafPal, rootC) => { for (let s = 0; s < 4; s++) newTex(name + '_' + s, p => {
+    const hgt = 3 + s * 2, g = CP(leafPal);
+    for (const x of [2, 6, 10, 13]) {
+      const hh = hgt - Math.floor(p.rng() * 2);
+      for (let k = 0; k < hh; k++) { p.px(x, 15 - k, g[k & 1]); if (k > 1 && (k & 1)) { p.px(x - 1, 15 - k, g[1]); p.px(x + 1, 14 - k, g[0]); } }
+      if (s === 3) { p.px(x, 15, C(rootC)); p.px(x, 14, C(rootC)); p.px(x + 1, 15, shadeC(C(rootC), 0.8)); }   // 育ちきると 根もとに色が見える
+    }
+  }); };
+  rootCrop('carrot', ['#3f9a38', '#58b845'], '#f08a2e');
+  rootCrop('potato', ['#3a7f3a', '#4f9a4a'], '#c9a36a');
+  for (let s = 0; s < 4; s++) newTex('stem_' + s, p => {
+    const g = s < 3 ? CP(['#5aa842', '#4f9a38']) : CP(['#b8a03a', '#9a8a30']), hgt = 4 + s * 3;
+    let x = 8; for (let k = 0; k < hgt; k++) { p.px(x, 15 - k, g[k & 1]); p.px(x - 1, 15 - k, g[1]); if (k > 2 && p.rng() < 0.35) x += p.rng() < 0.5 ? 1 : -1; if (k % 4 === 3) { p.px(x + 2, 15 - k, g[0]); p.px(x - 3, 14 - k, g[0]); p.px(x + 3, 15 - k, g[1]); } }
+  });
+  newTex('pumpkin_side', p => { for (let x = 0; x < 16; x++) { const rib = (x % 4) === 0, c = C(rib ? '#b85f14' : ['#e8892a', '#f0962f', '#dd7f24'][(x >> 1) % 3]); for (let y = 0; y < 16; y++) p.px(x, y, p.rng() < 0.1 ? shadeC(c, 0.9) : c); } for (let x = 0; x < 16; x++) { p.px(x, 0, C('#c96c1a')); p.px(x, 15, C('#a8520f')); } });
+  newTex('pumpkin_top', p => { p.speckle(CP(['#e8892a', '#dd7f24', '#f0962f'])); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#b85f14')); p.px(0, i, C('#b85f14')); p.px(i, 15, C('#b85f14')); p.px(15, i, C('#b85f14')); p.px(i, i, C('#c96c1a')); p.px(15 - i, i, C('#c96c1a')); } p.rect(6, 6, 4, 4, C('#5a7a2a')); p.rect(7, 7, 2, 2, C('#7a9a3a')); });
+  newTex('pumpkin_face', p => { p.copy('pumpkin_side'); const y = C('#ffe27a'), o = C('#ffb02e'); for (const [x0, y0, w, h] of [[3, 4, 3, 3], [10, 4, 3, 3], [7, 7, 2, 2], [3, 10, 10, 2], [4, 12, 2, 1], [8, 12, 2, 1], [11, 12, 1, 1]]) p.rect(x0, y0, w, h, y); for (const [x, yy] of [[3, 4], [12, 4], [5, 10], [9, 10]]) p.px(x, yy, o); });
+  newTex('melon_side', p => { p.speckle(CP(['#6fb84a', '#66ae43', '#78c252'])); for (let y = 0; y < 16; y++) { const j = y > 4 && y < 11 ? (p.rng() < 0.4 ? 1 : 0) : 0; for (const x0 of [1, 5, 9, 13]) { p.px(x0 + j, y, C('#3f8a2f')); p.px(x0 + 1 + j, y, C(p.rng() < 0.2 ? '#357a27' : '#3f8a2f')); } } });
+  newTex('melon_top', p => { p.speckle(CP(['#5aa83c', '#4f9a35', '#66b545'])); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#3f8a2f')); p.px(0, i, C('#3f8a2f')); p.px(i, 15, C('#3f8a2f')); p.px(15, i, C('#3f8a2f')); } p.rect(7, 7, 2, 2, C('#8a7a4a')); });
   // ひび割れ（8段階）
   const crackSeq = []; { const r = mulberry32(4242); for (let l = 0; l < 7; l++) { let x = 7 + Math.floor(r() * 2), y = 7 + Math.floor(r() * 2); const ang = l * 0.9 + r(); for (let k = 0; k < 9; k++) { crackSeq.push([l, k, Math.round(x), Math.round(y)]); x += Math.cos(ang + (r() - 0.5) * 1.6); y += Math.sin(ang + (r() - 0.5) * 1.6); } } }
   for (let s = 0; s < 8; s++) newTex('crack_' + s, p => { for (const [l, k, x, y] of crackSeq) if (k <= s + 1 && l <= s + 2 && x >= 0 && x < 16 && y >= 0 && y < 16) p.px(x, y, [20, 20, 22], 175); });
@@ -669,6 +689,17 @@ function buildIcons() {
   S(I.homura_rod, stick, { h: '#ffc23a', H: '#e8591a' });
   S(I.homura_powder, R_PILE, { m: '#ff9a2e', l: '#ffe08a', d: '#c9521a' });
   { const eye = R_BALL.slice(); eye[7] = '....dlmkkmmd....'; eye[8] = '....dmmkkmsd....'; S(I.hoshi_eye, eye, { l: '#c8fff6', m: '#43d6c8', s: '#1f9c94', d: '#0e4a50', k: '#0b1a22' }); }
+  S(I.carrot, ['', '', '..........gg.g..', '.........gggg...', '........dgggg...', '.......dmmdg....', '......dmlmmd....', '.....dmlmmmd....', '....dmlmmmd.....', '...dmlmmmd......', '..dmmmmmd.......', '..dmmmdd........', '..ddd...........'], { m: '#f08a2e', l: '#ffb86a', d: '#a8520f', g: '#4f9a38' });
+  S(I.potato, R_LUMP, { m: '#c9a36a', l: '#e0c08a', d: '#7a5c30' });
+  S(I.baked_potato, R_LUMP, { m: '#d9a84a', l: '#f6e0a0', d: '#7a4f1a' });
+  S(I.pumpkin_seeds, R_PILE, { m: '#efe6c4', l: '#fffbe6', d: '#b8a878' });
+  S(I.melon_seeds, R_PILE, { m: '#3a2a22', l: '#6a5444', d: '#1a120e' });
+  S(I.melon_slice, ['', '', '', '', '..dddddddddddd..', '..dmmmmmmmmmmd..', '...dmkmmmkmmd...', '...dmmmkmmmmd...', '....dmmmmmmd....', '....wdmmmmdw....', '.....wwddww.....', '......gggg......'], { m: '#e8483f', k: '#2a1a14', d: '#b52a25', w: '#e6f0c8', g: '#3f8a2f' });
+  S(I.pumpkin_pie, ['', '', '', '', '', '....dddddddd....', '..ddmmlmmmmmdd..', '.dmmmmmmlmmmmmd.', '.dcmmlmmmmmmmcd.', '.dccccccccccccd.', '..dccccccccccd..', '...dddddddddd...'], { m: '#e8892a', l: '#f6b45a', c: '#d9b06a', d: '#7a4f1a' });
+  S(I.shears, ['', '', '..dd......dd....', '.dlmd....dlmd...', '..dmmd..dmmd....', '...dmmddmmd.....', '....dmmmmd......', '.....dmmd.......', '....drddrd......', '...drd..drd.....', '..drd....drd....', '..drd....drd....', '...d......d.....'], { l: '#f6f6f6', m: '#b9bcc2', d: '#4a4d55', r: '#c9413a' });
+  S(I.egg, ['', '', '', '......dddd......', '.....dllmmd.....', '....dllmmmmd....', '....dlmmmmmd....', '...dlmmmmmmsd...', '...dmmmmmmmsd...', '...dmmmmmmssd...', '....dmmmmssd....', '.....dssssd.....', '......dddd......'], { l: '#fffaf0', m: '#f2e6d0', s: '#d6c4a6', d: '#8a785c' });
+  S(I.fried_egg, ['', '', '', '', '....dddddd......', '..ddwwwwwwdd....', '.dwwwwyyywwwd...', '.dwwwyyoyywwwd..', '.dwwwyyyyywwwd..', '..dwwwyyywwwd...', '...ddwwwwwdd....', '.....ddddd......'], { w: '#fffaf0', y: '#ffd23a', o: '#fff0a0', d: '#b8a888' });
+  S(I.milk_bucket, R_BUCKET, { l: '#f6f6f6', m: '#d0d0d0', s: '#a2a2a2', d: '#5f5f5f', f: '#fdfdf6' });
   // 立方体でないブロックのアイコン
   ICON.icon_bed = sprite(['', '', '', '', '', '.dd.............', '.dwwd...........', '.dwwwdrrrrrrrrd.', '.dwwwdrrRrrRrrd.', '.ddddddddddddddd', '.dmmmmmmmmmmmmmd', '.ddddddddddddddd', '.dm..........dm.', '.dm..........dm.', '', ''], P({ d: '#4a321a', w: '#f2f2f0', r: '#c9413a', R: '#e2685f', m: '#8a6238' }));
   ICON.icon_door = sprite(['...dddddddddd...', '...dmmmmmmmmd...', '...dmddmmddmd...', '...dmdwmmdwmd...', '...dmdwmmdwmd...', '...dmddmmddmd...', '...dmmmmmmmmd...', '...dmmmmmmmyd...', '...dmmmmmmmmd...', '...dmddddddmd...', '...dmdllllldd...', '...dmdlllllmd...', '...dmdlllllmd...', '...dmddddddmd...', '...dmmmmmmmmd...', '...dddddddddd...'], P({ d: '#5b3d18', m: '#b08a55', l: '#c9a46b', w: '#9fd4e8', y: '#f6cf3e' }));

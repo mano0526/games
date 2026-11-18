@@ -111,14 +111,15 @@ function fallingTick(world, e) {
 
 // ---------------- 生き物の定義 ----------------
 const MOBS = {
-  sheep: { name: 'ヒツジ', hw: 0.42, h: 1.15, hp: 8, speed: 1.3, model: 'sheep', voice: 'sheep', drops: () => [[I.raw_mutton, 1 + rnd(2)], [B.wool_white, 1]] },
+  sheep: { name: 'ヒツジ', hw: 0.42, h: 1.15, hp: 8, speed: 1.3, model: 'sheep', voice: 'sheep', drops: (e) => (e && e.sheared) ? [[I.raw_mutton, 1 + rnd(2)]] : [[I.raw_mutton, 1 + rnd(2)], [WOOL[e ? e.color | 0 : 0], 1]] },
   pig: { name: 'ブタ', hw: 0.42, h: 0.9, hp: 10, speed: 1.4, model: 'pig', voice: 'pig', drops: () => [[I.raw_pork, 1 + rnd(2)]] },
   cow: { name: 'ウシ', hw: 0.45, h: 1.3, hp: 10, speed: 1.2, model: 'cow', voice: 'cow', drops: () => [[I.raw_beef, 1 + rnd(2)]] },
   chicken: { name: 'ニワトリ', hw: 0.22, h: 0.7, hp: 4, speed: 1.3, model: 'chicken', voice: 'chicken', flutter: true, drops: () => [[I.raw_chicken, 1], [I.feather, rnd(3)]] },
-  shade: { name: 'ヨルカゲ', hw: 0.3, h: 1.9, hp: 20, speed: 2.5, model: 'shade', voice: 'shade', hostile: true, dmg: 3, burns: true, drops: () => Math.random() < 0.7 ? [[I.shadow_shard, 1 + rnd(2)]] : [] },
+  shade: { name: 'ヨルカゲ', hw: 0.3, h: 1.9, hp: 20, speed: 2.5, model: 'shade', voice: 'shade', hostile: true, dmg: 3, burns: true, drops: () => { const o = Math.random() < 0.7 ? [[I.shadow_shard, 1 + rnd(2)]] : []; const r = Math.random(); if (r < 0.07) o.push([I.carrot, 1]); else if (r < 0.14) o.push([I.potato, 1]); return o; } },
   rock: { name: 'イワコロ', hw: 0.4, h: 0.8, hp: 14, speed: 0, model: 'rock', voice: 'rock', hostile: true, dmg: 3, hop: true, drops: () => [[B.cobble, 1 + rnd(2)], [I.coal, rnd(2)], [B.ore_iron, Math.random() < 0.12 ? 1 : 0]] },
   wisp: { name: 'ヒトダマ', hw: 0.25, h: 0.55, hp: 8, speed: 2.4, model: 'wisp', voice: 'wisp', hostile: true, dmg: 3, fly: true, glow: true, drops: () => [[I.glow_dust, 1 + rnd(2)]] },
   king: { name: 'カゲの王', hw: 0.7, h: 4.1, hp: 160, speed: 2.0, model: 'king', voice: 'king', hostile: true, dmg: 7, boss: true, scale: 2.2, drops: () => [[B.crown_block, 1], [I.shadow_shard, 6], [I.diamond, 3], [I.golden_apple, 2]] },
+  dog: { name: 'イヌ', hw: 0.3, h: 0.78, hp: 20, speed: 1.9, model: 'dog', voice: 'dog', drops: () => [] },
   // ---- ホムラの底 ----
   homurabi: { name: 'ホムラビ', hw: 0.35, h: 1.5, hp: 20, speed: 2.2, model: 'homurabi', voice: 'homurabi', hostile: true, dmg: 5, fly: true, glow: true, fireproof: true, drops: () => Math.random() < 0.7 ? [[I.homura_rod, 1]] : [] },
   ukikurage: { name: 'ウキクラゲ', hw: 1.0, h: 2.6, hp: 10, speed: 1.3, model: 'ukikurage', voice: 'kurage', hostile: true, dmg: 6, fly: true, fireproof: true, scale: 2, drops: () => [[I.glow_dust, rnd(3)], [I.homura_powder, rnd(2)]] },
@@ -155,6 +156,9 @@ function buildModels() {
   MODELS.king.push(part('crown', -4.5, 30, -4.5, 4.5, 32, 4.5, 0, 22, 0), part('spike0', -4.5, 32, -4.5, -2.5, 34, -2.5, 0, 22, 0), part('spike1', 2.5, 32, -4.5, 4.5, 34, -2.5, 0, 22, 0), part('spike2', -1, 32, -4.5, 1, 35, -2.5, 0, 22, 0));
   MODELS.rock = [part('body', -6, 1, -6, 6, 12, 6, 0, 6, 0), part('foot0', -5, 0, -3, -1, 2, 3, -3, 2, 0), part('foot1', 1, 0, -3, 5, 2, 3, 3, 2, 0), part('eye0', -4, 7, -7, -2, 9, -6, 0, 6, 0), part('eye1', 2, 7, -7, 4, 9, -6, 0, 6, 0)];
   for (let i = 0; i < 4; i++) MODELS['pl' + i] = humanParts();   // 人の姿（0 は自分、1〜3 はほかの参加者）
+  MODELS.dog = quadruped({ bw: 6, bh: 6, bd: 11, legH: 5, legW: 2, hw: 6, hh: 5, hd: 5, hy: 8 });
+  MODELS.dog.push(part('snout', -1.5, 8, -11, 1.5, 10.5, -8.5, 0, 10, -4.5), part('ear0', -3, 13, -6.5, -1.5, 15, -5, 0, 10, -4.5), part('ear1', 1.5, 13, -6.5, 3, 15, -5, 0, 10, -4.5),
+    part('tail', -1, 9, 5.5, 1, 11, 10, 0, 10, 5.5), part('collar', -3.4, 7.6, -4.3, 3.4, 13.4, -3.3, 0, 10, -4.5));
   MODELS.yakebone = shade(); MODELS.hoshikage = shade();
   MODELS.homurabi = [part('fl0', -4, 2, -4, 4, 10, 4, 0, 6, 0), part('fl1', -3, 10, -3, 3, 16, 3, 0, 13, 0), part('fl2', -2, 16, -2, 2, 21, 2, 0, 18, 0), part('fl3', -1, 21, -1, 1, 24, 1, 0, 22, 0),
     part('mask', -4, 8, -6, 4, 17, -4, 0, 12, -5), part('hand0', 6, 8, -2, 9, 11, 1, 0, 9, 0), part('hand1', -9, 8, -2, -6, 11, 1, 0, 9, 0)];
@@ -253,6 +257,16 @@ function paintMob(m, id, f, g) {
     for (let i = 0; i < g.w * g.h / 20; i++) g.px(Math.floor(g.rng() * g.w), Math.floor(g.rng() * g.h), C('#55575c'));
     if (id === 'body' && front) { for (let x = 3; x < 9; x++) g.px(x, 8 + (x & 1), C('#2a2a2d')); g.rect(1, 2, 3, 3, C('#3a3a3d')); g.rect(8, 2, 3, 3, C('#3a3a3d')); }
     if (id === 'body' && top) for (let i = 0; i < 10; i++) g.px(Math.floor(g.rng() * g.w), Math.floor(g.rng() * g.h), C('#6a9a44'));
+  } else if (m === 'dog') {
+    const tan = CP(['#c98f55', '#c0864d', '#d29a60', '#b97e46']), cream = CP(['#f2e6d0', '#eadcc2', '#f8efdd']);
+    if (id === 'collar') { g.fill(CP(['#c9413a', '#b8352f'])); if (front || f === 4) g.px(Math.floor(g.w / 2), Math.floor(g.h / 2), C('#f6cf3e')); return; }
+    if (id.startsWith('ear')) { g.fill(CP(['#8a5a30', '#7c5029'])); return; }
+    if (id === 'snout') { g.fill(cream); if (front) { g.rect(1, 0, 1, 1, C('#1b1b1b')); g.px(1, 2, C('#7a4a3a')); } return; }
+    if (id === 'tail') { g.fill(tan); if (f === 4) g.fill(cream); return; }
+    g.fill(tan);
+    if (isLeg) { if (f !== 2 && f !== 3) g.rect(0, g.h - 2, g.w, 2, cream[0]); return; }
+    if (id === 'body') { if (f === 3) g.fill(cream); else if (!top) g.rect(0, g.h - 2, g.w, 2, cream[1]); }
+    if (id === 'head' && front) { g.rect(1, 3, 4, 2, cream[0]); g.px(1, 1, C('#141414')); g.px(4, 1, C('#141414')); g.px(1, 0, C('#fffaf0')); g.px(4, 0, C('#fffaf0')); }
   } else if (m === 'yakebone') {
     const bone = CP(['#3a3436', '#2e292b', '#463f41', '#262123']);
     g.fill(bone);
@@ -310,7 +324,7 @@ function paintMob(m, id, f, g) {
 function spawnMob(type, x, y, z) {
   const d = MOBS[type];
   const e = { kind: 'mob', type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, hw: d.hw, h: d.h, hp: d.hp, maxHp: d.hp, yaw: Math.random() * 6.28, pyaw: 0, headPitch: 0,
-    age: 0, hurt: 0, death: 0, atkCd: 0, walk: 0, walkAmp: 0, state: 0, timer: 0, moveYaw: 0, moving: false, panic: 0, kb: 0, dead: false, onGround: false, hitH: false, awake: type !== 'rock', swing: 0, burst: 0, shotCd: 60, summonCd: 200, slam: 0, voiceCd: 100 + rnd(300), fire: 0, spinOff0: Math.random() * 6.28, spinSeed0: Math.random() * 6.28 };
+    age: 0, hurt: 0, death: 0, atkCd: 0, walk: 0, walkAmp: 0, state: 0, timer: 0, moveYaw: 0, moving: false, panic: 0, kb: 0, dead: false, onGround: false, hitH: false, awake: type !== 'rock', swing: 0, burst: 0, love: 0, breedCd: 0, baby: 0, sheared: false, color: 0, owner: null, tamer: null, sit: false, eggT: 6000 + rnd(6000), shotCd: 60, summonCd: 200, slam: 0, voiceCd: 100 + rnd(300), fire: 0, spinOff0: Math.random() * 6.28, spinSeed0: Math.random() * 6.28 };
   e.pyaw = e.yaw;
   return addEnt(e);
 }
@@ -343,7 +357,7 @@ function mobTick(world, e) {
     if (e.death > dT) {
       e.dead = true;
       if (e.type === 'hoshikui') hoshiReward(world, e);
-      for (const [id, n] of d.drops()) if (n > 0) spawnDrop(e.x, e.y + 0.4, e.z, id, n, 0);
+      if (!(e.baby > 0)) for (const [id, n] of d.drops(e)) if (n > 0) spawnDrop(e.x, e.y + 0.4, e.z, id, n, 0);
       fxPuff(e.x, e.y + e.h * 0.5, e.z, d.boss ? 60 : 10, 0.85, 0.85, 0.85, { speed: d.boss ? 5 : 1.5, life: 0.9, size: 0.1, spread: e.hw * 2 });
       if (e.lastBy && net.on && e.lastBy !== net.pid) net.dm(e.lastBy, { t: 'kill', ty: e.type }); else if (!e.noCredit) player.onKill(e);
     }
@@ -385,7 +399,11 @@ function mobTick(world, e) {
       e.fire = 25; hurtMob(e, 3, e.x, e.z, 0); fxPuff(e.x, e.y + 1, e.z, 12, 0.25, 0.2, 0.45, { speed: 1.2, life: 1.1, size: 0.1, up: 1.4 });
     }
   } else {
-    if (e.panic > 0) { e.panic--; if (e.panic % 20 === 0 || e.hitH) e.moveYaw = Math.random() * 6.28; e.moving = true; }
+    passiveLife(world, e, d);
+    const goal = e.panic > 0 ? null : passiveGoal(world, e, d);   // [x, z, 速さ, 止まる近さ]。なければ ぶらぶら歩く
+    if (e.panic > 0) { e.panic--; if (e.panic % 20 === 0 || e.hitH) e.moveYaw = Math.random() * 6.28; e.moving = true; e.sit = false; }
+    else if (goal) { chasing = true; const gx = goal[0] - e.x, gz = goal[1] - e.z, gd = Math.hypot(gx, gz); if (gd > 0.05) wantYaw = Math.atan2(-gx, -gz); wantSpeed = gd > goal[3] ? goal[2] : 0; e.moving = false; }
+    else if (e.sit) e.moving = false;
     else wander(world, e, d);
   }
   if (!chasing && e.moving) { wantYaw = e.moveYaw; wantSpeed = d.speed * (d.hostile ? 0.45 : e.panic > 0 ? 2.2 : 1); }
@@ -582,13 +600,13 @@ function trySpawnHostile(world, R) {
 // バイオームごとに出る動物。地面が草（や落ち葉の土・きんしの土）の明るい場所に出る
 const ANIMAL_POOL = [];
 ANIMAL_POOL[BIOME.PLAINS] = ANIMAL_POOL[BIOME.FLOWER] = ANIMAL_POOL[BIOME.MEADOW] = ['sheep', 'cow', 'pig', 'chicken', 'sheep'];
-ANIMAL_POOL[BIOME.FOREST] = ANIMAL_POOL[BIOME.BIRCH] = ['pig', 'chicken', 'cow'];
+ANIMAL_POOL[BIOME.FOREST] = ANIMAL_POOL[BIOME.BIRCH] = ['pig', 'chicken', 'cow', 'dog'];
 ANIMAL_POOL[BIOME.CHERRY] = ['chicken', 'sheep', 'pig'];
 ANIMAL_POOL[BIOME.DARK] = ['pig', 'cow'];
 ANIMAL_POOL[BIOME.JUNGLE] = ['chicken', 'pig', 'chicken'];
 ANIMAL_POOL[BIOME.SAVANNA] = ['cow', 'sheep', 'chicken'];
 ANIMAL_POOL[BIOME.SWAMP] = ['pig', 'chicken'];
-ANIMAL_POOL[BIOME.SNOW] = ANIMAL_POOL[BIOME.TAIGA] = ANIMAL_POOL[BIOME.SNOW_TAIGA] = ANIMAL_POOL[BIOME.OLD_TAIGA] = ['sheep', 'sheep', 'chicken'];
+ANIMAL_POOL[BIOME.SNOW] = ANIMAL_POOL[BIOME.TAIGA] = ANIMAL_POOL[BIOME.SNOW_TAIGA] = ANIMAL_POOL[BIOME.OLD_TAIGA] = ['sheep', 'sheep', 'chicken', 'dog'];
 ANIMAL_POOL[BIOME.MOUNTAIN] = ['sheep', 'cow'];
 ANIMAL_POOL[BIOME.MUSHROOM] = ['cow'];
 const ANIMAL_GROUND = new Uint8Array(NB); ANIMAL_GROUND[B.grass] = ANIMAL_GROUND[B.podzol] = ANIMAL_GROUND[B.mycelium] = 1;
@@ -601,7 +619,8 @@ function trySpawnPassive(world, R) {
   const bio = world.biomeAt(x, z);
   const pool = ANIMAL_POOL[bio];
   if (!pool) return false;
-  const type = pool[rnd(pool.length)], cnt = 2 + rnd(3);
+  const type = pool[rnd(pool.length)], cnt = type === 'dog' ? 1 + rnd(2) : 2 + rnd(3);
+  if (type === 'dog' && mobCount('dog', 128) >= 2) return false;
   let made = 0;
   for (let k = 0; k < cnt; k++) { const mx = x + rnd(7) - 3, mz = z + rnd(7) - 3, my = findFloor(world, mx, sy + 3, mz); if (my !== null && world.isLoaded(mx, mz) && ANIMAL_GROUND[world.getBlock(mx, my - 1, mz)]) { spawnMob(type, mx + 0.5, my, mz + 0.5); made++; } }
   return made > 0;
@@ -655,7 +674,7 @@ function drawEntities(world, cam, alpha) {
 }
 function drawMob(world, e, x, y, z, alpha) {
   if (e.type === 'hoshikui') { drawHoshi(world, e, x, y, z, alpha); return; }
-  const d = MOBS[e.type], model = MODELS[d.model], sc = (d.scale || 1) / 16;
+  const d = MOBS[e.type], model = MODELS[d.model], sc = (d.scale || 1) / 16 * (e.baby > 0 ? 0.55 : 1);
   if (d.glow) { _lcE[0] = _lcE[1] = _lcE[2] = 1; } else lightRGB(world.getLightRaw(Math.floor(e.x), Math.floor(e.y + e.h * 0.6), Math.floor(e.z)), _lcE);
   let r = _lcE[0], g = _lcE[1], b = _lcE[2];
   if (e.hurt > 0 || e.hp <= 0) { r = Math.min(1.2, r * 1.6 + 0.2); g *= 0.45; b *= 0.45; }
@@ -665,9 +684,19 @@ function drawMob(world, e, x, y, z, alpha) {
   if (d.boss && e.hp <= 0) { const k = 1 - Math.min(1, e.death / 50) * 0.5; m4Scale(_mr, k, 1 - e.death / 60, k); m4Mul(_mm, _mm, _mr); }
   m4Scale(_mr, sc, sc, sc); m4Mul(_mm, _mm, _mr);
   const sw = Math.sin(e.walk) * e.walkAmp;
+  const sheep = d.model === 'sheep', wc = sheep ? (e.sheared ? SHEARED_RGB : e.color ? TINT_RGB[e.color + 1] : null) : null;
   for (const p of model) {
-    let rx = 0, ry = 0, rz = 0, ox = 0, oy = 0, oz = 0;
+    let rx = 0, ry = 0, rz = 0, ox = 0, oy = 0, oz = 0, pr = r, pg = g, pb = b;
     const id = p.id;
+    if (wc && id === 'body') { pr = r * wc[0]; pg = g * wc[1]; pb = b * wc[2]; }   // 毛の色（かられた後は はだの色）
+    if (d.model === 'dog') {
+      if (id === 'collar' && !e.tamer) continue;
+      if (id === 'tail') { ry = Math.sin(t * (e.tamer ? 0.6 : 0.25)) * 0.5; rx = e.sit ? 0.9 : 0.5; }
+      else if (id === 'leg0' || id === 'leg3') rx = e.sit ? (id === 'leg3' ? -1.35 : 0) : sw * 0.9;
+      else if (id === 'leg1' || id === 'leg2') rx = e.sit ? (id === 'leg2' ? -1.35 : 0) : -sw * 0.9;
+      else if (id === 'body') { if (e.sit) { rx = -0.42; oy = -1.2; } }
+      else { rx = e.headPitch + Math.sin(t * 0.05 + e.spinSeed0) * 0.06 - (e.swing > 0 ? 0.4 : 0); if (e.sit) oy = 1.4; }
+    } else
     if (d.model === 'rock') {
       if (!e.awake && (id.startsWith('eye') || id.startsWith('foot'))) continue;
       if (!e.awake) oy = -1; else if (id.startsWith('eye')) oy = Math.sin(t * 0.3) * 0.2;
@@ -716,11 +745,12 @@ function drawMob(world, e, x, y, z, alpha) {
       for (let k = 0; k < 4; k++) {
         const c = (f * 4 + k) * 3;
         m4Point(_pp, M, CPOS[c] ? bb[3] : bb[0], CPOS[c + 1] ? bb[4] : bb[1], CPOS[c + 2] ? bb[5] : bb[2]);
-        dynEnt.v(_pp[0], _pp[1], _pp[2], (uv[0] + 0.02 + CORNER_UV[k][0] * (uv[2] - 0.04)) / MOB_TEX, (uv[1] + 0.02 + (1 - CORNER_UV[k][1]) * (uv[3] - 0.04)) / MOB_TEX, 0, r * sh, g * sh, b * sh, 1);
+        dynEnt.v(_pp[0], _pp[1], _pp[2], (uv[0] + 0.02 + CORNER_UV[k][0] * (uv[2] - 0.04)) / MOB_TEX, (uv[1] + 0.02 + (1 - CORNER_UV[k][1]) * (uv[3] - 0.04)) / MOB_TEX, 0, pr * sh, pg * sh, pb * sh, 1);
       }
     }
   }
 }
+const SHEARED_RGB = [0.93, 0.72, 0.66];
 // 視線が当たる生き物を探す
 function pickMob(ox, oy, oz, dx, dy, dz, maxDist) {
   let best = null, bt = maxDist;
@@ -974,4 +1004,120 @@ function drawHoshi(world, e, x, y, z, alpha) {
     drawModel(i === s.length - 1 ? MODELS.hoshitail : MODELS.hoshiseg, _mb, r, g, b, null);
     if (i === 1 || i === 3) { const fl = e.land ? 1.15 : Math.sin(t * 0.22 + i) * 0.55 + 0.1; drawModel(MODELS.hoshiwing, _mb, r, g, b, (id) => [0, 0, id === 'wing0' ? fl : -fl]); }
   }
+}
+
+// ================= 動物を飼う・ふやす =================
+function meId() { return net.on ? net.pid : 'me'; }
+function heartFx(e, n) { for (let i = 0; i < (n || 2); i++) fxPuff(e.x + (Math.random() - 0.5) * 0.8, e.y + e.h + 0.2 + Math.random() * 0.3, e.z + (Math.random() - 0.5) * 0.8, 1, 1, 0.35, 0.5, { glow: true, speed: 0.2, life: 0.9, size: 0.09, up: 0.9, grav: 0 }); }
+function setBaby(e, ticks) { const d = MOBS[e.type]; e.baby = ticks; if (ticks > 0) { e.hw = d.hw * 0.55; e.h = d.h * 0.55; } else { e.hw = d.hw; e.h = d.h; } }
+// セーブ・しまうときに持っていく「その動物だけの状態」
+function mobEx(e) {
+  const o = {}; let any = false;
+  if (e.baby > 0) { o.b = e.baby; any = true; } if (e.sheared) { o.s = 1; any = true; } if (e.color) { o.c = e.color; any = true; }
+  if (e.tamer) { o.o = e.tamer; any = true; } if (e.sit) { o.t = 1; any = true; } if (e.breedCd > 0) { o.cd = e.breedCd; any = true; }
+  return any ? o : 0;
+}
+function applyEx(e, o) {
+  if (!o || typeof o !== 'object') return;
+  if (o.b > 0) setBaby(e, Math.min(24000, o.b | 0)); if (o.s) e.sheared = true; if (o.c > 0 && o.c < 16) e.color = o.c | 0;
+  if (typeof o.o === 'string') e.tamer = o.o.slice(0, 40); if (o.t) e.sit = true; if (o.cd > 0) e.breedCd = Math.min(12000, o.cd | 0);
+}
+// 毎回：育つ・こうふんがさめる・たまごを生む・毛がのびる
+function passiveLife(world, e, d) {
+  if (e.baby > 0 && --e.baby === 0) setBaby(e, 0);
+  if (e.breedCd > 0) e.breedCd--;
+  if (e.love > 0) { e.love--; if (e.age % 14 === 0) heartFx(e, 1); }
+  if (e.type === 'chicken' && !(e.baby > 0) && --e.eggT <= 0) { e.eggT = 6000 + rnd(6000); spawnDrop(e.x, e.y + 0.3, e.z, I.egg, 1, 0, 0, 2, 0); sfxAt('pop', e.x, e.y, e.z); }
+  if (e.type === 'sheep' && e.sheared && e.onGround && e.age % 40 === 0 && Math.random() < 0.05) {   // 草を食べると 毛がのびる
+    const bx = Math.floor(e.x), by = Math.floor(e.y - 0.5), bz = Math.floor(e.z);
+    if (world.getBlock(bx, by, bz) === B.grass) { world.setBlock(bx, by, bz, B.dirt, 0); fxBlockBits(bx + 0.5, by + 1, bz + 0.5, B.grass, 6, 0.6); e.sheared = false; sfxAt('eat', e.x, e.y, e.z); }
+  }
+}
+// その動物の好物を 手に持っている いちばん近い人
+function foodHolder(e, foods, maxD) {
+  let best = null, bd = maxD; const h = player.held();
+  if (!player.dead && h && foods.indexOf(h.id) >= 0) { const dd = Math.hypot(player.x - e.x, player.y - e.y, player.z - e.z); if (dd < bd) { bd = dd; best = player; } }
+  if (net.on) for (const p of net.peers.values()) { if (p.dead || p.dim !== game.world.dim || !net.fresh(p) || foods.indexOf(p.held) < 0) continue; const dd = Math.hypot(p.x - e.x, p.y - e.y, p.z - e.z); if (dd < bd) { bd = dd; best = p; } }
+  return best;
+}
+function ownerOf(e) {
+  if (!e.tamer) return null;
+  if (e.tamer === meId()) return player.dead ? null : player;
+  if (net.on) { const p = net.peers.get(e.tamer); if (p && !p.dead && p.dim === game.world.dim && net.fresh(p)) return p; }
+  return null;
+}
+// 動物の行き先を決める。[x, z, 速さ, 止まる近さ] か null
+function passiveGoal(world, e, d) {
+  if (e.type === 'dog') return dogGoal(world, e, d);
+  if (e.love > 0) {   // 相手を探して近づく。くっついたら 子どもが生まれる
+    let best = null, bd = 10;
+    for (const o of ents) { if (o === e || o.kind !== 'mob' || o.type !== e.type || o.dead || o.remote || !(o.love > 0) || o.baby > 0) continue; const dd = Math.hypot(o.x - e.x, o.z - e.z); if (dd < bd) { bd = dd; best = o; } }
+    if (best) {
+      if (bd < 1.5 && e.nid < best.nid) {
+        const b = spawnMob(e.type, (e.x + best.x) / 2, Math.max(e.y, best.y) + 0.1, (e.z + best.z) / 2); setBaby(b, 12000);
+        if (e.type === 'sheep') b.color = rnd(2) ? e.color : best.color;
+        e.love = best.love = 0; e.breedCd = best.breedCd = 6000;
+        heartFx(e, 8); heartFx(best, 8); sfxAt('pop', b.x, b.y, b.z); sfxAt('say_' + d.voice, b.x, b.y, b.z);
+        game.unlock('breed');
+      }
+      return [best.x, best.z, d.speed * 1.3, 0.8];
+    }
+  }
+  const foods = MOB_FOOD[e.type];
+  if (foods) { const T = foodHolder(e, foods, 8); if (T) return [T.x, T.z, d.speed * 1.25, 2.1]; }
+  return null;
+}
+// イヌ：野生は 肉を持った人についていく。なついたら 飼い主についていき、近くの敵にかみつく。「おすわり」中は動かない
+function dogGoal(world, e, d) {
+  if (!e.tamer) { const T = foodHolder(e, MEATS, 8); return T ? [T.x, T.z, d.speed * 1.3, 2.2] : null; }
+  if (e.sit) return null;
+  const O = ownerOf(e);
+  if (!O) return [e.x, e.z, 0, 99];   // 飼い主がいない間は その場で待つ
+  let tg = null, td = 9;
+  for (const o of ents) { if (o.kind !== 'mob' || o.dead || o.hp <= 0 || !MOBS[o.type].hostile || MOBS[o.type].boss || MOBS[o.type].fly || !o.awake) continue; const dd = Math.hypot(o.x - e.x, o.y - e.y, o.z - e.z); if (dd < td && Math.hypot(o.x - O.x, o.z - O.z) < 14) { td = dd; tg = o; } }
+  if (tg) {
+    if (td < 1.5 && e.atkCd === 0) { e.atkCd = 16; e.swing = 6; hurtMob(tg, 4, e.x, e.z, 4); sfxAt('say_dog', e.x, e.y, e.z); }
+    return [tg.x, tg.z, d.speed * 1.7, 1.0];
+  }
+  const dd = Math.hypot(O.x - e.x, O.y - e.y, O.z - e.z);
+  if (dd > 14 && e.age % 20 === 0) {   // はなれすぎたら 飼い主のそばへ とぶ
+    for (let k = 0; k < 8; k++) { const x = Math.floor(O.x) + rnd(5) - 2, z = Math.floor(O.z) + rnd(5) - 2, y = findFloor(world, x, Math.floor(O.y) + 2, z); if (y !== null && world.isLoaded(x, z)) { e.x = x + 0.5; e.y = y; e.z = z + 0.5; e.vx = e.vy = e.vz = 0; break; } }
+    return null;
+  }
+  if (dd > 3) return [O.x, O.z, d.speed * (dd > 7 ? 1.8 : 1.15), 2.4];
+  return [O.x, O.z, 0, 99];   // そばにいるときは 飼い主のほうを向く
+}
+// 手に持った物を 動物に使うと どうなるか。'wait' は「いまは何も起きないが、この動物の好物」
+function mobUse(e, it) {
+  if (!e || e.kind !== 'mob' || e.hp <= 0) return null;
+  const id = it ? it.id : 0, baby = e.baby > 0, me = meId();
+  if (e.type === 'dog') {
+    const meat = MEATS.indexOf(id) >= 0;
+    if (!e.tamer) return meat ? 'tame' : null;
+    if (e.tamer !== me) return null;
+    if (meat && e.hp < e.maxHp) return 'heal';
+    return 'sit';
+  }
+  const foods = MOB_FOOD[e.type];
+  if (foods && foods.indexOf(id) >= 0) return baby ? 'grow' : (e.love > 0 || e.breedCd > 0) ? 'wait' : 'love';
+  if (e.type === 'sheep' && !baby && !e.sheared) {
+    if (id === I.shears) return 'shear';
+    const c = DYE.indexOf(id); if (c >= 0 && c !== e.color) return 'dye';
+  }
+  if (e.type === 'cow' && !baby && id === I.bucket) return 'milk';
+  return null;
+}
+// 動物のがわで起きること（その動物を動かしている端末で）。who＝使った人
+function applyMobUse(e, act, who, arg) {
+  if (act === 'love') { if (e.love > 0 || e.breedCd > 0 || e.baby > 0) return; e.love = 600; heartFx(e, 7); sfxAt('say_' + MOBS[e.type].voice, e.x, e.y, e.z); }
+  else if (act === 'grow') { if (e.baby > 0) { setBaby(e, Math.max(1, Math.floor(e.baby * 0.85) - 300)); fxPuff(e.x, e.y + e.h, e.z, 5, 0.5, 1, 0.5, { glow: true, speed: 0.6, life: 0.6, size: 0.07, up: 0.6, grav: 0 }); } }
+  else if (act === 'shear') { if (e.sheared || e.type !== 'sheep') return; e.sheared = true; const n = 1 + rnd(3); for (let i = 0; i < n; i++) spawnDrop(e.x, e.y + 0.7, e.z, WOOL[e.color | 0], 1, 0); sfxAt('shear', e.x, e.y, e.z); }
+  else if (act === 'dye') { if (arg >= 0 && arg < 16) e.color = arg | 0; }
+  else if (act === 'tame') {
+    if (e.tamer || e.type !== 'dog') return;
+    if (rnd(3) === 0) { e.tamer = String(who); e.sit = false; e.hp = e.maxHp; heartFx(e, 10); sfxAt('say_dog', e.x, e.y, e.z); }
+    else fxPuff(e.x, e.y + e.h, e.z, 6, 0.4, 0.4, 0.4, { speed: 0.8, life: 0.6, size: 0.08, up: 0.6 });
+  }
+  else if (act === 'heal') { e.hp = Math.min(e.maxHp, e.hp + 6); heartFx(e, 3); }
+  else if (act === 'sit') { if (e.tamer === who) { e.sit = !e.sit; sfxAt('say_dog', e.x, e.y, e.z); } }
 }

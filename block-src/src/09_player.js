@@ -170,11 +170,14 @@ class Player {
     } else this.brk = null;
     const it = this.held(), def = it ? ITEMS[it.id] : null;
     const tInteract = this.target && BLOCKS[this.target.id].interact && !this.sneaking;
-    const canEat = !!def && !!def.food && !tInteract && (this.food < 20 || !!def.heal || this.mode === 1);
+    const mobAct = this.targetMob ? mobUse(this.targetMob, it) : null;   // 動物に使える物を持っているか
+    const plant = !!def && !!def.place && !!this.target && this.target.id === B.farmland;   // 食べられる作物（ニンジンなど）を 畑に植えようとしている
+    const canEat = !!def && !!def.food && !tInteract && !mobAct && !plant && (this.food < 20 || !!def.heal || !!def.drink || this.mode === 1);
     this.autoEat = Math.max(0, (this.autoEat || 0) - dt);
     if (input.tapPending) {   // 画面を軽くタップ：生き物なら攻撃、食べ物なら食べる、それ以外は置く・使う
       input.tapPending = false;
-      if (this.targetMob) { if (this.cool <= 0) this.attack(this.targetMob); }
+      if (this.targetMob && mobAct) { this.use(world); this.useCool = 0.24; }   // えさ・ハサミなどを持っていれば、たたかずに使う
+      else if (this.targetMob) { if (this.cool <= 0) this.attack(this.targetMob); }
       else if (this.targetPeer) { if (this.cool <= 0) this.attackPeer(this.targetPeer); }
       else if (canEat) this.autoEat = 1.7;
       else { this.use(world); this.useCool = 0.24; }
@@ -186,6 +189,7 @@ class Player {
         this.eating = 0;
         this.food = Math.min(20, this.food + def.food[0]); this.sat = Math.min(20, this.sat + def.food[1]);
         if (def.heal) this.hp = Math.min(20, this.hp + def.heal);
+        if (def.drink) this.burnT = 0;
         const id = it.id; this.useHeldOne();
         if (def.leftover && this.mode === 0) { if (!this.inv[this.sel]) this.inv[this.sel] = { id: def.leftover, n: 1, d: 0 }; else if (this.give(def.leftover, 1, 0)) spawnDrop(this.x, this.y + 1, this.z, def.leftover, 1, 0); }
         sfx('burp'); ui.bumpFood(); this.stat('eat', id); this.invDirty = true;
@@ -227,7 +231,7 @@ class Player {
     world.spillEnt(t.x, t.y, t.z);
     if (this.mode === 0) {
       const tool = this.heldTool();
-      const drops = blockDrops(id, meta, tool, world.rng);
+      const drops = (tool && tool.type === 'shears' && (ISLEAF[id] || id === B.vine || id === B.tallgrass || id === B.fern)) ? [[id, 1]] : blockDrops(id, meta, tool, world.rng);   // ハサミなら 葉・つた・草が そのまま手に入る
       const toWater = id === B.ice && (SOLID[world.getBlock(t.x, t.y - 1, t.z)] || FLUID[world.getBlock(t.x, t.y - 1, t.z)]);
       world.setBlock(t.x, t.y, t.z, toWater ? B.water : 0, 0);
       for (const [did, n] of drops) spawnDrop(t.x + 0.5, t.y + 0.35, t.z + 0.5, did, n, 0);
@@ -238,6 +242,7 @@ class Player {
     this.stats.broken++; this.stat('break', id);
   }
   attack(e) {
+    if (e.type === 'dog' && e.tamer === meId()) { this.swing(); this.cool = 0.32; return; }   // 自分のイヌは たたけない
     const tool = this.heldTool(); let dmg = tool ? tool.dmg : 1;
     const crit = this.vy < -0.5 && !this.onGround && !this.inWater && !this.flying;
     if (crit) dmg *= 1.5;
@@ -246,7 +251,7 @@ class Player {
     if (hurtMob(e, dmg, this.x, this.z, this.sprinting ? 8 : 5.5)) {
       sfx('hit');
       if (crit) fxPuff(e.x, e.y + e.h * 0.7, e.z, 10, 1, 0.9, 0.3, { glow: true, speed: 3, life: 0.4, size: 0.06 });
-      if (tool && tool.type !== 'lighter') this.wearHeld(tool.type === 'sword' ? 1 : 2);
+      if (tool && tool.type !== 'lighter' && tool.type !== 'shears') this.wearHeld(tool.type === 'sword' ? 1 : 2);
       this.exh += 0.1;
     }
   }
@@ -259,8 +264,24 @@ class Player {
     if (tool) this.wearHeld(tool.type === 'sword' ? 1 : 2);
   }
   onKill(e) { this.stats.kills++; this.stat('kill', e.type); }
+  // 動物に 手に持った物を使う（えさ・ハサミ・バケツ・染料・おすわり）
+  useOnMob(e, act, it) {
+    this.swing();
+    if (act === 'wait') return true;
+    const me = meId(), arg = act === 'dye' ? DYE.indexOf(it.id) : 0;
+    if (e.remote) net.dm(e.owner, { t: 'use', n: e.rnid, a: act, c: arg }); else applyMobUse(e, act, me, arg);
+    if (act === 'love' || act === 'grow' || act === 'tame' || act === 'heal' || act === 'dye') { this.useHeldOne(); sfx('eat', 0.4); }
+    else if (act === 'shear') this.wearHeld(1);
+    else if (act === 'milk') {
+      sfx('splash', 0.5);
+      if (this.mode === 0) { it.n--; if (it.n <= 0) this.inv[this.sel] = { id: I.milk_bucket, n: 1, d: 0 }; else if (this.give(I.milk_bucket, 1, 0)) spawnDrop(this.x, this.y + 1, this.z, I.milk_bucket, 1, 0); this.invDirty = true; }
+      else this.give(I.milk_bucket, 1, 0);
+    }
+    return true;
+  }
   use(world) {
     const t = this.target, it = this.held(), def = it ? ITEMS[it.id] : null;
+    if (this.targetMob) { const act = mobUse(this.targetMob, it); if (act) return this.useOnMob(this.targetMob, act, it); }
     if (t && !this.sneaking) { const b = BLOCKS[t.id]; if (b.interact) { this.swing(); this.interactBlock(world, t, b.interact); return true; } }
     if (!it) return false;
     if (def.tool && def.tool.type === 'lighter') return t ? this.useLighter(world, t) : false;

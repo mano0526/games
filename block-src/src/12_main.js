@@ -14,6 +14,8 @@ const ACHS = [
   { id: 'ipick', title: '鉄のツルハシ', hint: '鉄インゴット3こと棒2本。金やダイヤがほれる', icon: I.iron_pick },
   { id: 'farm', title: '畑をたがやす', hint: 'クワで土をたがやし、草から出る種をまこう', icon: I.wood_hoe },
   { id: 'bread', title: 'パンを焼く', hint: '育った小麦3つでパンになる', icon: I.bread },
+  { id: 'breed', title: '動物をふやす', hint: '同じ動物2ひきに好物をあげると子どもが生まれる。ウシ・ヒツジ＝小麦、ブタ＝ニンジンかジャガイモ、ニワトリ＝種', icon: I.wheat },
+  { id: 'dog', title: 'イヌとなかよくなる', hint: '森や雪の森にいるイヌに、肉をあげてみよう（何回か必要）。なつくと ついてきて、敵にかみつく', icon: I.cooked_pork },
   { id: 'armor', title: 'よろいを身につける', hint: '鉄で防具を作り、持ち物の左のマスに入れよう', icon: I.iron_chest },
   { id: 'shade', title: 'ヨルカゲをたおす', hint: '夜に現れる影の敵。たおすと「カゲのかけら」を落とす', icon: I.shadow_shard },
   { id: 'loot', title: '遺跡の宝箱を開ける', hint: '地上の石づくりの遺跡や、地下の小部屋を探そう', icon: B.chest },
@@ -566,7 +568,7 @@ const game = {
     tickEntities(w);
     // ボスがたおれたかは、ここ（生き物を動かしたすぐ後）で見る。あとの「ボスがいなければ出す」より先に見ないと、たおした瞬間に 次のボスが出てしまう
     if (this.boss && this.boss.dead) { if (this.boss.hp <= 0) this.bossDefeated(this.boss.type); else { this.boss = null; this.bossLost = 120; } }   // 倒した以外で消えた＝ほかの人の端末に移った
-    if (w.tick % 20 === 0) { spawnCycle(w); if (w.dim) this.dimTick(); }
+    if (w.tick % 20 === 0) { spawnCycle(w); if (w.dim) this.dimTick(); if (!this.ach.dog && w.tick % 100 === 0) { const me = meId(); for (const e of ents) if (e.type === 'dog' && e.tamer === me) { this.unlock('dog'); break; } } }
     if (w.tick % 10 === 0) map.mark();
     player.tick(); net.tick();
     if (this.bossLost > 0 && --this.bossLost === 0 && !this.boss) ui.dark(false);
@@ -673,5 +675,5 @@ function startApp(data) {
   game.boot();
 }
 try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => { if (game.world && !game.isDemo) { game.save(); return { resume: game.online ? '@' + net.code : game.worldId }; } return {}; }); } catch (e) { }
-window.__kk = { CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
+window.__kk = { mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
 if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(startApp); else startApp((window.claude && window.claude.hot && window.claude.hot.data) || {});

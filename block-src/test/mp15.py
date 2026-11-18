@@ -24,7 +24,7 @@ async def main():
     await m.ev(1, f"(c) => {{ {K}.game.joinOnline(c); }}", code)
     await m.playing(1); await m.wait(2500)
     v = await m.ev(0, f"() => [{K}.net.meta.v, {K}.NET_VER]")
-    check('通信の版', v[0] == v[1] == 3, v)
+    check('通信の版', v[0] == v[1] == 4, v)
     # 1. A が門をひらく → B にも門と一覧が届く
     g = await m.ev(0, f"""() => {{ const k = {K}, w = k.world, B = k.B, p = k.player; const x = Math.floor(p.x) + 3, z = Math.floor(p.z), y = Math.floor(p.y) + 3;
       for (let dx = -1; dx <= 2; dx++) for (let dy = -1; dy <= 3; dy++) {{ const edge = dx === -1 || dx === 2 || dy === -1 || dy === 3; w.setBlock(x + dx, y + dy, z, edge ? B.obsidian : 0, 0); }}

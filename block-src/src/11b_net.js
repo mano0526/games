@@ -3,7 +3,7 @@
 //   meta  世界の設定      time 時刻      gv/区画 地形の版
 //   c/区画/マス 変えたブロック   e/区画/マス 入れ物の中身   a/区画/… しまってある動物
 //   pl/人 参加者   st/人 位置と、その人が動かしている生き物   dm/人 個別の連絡
-const NET_VER = 3, NET_MAX = 4;   // 2: ブロックの番号が256以上になった ／ 3: べつの世界（ホムラの底・ソラのはて）と門（2026-11-18）
+const NET_VER = 4, NET_MAX = 4;   // 4: 動物の記録に「その動物だけの状態」が入った   // 2: ブロックの番号が256以上になった ／ 3: べつの世界（ホムラの底・ソラのはて）と門（2026-11-18）
 const NET_CFG = { apiKey: 'AIzaSyBTuzvBh9qtf5F8JnHVa5bv1-igP3E_ebA', authDomain: 'claude-4d377.firebaseapp.com', databaseURL: 'https://claude-4d377-default-rtdb.asia-southeast1.firebasedatabase.app', projectId: 'claude-4d377', storageBucket: 'claude-4d377.firebasestorage.app', messagingSenderId: '652412386711', appId: '1:652412386711:web:a6033541ef4fa62da998d2' };
 const NET_URL = 'https://mano0526.github.io/games/block.html';
 function withTimeout(p, ms) {

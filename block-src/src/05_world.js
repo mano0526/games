@@ -2,6 +2,7 @@
 const DX6 = [1, -1, 0, 0, 0, 0], DY6 = [0, 0, 1, -1, 0, 0], DZ6 = [0, 0, 0, 0, 1, -1];
 const RTICK = new Uint8Array(NB);
 for (const k of ['grass', 'wheat_crop', 'farmland', 'cactus']) RTICK[B[k]] = 1;
+for (let i = 0; i < NB; i++) if (BLOCKS[i] && BLOCKS[i].shape === S_CROP) RTICK[i] = 1;
 for (const w of _woods) { RTICK[w[3]] = 1; RTICK[w[5]] = 1; }
 
 function posKey(x, y, z) { return ((x + 1048576) * 2097152 + (z + 1048576)) * 128 + y; }
@@ -662,17 +663,21 @@ class World {
       if (this.getBlock(nx, ny, nz) === B.dirt) { const a2 = this.getBlock(nx, ny + 1, nz); if (!OPAQUE[a2] && !FLUID[a2] && this.lightLevel(nx, ny + 1, nz) >= 4) this.setBlock(nx, ny, nz, B.grass, 0); }
     } else if (SAP_TYPE[id] !== undefined) {
       if (this.lightLevel(x, y, z) >= 9 && Math.random() < 0.3 && this.areaLoaded(x, z, 7)) { const nat = this.natural; this.natural = false; this.growTree(x, y, z, SAP_TYPE[id]); this.natural = nat; }
-    } else if (id === B.wheat_crop) {
+    } else if (SHAPE[id] === S_CROP) {
       if (meta < 3 && this.lightLevel(x, y, z) >= 9) {
         const wet = this.getMeta(x, y - 1, z) === 1;
         if (Math.random() < (wet ? 0.75 : 0.35)) this.setBlock(x, y, z, id, meta + 1);
+      } else if (meta >= 3 && BLOCKS[id].fruit && Math.random() < 0.3 && this.areaLoaded(x, z, 1)) {   // つる：となりに実がなければ、あいている土の上に 実をつける
+        const fr = BLOCKS[id].fruit; let has = false;
+        for (let d = 0; d < 4; d++) if (this.getBlock(x + F4[d][0], y, z + F4[d][1]) === fr) has = true;
+        if (!has) { const d = F4[(Math.random() * 4) | 0], nx = x + d[0], nz = z + d[1], cur = this.getBlock(nx, y, nz), bl = this.getBlock(nx, y - 1, nz); if ((cur === 0 || SHAPE[cur] === S_CROSS) && (SOIL[bl] || bl === B.farmland)) this.setBlock(nx, y, nz, fr, 0); }
       }
     } else if (id === B.farmland) {
       if (!this.areaLoaded(x, z, 4)) return;
       let wet = false;
       for (let dz = -4; dz <= 4 && !wet; dz++) for (let dx = -4; dx <= 4; dx++) if (this.getBlock(x + dx, y, z + dz) === B.water || this.getBlock(x + dx, y + 1, z + dz) === B.water) { wet = true; break; }
       if (wet !== (meta === 1)) this.setBlock(x, y, z, id, wet ? 1 : 0);
-      else if (!wet && this.getBlock(x, y + 1, z) !== B.wheat_crop && Math.random() < 0.25) this.setBlock(x, y, z, B.dirt, 0);
+      else if (!wet && SHAPE[this.getBlock(x, y + 1, z)] !== S_CROP && Math.random() < 0.25) this.setBlock(x, y, z, B.dirt, 0);
     } else if (ISLEAF[id]) {
       if (!(meta & 1) && !this.leafHasLog(x, y, z)) { fxLeafDecay(x, y, z, id); this.breakNatural(x, y, z); }
     } else if (id === B.cactus) {

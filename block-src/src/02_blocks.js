@@ -93,7 +93,7 @@ defBlock(36, 'ice', '氷', { tex: 'ice', hard: 0.5, tool: 'pick', trans: true, o
 defBlock(37, 'cactus', 'サボテン', { shape: S_CACTUS, tex: { top: 'cactus_top', bottom: 'cactus_top', side: 'cactus_side' }, hard: 0.4, sound: 'cloth', support: 'cactus' });
 defBlock(38, 'clay', '粘土', { tex: 'clay', hard: 0.6, tool: 'shovel', sound: 'dirt', drop: () => [[I.clay_ball, 4]] });
 defBlock(39, 'bricks', 'レンガ', { tex: 'bricks', hard: 2, tool: 'pick', level: 1, needTool: true });
-defBlock(40, 'tallgrass', '草', { shape: S_CROSS, tex: 'tallgrass', hard: 0, sound: 'grass', replace: true, tint: true, support: 'soil', drop: (rng) => rng() < 0.18 ? [[I.wheat_seeds, 1]] : [], sprite: 'tallgrass_0' });
+defBlock(40, 'tallgrass', '草', { shape: S_CROSS, tex: 'tallgrass', hard: 0, sound: 'grass', replace: true, tint: true, support: 'soil', drop: (rng) => { const r = rng(); return r < 0.18 ? [[I.wheat_seeds, 1]] : r < 0.2 ? [[I.pumpkin_seeds, 1]] : r < 0.22 ? [[I.melon_seeds, 1]] : r < 0.235 ? [[I.carrot, 1]] : r < 0.25 ? [[I.potato, 1]] : []; }, sprite: 'tallgrass_0' });
 defBlock(41, 'flower_red', '赤い花', { shape: S_CROSS, tex: 'flower_red', hard: 0, sound: 'grass', support: 'soil', sprite: 'flower_red' });
 defBlock(42, 'flower_yellow', '黄色い花', { shape: S_CROSS, tex: 'flower_yellow', hard: 0, sound: 'grass', support: 'soil', sprite: 'flower_yellow' });
 defBlock(43, 'flower_blue', '青い花', { shape: S_CROSS, tex: 'flower_blue', hard: 0, sound: 'grass', support: 'soil', sprite: 'flower_blue' });
@@ -102,7 +102,7 @@ defBlock(45, 'deadbush', '枯れ草', { shape: S_CROSS, tex: 'deadbush', hard: 0
 for (const [k, n, , , , sapId] of _woods) defBlock(sapId, 'sapling_' + k, n + 'の苗木', { shape: S_CROSS, tex: 'sapling_' + k, hard: 0, sound: 'grass', support: 'soil', sprite: 'sapling_' + k });
 defBlock(50, 'farmland', '耕地', { shape: S_FARM, tex: { top: 'farmland_dry', bottom: 'dirt', side: 'dirt' }, hard: 0.6, tool: 'shovel', sound: 'dirt', drop: 'dirt', soil: true });
 defBlock(51, 'wheat_crop', '小麦', {
-  shape: S_CROP, tex: 'wheat_0', hard: 0, sound: 'grass', support: 'farmland',
+  shape: S_CROP, tex: 'wheat_0', stages: 'wheat', hard: 0, sound: 'grass', support: 'farmland',
   drop: (rng, meta) => meta >= 3 ? [[I.wheat, 1], [I.wheat_seeds, 1 + Math.floor(rng() * 3)]] : [[I.wheat_seeds, 1]]
 });
 defBlock(52, 'mushroom_brown', '茶色いキノコ', { shape: S_CROSS, tex: 'mushroom_brown', hard: 0, sound: 'grass', support: 'solid', sprite: 'mushroom_brown' });
@@ -138,7 +138,7 @@ const _capDrop = (small) => (rng, meta, tool) => (tool && tool.type === 'axe') ?
 defBlock(99, 'mush_brown', '茶色いキノコのかさ', { tex: { top: 'mush_brown', side: 'mush_brown', bottom: 'mush_pore' }, hard: 0.2, tool: 'axe', sound: 'wood', drop: _capDrop(52) });
 defBlock(100, 'mush_red', '赤いキノコのかさ', { tex: { top: 'mush_red', side: 'mush_red', bottom: 'mush_pore' }, hard: 0.2, tool: 'axe', sound: 'wood', drop: _capDrop(53) });
 defBlock(101, 'mush_stem', 'キノコの柄', { tex: { top: 'mush_pore', side: 'mush_stem', bottom: 'mush_pore' }, hard: 0.2, tool: 'axe', sound: 'wood' });
-defBlock(102, 'fern', 'シダ', { shape: S_CROSS, tex: 'fern', hard: 0, sound: 'grass', replace: true, support: 'soil', drop: (rng) => rng() < 0.1 ? [[I.wheat_seeds, 1]] : [], sprite: 'fern' });
+defBlock(102, 'fern', 'シダ', { shape: S_CROSS, tex: 'fern', hard: 0, sound: 'grass', replace: true, support: 'soil', drop: (rng) => { const r = rng(); return r < 0.1 ? [[I.wheat_seeds, 1]] : r < 0.14 ? [[I.melon_seeds, 1]] : r < 0.17 ? [[I.potato, 1]] : []; }, sprite: 'fern' });
 defBlock(103, 'lily_pad', 'スイレンの葉', { shape: S_FLAT, tex: 'lily_pad', hard: 0, sound: 'grass', solid: true, support: 'water', sprite: 'lily_pad' });
 defBlock(104, 'vine', 'つた', { shape: S_LADDER, tex: 'vine', hard: 0.2, sound: 'grass', drop: (rng) => rng() < 0.4 ? [[104, 1]] : [], sprite: 'vine' });
 defBlock(105, 'granite', '花こう岩', { tex: 'granite', hard: 1.5, tool: 'pick', level: 1, needTool: true });
@@ -242,13 +242,22 @@ defBlock(704, 'sora_bricks', 'そら石レンガ', { tex: 'sora_bricks', hard: 3
 defBlock(701, 'fence_yake', 'やけレンガのフェンス', { shape: S_FENCE, fence: true, tex: 'yake_bricks', hard: 2.5, tool: 'pick', level: 1, needTool: true, base: 688 });
 defBlock(702, 'wall_yake_bricks', 'やけレンガのへい', { shape: S_WALL, tex: 'yake_bricks', hard: 2.5, tool: 'pick', level: 1, needTool: true, base: 688 });
 defBlock(707, 'wall_sora_bricks', 'そら石レンガのへい', { shape: S_WALL, tex: 'sora_bricks', hard: 3, tool: 'pick', level: 1, needTool: true, base: 704 });
+// ---- 畑の作物（710〜） ----
+defBlock(710, 'carrot_crop', 'ニンジン', { shape: S_CROP, tex: 'carrot_0', stages: 'carrot', hard: 0, sound: 'grass', support: 'farmland', drop: (rng, meta) => meta >= 3 ? [[I.carrot, 2 + Math.floor(rng() * 3)]] : [[I.carrot, 1]] });
+defBlock(711, 'potato_crop', 'ジャガイモ', { shape: S_CROP, tex: 'potato_0', stages: 'potato', hard: 0, sound: 'grass', support: 'farmland', drop: (rng, meta) => meta >= 3 ? [[I.potato, 2 + Math.floor(rng() * 3)]] : [[I.potato, 1]] });
+// つる：育ちきると、となりの土の上に 実がなる
+defBlock(712, 'pumpkin_stem', 'カボチャのつる', { shape: S_CROP, tex: 'stem_0', stages: 'stem', fruit: 714, hard: 0, sound: 'grass', support: 'farmland', drop: (rng, meta) => [[I.pumpkin_seeds, meta >= 3 ? 1 + Math.floor(rng() * 2) : 1]] });
+defBlock(713, 'melon_stem', 'スイカのつる', { shape: S_CROP, tex: 'stem_0', stages: 'stem', fruit: 716, hard: 0, sound: 'grass', support: 'farmland', drop: (rng, meta) => [[I.melon_seeds, meta >= 3 ? 1 + Math.floor(rng() * 2) : 1]] });
+defBlock(714, 'pumpkin', 'カボチャ', { tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side' }, hard: 1, tool: 'axe', sound: 'wood' });
+defBlock(715, 'jack_lantern', 'カボチャのランタン', { tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side', front: 'pumpkin_face' }, hard: 1, tool: 'axe', sound: 'wood', light: 15, facing: true });
+defBlock(716, 'melon', 'スイカ', { tex: { top: 'melon_top', bottom: 'melon_top', side: 'melon_side' }, hard: 1, tool: 'axe', sound: 'wood', drop: (rng) => [[I.melon_slice, 3 + Math.floor(rng() * 5)]] });
 // ほしの結晶：ソラのはての柱の上で、ボスの体力をもどす。こわすと はじける
 defBlock(708, 'hoshi_crystal', 'ほしの結晶', { tex: 'hoshi_crystal', hard: 0.4, cutout: true, opac: 0, light: 15, sound: 'glass', drop: () => [] });
 defBlock(709, 'hoshi_egg', 'ホシのたまご', { tex: 'hoshi_egg', hard: 3, light: 9, sound: 'stone' });
 for (let i = 0; i < NB; i++) if (BLOCKS[i] && typeof BLOCKS[i].drop === 'string') BLOCKS[i].drop = B[BLOCKS[i].drop];
 
 // ブロックをそのままアイテムとしても登録（持てないものは除く）
-const _noItem = new Set([0, 7, 8, 31, 50, 51, 681, 683]);
+const _noItem = new Set([0, 7, 8, 31, 50, 51, 681, 683, 710, 711, 712, 713]);
 for (let i = 1; i < NB; i++) if (BLOCKS[i] && !_noItem.has(i)) defItem(i, BLOCKS[i].key, BLOCKS[i].name, { block: i });
 ITEMS[B.bed].stack = 1;
 
@@ -299,6 +308,18 @@ defItem(342, 'quartz', '白水晶', {});
 defItem(343, 'homura_rod', 'ホムラの芯', {});
 defItem(344, 'homura_powder', 'ホムラの粉', {});
 defItem(345, 'hoshi_eye', 'ほしの目', {});
+// ---- 畑と動物（346〜） ----
+defItem(346, 'carrot', 'ニンジン', { food: [3, 3.6], place: 710 });
+defItem(347, 'potato', 'ジャガイモ', { food: [1, 0.6], place: 711 });
+defItem(348, 'baked_potato', '焼きジャガイモ', { food: [5, 6] });
+defItem(349, 'pumpkin_seeds', 'カボチャの種', { place: 712 });
+defItem(350, 'melon_seeds', 'スイカの種', { place: 713 });
+defItem(351, 'melon_slice', 'スイカ', { food: [2, 1.2] });
+defItem(352, 'pumpkin_pie', 'パンプキンパイ', { food: [8, 4.8] });
+defItem(353, 'shears', 'ハサミ', { stack: 1, tool: { type: 'shears', tier: 0, speed: 1, dur: 238, dmg: 1, mat: 'iron' } });
+defItem(354, 'egg', 'たまご', { stack: 16 });
+defItem(355, 'fried_egg', '目玉焼き', { food: [4, 4.8] });
+defItem(356, 'milk_bucket', 'ミルク入りバケツ', { stack: 1, food: [2, 2.4], leftover: 282, drink: true });
 
 const TOOL_MATS = [
   { k: 'wood', n: '木', tier: 1, speed: 2, dur: 60, mat: '#planks' },
@@ -449,6 +470,13 @@ shapeless(B.mossy_cobble, 1, [B.cobble, B.vine], 'block');
 shapeless(B.mossy_cobble, 1, [B.cobble, B.moss], 'block');
 shaped(B.altar, 1, ['OSO', 'SDS', 'OSO'], { O: B.obsidian, S: I.shadow_shard, D: I.diamond }, 'block');
 
+// ---- 畑と動物 ----
+shaped(I.shears, 1, [' I', 'I '], { I: I.iron_ingot }, 'tool');
+shapeless(I.pumpkin_seeds, 4, [B.pumpkin], 'food');
+shapeless(I.melon_seeds, 1, [I.melon_slice], 'food');
+shaped(B.melon, 1, ['MMM', 'MMM', 'MMM'], { M: I.melon_slice }, 'food');
+shapeless(B.jack_lantern, 1, [B.pumpkin, B.torch], 'block');
+shapeless(I.pumpkin_pie, 1, [B.pumpkin, I.egg, I.wheat], 'food');
 // ---- べつの世界 ----
 shapeless(I.flint_steel, 1, [I.iron_ingot, I.flint], 'tool');
 shapeless(I.homura_powder, 2, [I.homura_rod], 'misc');
@@ -477,6 +505,7 @@ SMELT[B.stone_bricks] = [B.cracked_bricks, 1]; SMELT[B.stone] = [B.smooth_stone,
 SMELT[I.raw_pork] = [I.cooked_pork, 1]; SMELT[I.raw_beef] = [I.steak, 1];
 SMELT[I.raw_mutton] = [I.cooked_mutton, 1]; SMELT[I.raw_chicken] = [I.cooked_chicken, 1];
 SMELT[B.ore_coal] = [I.coal, 1]; SMELT[B.ore_diamond] = [I.diamond, 1]; SMELT[B.ore_quartz] = [I.quartz, 1];
+SMELT[I.potato] = [I.baked_potato, 1]; SMELT[I.egg] = [I.fried_egg, 1];
 const FUEL = {};   // 燃える時間（秒）。1こ焼くのに10秒
 FUEL[I.coal] = 80; FUEL[I.charcoal] = 80; FUEL[I.stick] = 5; FUEL[I.lava_bucket] = 1000;
 for (const id of TAGS['#planks']) FUEL[id] = 15;
@@ -491,3 +520,7 @@ const SMELT_TIME = 200;   // 1こ焼くのにかかる時間（1秒=20）
 
 function itemName(id) { return ITEMS[id] ? ITEMS[id].name : '？'; }
 function maxStack(id) { return ITEMS[id] ? ITEMS[id].stack : 64; }
+
+// ---------------- 動物の好物 ----------------
+const MOB_FOOD = { cow: [267], sheep: [267], pig: [346, 347], chicken: [266, 349, 350] };   // 小麦／ニンジン・ジャガイモ／種
+const MEATS = [271, 272, 273, 274, 275, 276, 277, 278];

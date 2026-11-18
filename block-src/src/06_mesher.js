@@ -47,7 +47,8 @@ function leafBuried(pi) {
 }
 const mB = new Uint16Array(5832), mM = new Uint8Array(5832), mL = new Uint8Array(5832);
 const CUBE_TL = new Uint16Array(NB * 6);
-let TL_GRASS_TOP = [], TL_GRASS_SIDE = [], TL_TALL = [], TL_SNOWSIDE = 0, TL_WHEAT = [], TL_LEAF_FAST = {};
+let TL_GRASS_TOP = [], TL_GRASS_SIDE = [], TL_TALL = [], TL_SNOWSIDE = 0, TL_LEAF_FAST = {};
+const CROP_TL = {};   // 作物のブロック番号 → 育ち具合ごとの絵（4段階）
 const meshOpts = { fancyLeaves: true };
 
 function initMesher() {
@@ -55,7 +56,7 @@ function initMesher() {
   TL_GRASS_TOP = GRASS_PALS.map((p, i) => TEX['grass_top_' + i]);
   TL_GRASS_SIDE = GRASS_PALS.map((p, i) => TEX['grass_side_' + i]);
   TL_TALL = GRASS_PALS.map((p, i) => TEX['tallgrass_' + i]);
-  TL_WHEAT = [0, 1, 2, 3].map(i => TEX['wheat_' + i]);
+  for (let id = 1; id < NB; id++) { const b = BLOCKS[id]; if (b && b.stages) CROP_TL[id] = [0, 1, 2, 3].map(i => TEX[b.stages + '_' + i]); }
   TL_SNOWSIDE = TEX.grass_side_snow;
   for (const w of _woods) TL_LEAF_FAST[w[3]] = TEX['leaves_' + w[0] + '_f'];
 }
@@ -264,7 +265,7 @@ function meshSection(world, c, sy) {
           break;
         }
         case S_CROP: {
-          const layer = TL_WHEAT[meta & 3], fl = [0, 0, 1, 1], uv = [0, 16, 16, 16, 16, 0, 0, 0];
+          const layer = (CROP_TL[id] || CROP_TL[51])[meta & 3], fl = [0, 0, 1, 1], uv = [0, 16, 16, 16, 16, 0, 0, 0];
           for (const o of [4, 12]) {
             quadP(mbC, [bx + o, by - 1, bz, bx + o, by - 1, bz + 16, bx + o, by + 15, bz + 16, bx + o, by + 15, bz], layer, uv, sky, blk, 235, fl, 0, true);
             quadP(mbC, [bx, by - 1, bz + o, bx + 16, by - 1, bz + o, bx + 16, by + 15, bz + o, bx, by + 15, bz + o], layer, uv, sky, blk, 235, fl, 0, true);
