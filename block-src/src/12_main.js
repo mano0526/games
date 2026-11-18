@@ -16,6 +16,8 @@ const ACHS = [
   { id: 'bread', title: 'パンを焼く', hint: '育った小麦3つでパンになる', icon: I.bread },
   { id: 'breed', title: '動物をふやす', hint: '同じ動物2ひきに好物をあげると子どもが生まれる。ウシ・ヒツジ＝小麦、ブタ＝ニンジンかジャガイモ、ニワトリ＝種', icon: I.wheat },
   { id: 'dog', title: 'イヌとなかよくなる', hint: '森や雪の森にいるイヌに、肉をあげてみよう（何回か必要）。なつくと ついてきて、敵にかみつく', icon: I.cooked_pork },
+  { id: 'village', title: '村を見つける', hint: '草原・砂漠・雪原などにある、道と家のある村', icon: B.path },
+  { id: 'trade', title: 'サトビトと こうかんする', hint: '村人に「使う」。小麦16こ や 石炭12こ が 緑の石「ヒスイ」1こになり、ヒスイで いろいろな物と かえてもらえる', icon: I.jade },
   { id: 'armor', title: 'よろいを身につける', hint: '鉄で防具を作り、持ち物の左のマスに入れよう', icon: I.iron_chest },
   { id: 'shade', title: 'ヨルカゲをたおす', hint: '夜に現れる影の敵。たおすと「カゲのかけら」を落とす', icon: I.shadow_shard },
   { id: 'bow', title: '弓をつくる', hint: '棒3本と糸3本。糸は 夜に出る けむし「イトハキ」が落とす。矢は 火打ち石・棒・羽根', icon: I.bow },
@@ -218,7 +220,7 @@ const game = {
   },
   beginWorld(meta, chunks) {
     this.disposeWorld();
-    const w = this.world = new World(meta.seed, chunks); _activeWorld = w; w.onUnload = freeChunkMeshes;
+    const w = this.world = new World(meta.seed, chunks); _activeWorld = w; w.onUnload = freeChunkMeshes; w.onMark = (x, y, z, o) => { spawnSato(x, y, z, o); };
     w.setGen(meta.gv0 || 1, meta.rgv ? new Map(Object.entries(meta.rgv)) : null);
     w.day = meta.day || 1; w.time = meta.time || 0; w.tick = meta.tick || 0;
     this.online = !!meta.online; this.inBed = false; this.sessionT = 0; this.bossLost = 0;
@@ -377,6 +379,7 @@ const game = {
     else if (kind === 'prime') this.unlock('boom');
     else if (kind === 'ench') this.unlock('ench');
     else if (kind === 'potion') this.unlock('potion');
+    else if (kind === 'trade') this.unlock('trade');
     else if (kind === 'place' && id === B.torch) this.unlock('torch');
   },
   // みんなの世界では、全員がベッドに入るまで横になって待つ
@@ -531,6 +534,24 @@ const game = {
     this.unlock('ring');
     ui.toast('ソラの門が ひらいた！ とびこむと「ソラのはて」へ。帰り道は、ボスをたおすと ひらく', 9);
   },
+  // その村のある区画が、村のある版（3より後）の地形か。昔の版で作った区画には 村はない
+  vilOK(V) {
+    const w = this.world; let gv;
+    if (w.net) gv = w.gv0 >= 3 ? 3 : w.isLoaded(V.x, V.z) ? w.genVer(V.x >> 4, V.z >> 4) : 0;
+    else if (!w.rgv) gv = w.gv0;
+    else gv = w.rgv.get(w.pre + (V.x >> 6) + ',' + (V.z >> 6)) || GEN_CUR;
+    return gv >= 3;
+  },
+  // いちばん近い村（まだ行っていない所も ふくむ）
+  villageNear(x, z) {
+    const w = this.world; if (!w || w.dim) return null;
+    const g = w.genOf(3, 0), vx = Math.floor(x / VIL_CELL), vz = Math.floor(z / VIL_CELL); let best = null, bd = 1e18;
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {   // 昔の世界では 近くの村が「ない」ことがあるので、その先の村も さがす
+      const V = g.village(vx + dx, vz + dz); if (!V || !this.vilOK(V)) continue;
+      const d = (V.x - x) * (V.x - x) + (V.z - z) * (V.z - z); if (d < bd) { bd = d; best = V; }
+    }
+    return best;
+  },
   // べつの世界にいる間、1秒ごとに
   dimTick() {
     const w = this.world;
@@ -579,7 +600,7 @@ const game = {
     tickEntities(w);
     // ボスがたおれたかは、ここ（生き物を動かしたすぐ後）で見る。あとの「ボスがいなければ出す」より先に見ないと、たおした瞬間に 次のボスが出てしまう
     if (this.boss && this.boss.dead) { if (this.boss.hp <= 0) this.bossDefeated(this.boss.type); else { this.boss = null; this.bossLost = 120; } }   // 倒した以外で消えた＝ほかの人の端末に移った
-    if (w.tick % 20 === 0) { spawnCycle(w); if (w.dim) this.dimTick(); if (!this.ach.dog && w.tick % 100 === 0) { const me = meId(); for (const e of ents) if (e.type === 'dog' && e.tamer === me) { this.unlock('dog'); break; } } }
+    if (w.tick % 20 === 0) { spawnCycle(w); if (w.dim) this.dimTick(); else if (!this.ach.village && w.tick % 60 === 0) { const V = this.villageNear(player.x, player.z); if (V && Math.abs(V.x - player.x) < V.rad && Math.abs(V.z - player.z) < V.rad) { this.unlock('village'); ui.toast('村を見つけた！ サトビトに「使う」で 物を こうかんできる', 7); } } if (!this.ach.dog && w.tick % 100 === 0) { const me = meId(); for (const e of ents) if (e.type === 'dog' && e.tamer === me) { this.unlock('dog'); break; } } }
     if (w.tick % 10 === 0) map.mark();
     player.tick(); net.tick();
     if (this.bossLost > 0 && --this.bossLost === 0 && !this.boss) ui.dark(false);
@@ -686,5 +707,5 @@ function startApp(data) {
   game.boot();
 }
 try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => { if (game.world && !game.isDemo) { game.save(); return { resume: game.online ? '@' + net.code : game.worldId }; } return {}; }); } catch (e) { }
-window.__kk = { get selfPose() { return _self; }, POTIONS, itemDmg, enchOf, enchSet, enchAny, enchList, enchRoll, enchKind, ENCH, ENCH_NEED, xpNeed, spawnXp, holdKind, spawnShot, spawnPrimed, blast, blastAll, losTo, get MOB_USED() { return MOB_USED; }, mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
+window.__kk = { get selfPose() { return _self; }, tradesOf, VJOBS, spawnSato, VIL_CELL, lotXZ, walkPath, F4, POTIONS, itemDmg, enchOf, enchSet, enchAny, enchList, enchRoll, enchKind, ENCH, ENCH_NEED, xpNeed, spawnXp, holdKind, spawnShot, spawnPrimed, blast, blastAll, losTo, get MOB_USED() { return MOB_USED; }, mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
 if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(startApp); else startApp((window.claude && window.claude.hot && window.claude.hot.data) || {});

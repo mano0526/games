@@ -258,10 +258,14 @@ defBlock(717, 'hajike_box', 'はじけ箱', { tex: { top: 'hajike_top', bottom: 
 // ほしの結晶：ソラのはての柱の上で、ボスの体力をもどす。こわすと はじける
 defBlock(708, 'hoshi_crystal', 'ほしの結晶', { tex: 'hoshi_crystal', hard: 0.4, cutout: true, opac: 0, light: 15, sound: 'glass', drop: () => [] });
 defBlock(709, 'hoshi_egg', 'ホシのたまご', { tex: 'hoshi_egg', hard: 3, light: 9, sound: 'stone' });
+// 村の道。ふつうの土より 少し明るく、ふみかためてある（スコップで草を たたいても作れる）
+defBlock(719, 'path', 'ふみかためた道', { tex: { top: 'path_top', bottom: 'dirt', side: 'path_side' }, hard: 0.6, tool: 'shovel', sound: 'gravel', drop: 'dirt' });
+// 村人のしるし：地形づくりが 家の中に置く ござ。近くの人の端末が見つけると、村人に かわって消える（持ち物にはならない）
+defBlock(720, 'vmark', 'ござ', { shape: S_LAYER, lh: 1, tex: 'hay_top', hard: 0.1, sound: 'grass', drop: () => [] });
 for (let i = 0; i < NB; i++) if (BLOCKS[i] && typeof BLOCKS[i].drop === 'string') BLOCKS[i].drop = B[BLOCKS[i].drop];
 
 // ブロックをそのままアイテムとしても登録（持てないものは除く）
-const _noItem = new Set([0, 7, 8, 31, 50, 51, 681, 683, 710, 711, 712, 713]);
+const _noItem = new Set([0, 7, 8, 31, 50, 51, 681, 683, 710, 711, 712, 713, 720]);
 for (let i = 1; i < NB; i++) if (BLOCKS[i] && !_noItem.has(i)) defItem(i, BLOCKS[i].key, BLOCKS[i].name, { block: i });
 ITEMS[B.bed].stack = 1;
 
@@ -346,6 +350,7 @@ const POTIONS = {
   night: ['よめの くすり', '#3a55d8', 3600, 346, '3分のあいだ 暗い所が 明るく見える']
 };
 { let pi = 367; for (const k in POTIONS) defItem(pi++, 'potion_' + k, POTIONS[k][0], { stack: 16, food: [0, 0], drink: true, leftover: 365, potion: k }); }
+defItem(373, 'jade', 'ヒスイ', {});   // 村人との こうかんに使う 緑の石
 
 const TOOL_MATS = [
   { k: 'wood', n: '木', tier: 1, speed: 2, dur: 60, mat: '#planks' },
@@ -603,3 +608,20 @@ function enchRoll(id, tier, seed) {
 const ENCH_NEED = [5, 12, 20];   // その段に いるレベル（使うのは 段+1 レベルと ひかりの粉 段+1 こ）
 const XP_SMELT = {}; XP_SMELT[I.iron_ingot] = 0.7; XP_SMELT[I.gold_ingot] = 1; XP_SMELT[I.quartz] = 0.2;
 for (const k of ['cooked_pork', 'steak', 'cooked_mutton', 'cooked_chicken', 'baked_potato', 'fried_egg']) if (I[k] !== undefined) XP_SMELT[I[k]] = 0.35;
+
+// ---- 村人（サトビト）の しごとと こうかん ----
+const VJOBS = ['はたけの人', 'かじや', 'かりうど', 'ものしり'];
+// その村人の こうかんの一覧。[わたす物, 数, もらう物, 数, 1日に できる回数]。vs＝村人ごとの番号（下2ビットが しごと）
+function tradesOf(vs) {
+  const r = mulberry32(vs >>> 0), pk = (a, b) => r() < 0.5 ? a : b, J = I.jade;
+  switch (vs & 3) {
+    case 0: return [[I.wheat, 16, J, 1, 6], pk([I.carrot, 14, J, 1, 6], [I.potato, 14, J, 1, 6]), pk([B.pumpkin, 5, J, 1, 4], [B.melon, 4, J, 1, 4]),
+      [J, 1, I.bread, 4, 6], pk([J, 1, I.apple, 3, 6], [J, 2, I.pumpkin_pie, 3, 4]), [J, 6, I.golden_apple, 1, 2]];
+    case 1: return [[I.coal, 12, J, 1, 6], [I.iron_ingot, 4, J, 1, 6], pk([J, 4, I.iron_pick, 1, 3], [J, 4, I.iron_axe, 1, 3]),
+      pk([J, 5, I.iron_sword, 1, 3], [J, 3, I.shield, 1, 3]), pk([J, 7, I.iron_chest, 1, 2], [J, 5, I.iron_helmet, 1, 2]), [J, 10, I.diamond, 1, 2]];
+    case 2: return [[I.string, 8, J, 1, 6], pk([I.raw_beef, 8, J, 1, 6], [I.raw_pork, 8, J, 1, 6]), [I.feather, 12, J, 1, 4],
+      [J, 1, I.arrow, 12, 6], pk([J, 3, I.bow, 1, 2], [J, 2, I.steak, 5, 4]), [J, 3, I.pop_powder, 2, 3]];
+    default: return [[I.glow_dust, 6, J, 1, 6], pk([I.flint, 8, J, 1, 6], [B.glass, 10, J, 1, 6]), [J, 1, I.glass_bottle, 3, 6],
+      pk([J, 4, I.potion_heal, 1, 3], [J, 4, I.potion_regen, 1, 3]), pk([J, 5, I.potion_night, 1, 2], [J, 5, I.potion_speed, 1, 2]), [J, 3, I.xp_orb, 18, 4]];
+  }
+}

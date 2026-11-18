@@ -13,8 +13,8 @@ async def main():
     await s.ev(f"() => {{ {K}.settings.viewDist = 5; }}")
     await s.new_world('4242', mode=1, diff=0)
     await s.wait(9000)   # しばらく置いて、はしのチャンクの葉が枯れないことも見る
-    r = await s.ev(f"() => {{ const k = {K}, w = k.world; return [w.gv0, k.GEN_CUR, w.gen === w.genOf(2), w.genVer(0, 0)]; }}")
-    check('新しい世界は版2', r == [2, 2, True, 2], r)
+    r = await s.ev(f"() => {{ const k = {K}, w = k.world; return [w.gv0, k.GEN_CUR, w.gen === w.genOf(k.GEN_CUR), w.genVer(0, 0)]; }}")
+    check('新しい世界は いまの版（2より後）', r[0] == r[1] and r[1] >= 2 and r[2] and r[3] == r[1], r)   # 版の数は きめ打ちしない
     # 作業スレッドで作ったチャンクと、その場で作ったチャンクが同じ
     r = await s.ev(f"""() => {{ const k = {K}, w = k.world, p = k.player; let n = 0, bad = 0;
       const cx0 = Math.floor(p.x) >> 4, cz0 = Math.floor(p.z) >> 4;
@@ -81,7 +81,7 @@ async def main():
     await s.pg.wait_for_function('window.__kk.game.state === "playing"', timeout=90000)
     await s.wait(1500)
     r = await s.ev(f"() => {{ const k = {K}, w = k.world; return [w.gv0, w.getBlock({pos[0]}, 110, {pos[1]}) === k.B.terracotta_yellow, w.biomeAt({pos[0]}, {pos[1]})]; }}")
-    check('読み直しても同じ', r == [2, True, pos[2]], r)
+    check('読み直しても同じ', r[0] >= 2 and r[1] and r[2] == pos[2], r)
     # 昔の世界（版の記録がない）は 版1のまま
     await s.ev(f"() => {K}.game.quitToTitle()")
     await s.pg.wait_for_function('window.__kk.game.state === "title"', timeout=30000)

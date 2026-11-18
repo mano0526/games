@@ -606,4 +606,4 @@ function genFeature(kind, rng, put) {
 
 // 地形の版。新しい版を足しても、古い場所は古い版のまま作れるように全部残す
 const GENS = { 1: WorldGen, 2: WorldGen2 };
-const GEN_CUR = 2;
+const GEN_CUR = 3;   // 3＝村と見はり塔（03d_gen3.js）

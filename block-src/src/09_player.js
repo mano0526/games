@@ -16,6 +16,7 @@ class Player {
     this.stats = { broken: 0, placed: 0, kills: 0, deaths: 0, crafted: 0, dist: 0 };
     this.burnT = 0; this.gateT = 0; this.gateWait = false;   // 火がついている残り時間／門の中にいる時間／門から出るまで待つ
     this.fx = { regen: 0, speed: 0, str: 0, fire: 0, night: 0 };   // くすりの効き目の のこり（20＝1秒）
+    this.trades = {};   // 村人との こうかん：{村人の番号: [日にち, 1つ目を使った回数, …]}
     this.xpLv = 0; this.xpPt = 0; this.enchSeed = (Math.random() * 0x7fffffff) | 0;   // 経験値：レベルと、そのレベルの中で ためた数
     this.drawT = 0; this.autoBow = 0; this.blocking = false; this.blockK = 0; this.noBlockT = 0; this.webT = 0; this.noArrowT = 0;   // 弓を引いている時間／タップで自動で引く残り／盾をかまえているか／糸にからまっている残り
   }
@@ -40,6 +41,8 @@ class Player {
     for (let i = 0; i < 36; i++) { const s = this.inv[i]; if (!s) return true; if (max > 1 && !d && s.id === id && s.n < max && !s.d) return true; }
     return false;
   }
+  tradeLeft(vs, i, max) { const r = this.trades[vs]; return r && r[0] === game.world.day ? Math.max(0, max - (r[i + 1] | 0)) : max; }
+  tradeUse(vs, i) { const day = game.world.day; let r = this.trades[vs]; if (!r || r[0] !== day) r = this.trades[vs] = [day, 0, 0, 0, 0, 0, 0]; r[i + 1]++; }
   countSpec(spec) { let c = 0; for (const s of this.inv) if (s && specMatch(spec, s.id)) c += s.n; return c; }
   consumeSpec(spec, n) {
     for (let i = 35; i >= 0 && n > 0; i--) { const s = this.inv[i]; if (s && specMatch(spec, s.id)) { const k = Math.min(n, s.n); s.n -= k; n -= k; if (s.n <= 0) this.inv[i] = null; } }
@@ -320,6 +323,7 @@ class Player {
   onKill(e) { this.stats.kills++; this.stat('kill', e.type); }
   // 動物に 手に持った物を使う（えさ・ハサミ・バケツ・染料・おすわり）
   useOnMob(e, act, it) {
+    if (act === 'trade') { ui.open('trade', e); sfx('click'); sfxAt('say_sato', e.x, e.y, e.z); return true; }
     this.swing();
     if (act === 'wait') return true;
     const me = meId(), arg = act === 'dye' ? DYE.indexOf(it.id) : 0;
@@ -341,6 +345,14 @@ class Player {
     if (def.tool && def.tool.type === 'lighter') return t ? this.useLighter(world, t) : false;
     if (def.bucket) return this.useBucket(world, it, def);
     if (def.bottle) return this.useBottle(world, it);
+    if (def.tool && def.tool.type === 'shovel' && t && t.id === B.grass && t.ny === 1) {   // スコップで 草を たたくと 道になる
+      const ab = world.getBlock(t.x, t.y + 1, t.z);
+      if (ab === 0 || SHAPE[ab] === S_CROSS || ab === B.snow_layer) {
+        if (ab) world.breakNatural(t.x, t.y + 1, t.z);
+        world.setBlock(t.x, t.y, t.z, B.path, 0); sfx('dig_dirt'); fxBlockBits(t.x + 0.5, t.y + 1, t.z + 0.5, B.dirt, 5, 0.5);
+        this.wearHeld(1); this.swing(); return true;
+      }
+    }
     if (def.tool && def.tool.type === 'hoe' && t && (t.id === B.grass || t.id === B.dirt)) {
       const ab = world.getBlock(t.x, t.y + 1, t.z);
       if (ab === 0 || SHAPE[ab] === S_CROSS || ab === B.snow_layer) {
@@ -625,7 +637,8 @@ class Player {
     game.needSafeSpot = sp === game.worldSpawn ? 1 : 2;
   }
   serialize() {
-    return { x: this.x, y: this.y, z: this.z, yaw: this.yaw, pitch: this.pitch, hp: this.hp, food: this.food, sat: this.sat, air: this.air, inv: this.inv, armor: this.armor, sel: this.sel, spawn: this.spawn, flying: this.flying, stats: this.stats, dead: this.dead, deathPos: this.deathPos, xpLv: this.xpLv, xpPt: this.xpPt, enchSeed: this.enchSeed, fx: this.fx };
+    const day = game.world ? game.world.day : 0, tr = {}; for (const k in this.trades) if (this.trades[k][0] === day) tr[k] = this.trades[k];   // きょうの分だけ のこす
+    return { trades: tr, x: this.x, y: this.y, z: this.z, yaw: this.yaw, pitch: this.pitch, hp: this.hp, food: this.food, sat: this.sat, air: this.air, inv: this.inv, armor: this.armor, sel: this.sel, spawn: this.spawn, flying: this.flying, stats: this.stats, dead: this.dead, deathPos: this.deathPos, xpLv: this.xpLv, xpPt: this.xpPt, enchSeed: this.enchSeed, fx: this.fx };
   }
   load(o) {
     for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'hp', 'food', 'sat', 'air', 'sel', 'spawn', 'flying', 'deathPos', 'xpLv', 'xpPt', 'enchSeed']) if (o[k] !== undefined) this[k] = o[k];
@@ -634,6 +647,7 @@ class Player {
     if (o.inv) this.inv = o.inv.map(s => s ? { id: s.id, n: s.n, d: s.d || 0 } : null); while (this.inv.length < 36) this.inv.push(null);
     if (o.armor) this.armor = o.armor.map(s => s ? { id: s.id, n: s.n, d: s.d || 0 } : null); while (this.armor.length < 5) this.armor.push(null);   // 昔のセーブには 盾のマスがない
     if (o.stats) Object.assign(this.stats, o.stats);
+    this.trades = {}; if (o.trades && typeof o.trades === 'object') for (const k in o.trades) { const r = o.trades[k]; if (Array.isArray(r) && r.length === 7) this.trades[k] = r.map(n => n | 0); }
     if (o.dead) { this.hp = 20; this.food = 20; }
     this.invDirty = true;
   }

@@ -81,6 +81,7 @@ const audio = {
         case 'bone': for (let i = 0; i < 3; i++) T(0.05, 'square', (260 + i * 70) * p, 180 * p, 0.14 * v, 0.003, null, i * 0.07 * L); N(0.2 * L, 'bandpass', 1500, 900, 2, 0.12 * v); break;
         case 'magma': T(0.22 * L, 'sine', 150 * p, 70, 0.4 * v); N(0.25 * L, 'lowpass', 600 * p, 200, 1, 0.4 * v, 0.01); break;
         case 'hoshi': T(1.3 * L, 'sawtooth', 110 * p, 52 * p, 0.42 * v, 0.2, [3, 7]); T(1.1 * L, 'sine', 330 * p, 160 * p, 0.2 * v, 0.2, [5, 20]); N(1.0 * L, 'bandpass', 500, 180, 1.5, 0.35 * v, 0.25); break;
+        case 'sato': T(0.12 * L, 'triangle', 300 * p, 345 * p, 0.24 * v, 0.02); T(0.17 * L, 'triangle', 385 * p, 450 * p, 0.22 * v, 0.02, null, 0.15 * L); break;
         case 'dog': T(0.09 * L, 'square', 520 * p, 330 * p, 0.22 * v, 0.004); T(0.11 * L, 'sawtooth', 430 * p, 260 * p, 0.18 * v, 0.004, null, 0.13 * L); break;
         case 'yumi': T(0.25 * L, 'triangle', 520 * p, 390 * p, 0.14 * v, 0.02, [9, 25]); N(0.3 * L, 'highpass', 2600, 1800, 0.8, 0.1 * v, 0.03); break;
         case 'dake': T(0.16 * L, 'sine', 240 * p, 150 * p, 0.3 * v, 0.01); N(0.18 * L, 'lowpass', 700, 300, 1, 0.2 * v, 0.01); break;
@@ -100,6 +101,7 @@ const audio = {
       case 'deny': T(0.09, 'square', 170, 150, 0.16); break;
       case 'craft': T(0.05, 'triangle', 240, 150, 0.4); N(0.04, 'lowpass', 1500, 700, 1, 0.25); T(0.09, 'triangle', 523, 0, 0.22, 0.004, null, 0.07); T(0.09, 'triangle', 659, 0, 0.22, 0.004, null, 0.13); T(0.16, 'triangle', 784, 0, 0.25, 0.004, null, 0.19); break;
       case 'achieve': [523, 659, 784, 1047, 1319].forEach((f, i) => { T(0.5, 'triangle', f, 0, 0.26, 0.005, null, i * 0.09); T(0.6, 'sine', f * 2, 0, 0.1, 0.005, null, i * 0.09); }); T(0.9, 'sine', 1568, 0, 0.14, 0.01, null, 0.5); break;
+      case 'trade': [988, 1319, 1760].forEach((f, i) => T(0.16, 'sine', f, f, 0.2, 0.003, null, i * 0.06)); T(0.07, 'square', 2637, 2637, 0.04, 0.002, null, 0.2); break;
       case 'treasure': [1319, 1568, 1976, 2637].forEach((f, i) => T(0.35, 'sine', f, 0, 0.18, 0.004, null, i * 0.07)); break;
       case 'dawn': T(1.4, 'sine', 784, 0, 0.16, 0.02); T(1.6, 'sine', 1175, 0, 0.13, 0.02, null, 0.28); T(1.9, 'sine', 1568, 0, 0.1, 0.02, null, 0.56); break;
       case 'sleep': [659, 587, 523, 392].forEach((f, i) => T(0.9, 'sine', f, 0, 0.16, 0.03, null, i * 0.32)); break;

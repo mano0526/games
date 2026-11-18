@@ -76,6 +76,7 @@ const keys = {};
 const touchSt = { stick: null, sx: 0, sy: 0, mag: 0, jump: false, sneak: false, brk: false, use: false, look: new Map(), rayHold: 0 };
 let pointerLocked = false, lastJumpTap = 0, lastWTap = 0, sprintLatch = false, sneakLatch = false, mouseNdc = [0, 0], mouseL = false, mouseR = false;
 
+function compass8(dx, dz) { return ['北', '北東', '東', '南東', '南', '南西', '西', '北西'][((Math.round(Math.atan2(dx, -dz) / (Math.PI / 4)) % 8) + 8) % 8]; }
 const ui = {
   screen: null, slots: [], ent: null, entPos: null, craft: [], craftW: 2, recipe: null, recTab: 'ok', menu: null, menuStack: [],
   hp: -99, food: -99, air: -99, armor: -99, sel: -99, infoT: 0, pick: [], heldT: 0, achQ: [], achT: 0, longT: null, lastInfo: '',
@@ -118,6 +119,7 @@ const ui = {
   bump(id) { const el = $(id); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); },
   bumpHearts() { this.bump('hearts'); }, bumpFood() { this.bump('foods'); },
   updateHud(dt) {
+    if (this.screen === 'trade') this.tradeTick(dt);
     const p = player, creative = p.mode === 1;
     $('status').style.visibility = creative ? 'hidden' : 'visible'; $('xpbar').style.visibility = creative ? 'hidden' : 'visible';
     let fk = ''; for (const k in p.fx) if (p.fx[k] > 0) fk += k + Math.ceil(p.fx[k] / 20) + ',';   // くすりの効き目：小さな絵と のこり時間
@@ -403,9 +405,13 @@ const ui = {
       const ok = !!game.ach[a.id]; if (ok) done++;
       const el = document.createElement('div'); el.className = 'note' + (ok ? ' done' : '') + (!ok && next ? ' next' : '');
       let hint = a.hint;
+      if (a.id === 'village' && !ok && game.world) {
+        const V = game.villageNear(player.x, player.z);
+        if (V) { const dx = V.x - player.x, dz = V.z - player.z; hint += '。いちばん近いのは ' + compass8(dx, dz) + 'へ 約' + Math.round(Math.hypot(dx, dz) / 10) * 10 + 'ブロック'; }
+      }
       if (a.id === 'fort' && !ok && game.world && game.world.dim === 1) {   // いちばん近い とりでの方向を教える
         const f = nearestFort(game.world.seed, player.x, player.z);
-        if (f) { const dx = f.x - player.x, dz = f.z - player.z, dir = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'][((Math.round(Math.atan2(dx, -dz) / (Math.PI / 4)) % 8) + 8) % 8]; hint += '。いちばん近いのは ' + dir + 'へ 約' + Math.round(Math.hypot(dx, dz) / 10) * 10 + 'ブロック（高さ ' + FORT_Y + '）'; }
+        if (f) { const dx = f.x - player.x, dz = f.z - player.z, dir = compass8(dx, dz); hint += '。いちばん近いのは ' + dir + 'へ 約' + Math.round(Math.hypot(dx, dz) / 10) * 10 + 'ブロック（高さ ' + FORT_Y + '）'; }
       }
       el.innerHTML = '<div><strong>' + esc(a.title) + '</strong><span class="dim">' + esc(hint) + '</span></div>'; box.appendChild(el);
       if (!ok) next = false;
@@ -450,7 +456,7 @@ const ui = {
       tip.style.display = 'none';
     });
     $('recTabs').addEventListener('click', (e) => { const b = e.target.closest('.btn'); if (!b) return; sfx('click'); this.recTab = b.dataset.t; this.paintRecipes(); });
-    $('scrTop').addEventListener('click', (e) => { const b = e.target.closest('.btn.enchb'); if (b && !b.disabled) this.doEnch(+b.dataset.t); });
+    $('scrTop').addEventListener('click', (e) => { const b = e.target.closest('.btn.enchb'); if (b && !b.disabled) this.doEnch(+b.dataset.t); const q = e.target.closest('.btn.tradeb'); if (q) this.doTrade(+q.dataset.t); });
     $('recList').addEventListener('click', (e) => { const b = e.target.closest('.btn'); if (!b || b.disabled) return; this.craftFromList(RECIPES[+b.dataset.r], e.shiftKey, b.closest('.rec')); });
   },
   moveCursor(x, y) { const c = $('cursorItem'); c.style.left = x + 'px'; c.style.top = y + 'px'; this._cx = x; this._cy = y; },
@@ -463,7 +469,7 @@ const ui = {
     this.screen = kind; this.ent = ent || null; this.entPos = pos || null; this.slots = [];
     const top = $('scrTop'); top.innerHTML = ''; $('scrInv').innerHTML = ''; $('scrHot').innerHTML = '';
     const creative = player.mode === 1 && kind === 'inv';
-    $('scrTitle').textContent = kind === 'table' ? '作業台' : kind === 'furnace' ? 'かまど' : kind === 'chest' ? 'チェスト' : kind === 'ench' ? 'ちからの台' : '持ち物';
+    $('scrTitle').textContent = kind === 'table' ? '作業台' : kind === 'furnace' ? 'かまど' : kind === 'chest' ? 'チェスト' : kind === 'ench' ? 'ちからの台' : kind === 'trade' ? 'こうかん：' + VJOBS[ent.vs & 3] : '持ち物';
     this.enchS = null;
     const hasRec = (kind === 'inv' && !creative) || kind === 'table';
     $('recipes').style.display = hasRec ? '' : 'none';
@@ -505,11 +511,12 @@ const ui = {
       const a = mk('g1'); this.addSlot(a, { t: 'ench', a: this.enchS, i: 0 }).title = '力をこめる物';
       const b = mk('g1'); this.addSlot(b, { t: 'ench', a: this.enchS, i: 1 }).title = 'ひかりの粉';
       const o = mk(''); o.id = 'enchOpts';
+    } else if (kind === 'trade') { const o = mk(''); o.id = 'tradeOpts'; this.tradeT = 0;
     } else if (kind === 'chest') { const g = mk('grid9'); for (let i = 0; i < 27; i++) this.addSlot(g, { t: 'chest', a: ent.items, i }); }
     for (let i = 9; i < 36; i++) this.addSlot($('scrInv'), { t: 'inv', a: player.inv, i });
     for (let i = 0; i < 9; i++) this.addSlot($('scrHot'), { t: 'inv', a: player.inv, i });
     $('scrHelp').textContent = touchSt.touchUsed ? 'タップで持つ・置く ／ 長押しで半分だけ持つ・1こだけ置く' : 'クリックで持つ・置く ／ 右クリックで半分・1こ ／ Shift+クリックでまとめて移す';
-    $('scrInfo').textContent = kind === 'ench' ? '力をこめると レベルと「ひかりの粉」を使います（今のレベル ' + player.xpLv + '）' : kind === 'furnace' ? '上に焼く物、下に燃料（木・石炭など）を入れます' : kind === 'inv' && !creative ? '4マスに材料を並べるか、右の一覧から作れます' : kind === 'table' ? '9マスに材料を並べるか、右の一覧から作れます' : '';
+    $('scrInfo').textContent = kind === 'trade' ? '左の物を わたすと 右の物を もらえます（できる回数は 朝に もどる）' : kind === 'ench' ? '力をこめると レベルと「ひかりの粉」を使います（今のレベル ' + player.xpLv + '）' : kind === 'furnace' ? '上に焼く物、下に燃料（木・石炭など）を入れます' : kind === 'inv' && !creative ? '4マスに材料を並べるか、右の一覧から作れます' : kind === 'table' ? '9マスに材料を並べるか、右の一覧から作れます' : '';
     this.recipe = null;
     $('screen').classList.add('on'); $('app').classList.add('uiopen');
     this.refresh();
@@ -562,6 +569,7 @@ const ui = {
     if (!this.screen) return;
     if (this.craft.length) this.recipe = matchGrid(this.craft, this.craftW);
     if (this.screen === 'ench') this.paintEnch();
+    if (this.screen === 'trade') this.paintTrade();
     for (const r of this.slots) {
       const q = this.getS(r); this.paintSlot(r.el, q);
       if (r.t === 'armor') { r.el.classList.toggle('ghost', !q); if (!q) r.el.querySelector('i').style.backgroundImage = 'url(' + ICON_URL[r.i === 4 ? I.shield : I['iron_' + ARMOR_TYPES[r.i][0]]] + ')'; }   // 空の防具のマスには「ここに何を入れるか」の うすい絵
@@ -645,6 +653,38 @@ const ui = {
     if ((ac >> 4) & 3) { c.fillStyle = col((ac >> 4) & 3); c.fillRect(4, 19, 8, 9); }
     if ((ac >> 6) & 3) { c.fillStyle = col((ac >> 6) & 3); c.fillRect(4, 28, 8, 4); }
     cv._ac = ac;
+  },
+  // こうかん：その村人の 6つの こうかんを ならべる。足りない物・きょうは おしまいの物は うすく出す
+  paintTrade() {
+    const box = $('tradeOpts'), e = this.ent; if (!box || !e) return;
+    const cre = player.mode === 1; let h = '';
+    tradesOf(e.vs).forEach((t, i) => {
+      const left = player.tradeLeft(e.vs, i, t[4]), have = player.countSpec(t[0]), ok = left > 0 && (cre || have >= t[1]);
+      h += '<button type="button" class="btn tradeb' + (ok ? '' : ' off') + '" data-t="' + i + '"><span class="tr"><i style="background-image:url(' + ICON_URL[t[0]] + ')"></i><b>' + t[1] + '</b><em>▶</em><i style="background-image:url(' + ICON_URL[t[2]] + ')"></i><b>' + t[3] + '</b></span>'
+        + '<small>' + esc(itemName(t[0])) + ' → ' + esc(itemName(t[2])) + '</small><small class="' + (left > 0 && !ok ? 'no' : '') + '">' + (left <= 0 ? 'きょうは おしまい' : ok ? 'あと ' + left + '回' : '持っている数 ' + Math.min(have, 999) + '/' + t[1]) + '</small></button>';
+    });
+    if (box._h !== h) { box.innerHTML = h; box._h = h; }
+  },
+  doTrade(i) {
+    const e = this.ent; if (!e || e.dead || e.hp <= 0) { this.close(); return; }
+    const t = tradesOf(e.vs)[i]; if (!t) return;
+    const cre = player.mode === 1;
+    if (player.tradeLeft(e.vs, i, t[4]) <= 0) { sfx('deny', 0.4); this.toast('この こうかんは きょうは おしまい。あしたの朝に また できる'); return; }
+    if (!cre && player.countSpec(t[0]) < t[1]) { sfx('deny', 0.4); this.toast(itemName(t[0]) + 'が ' + t[1] + 'こ いる（持っている数 ' + player.countSpec(t[0]) + '）'); return; }
+    if (!cre) player.consumeSpec(t[0], t[1]);
+    const rest = player.give(t[2], t[3], 0); if (rest) spawnDrop(player.x, player.eyeY() - 0.3, player.z, t[2], rest, 0);
+    player.tradeUse(e.vs, i); if (t[2] !== I.xp_orb) player.addXp(1 + rnd(2));
+    sfx('trade'); this.pickupFx(t[2], t[3]); game.onStat('trade', 0);
+    if (e.remote) net.dm(e.owner, { t: 'use', n: e.rnid, a: 'traded', c: 0 }); else applyMobUse(e, 'traded', meId(), 0);
+    this.refresh();
+    const b = $('tradeOpts').children[i]; if (b) { b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash'); }
+  },
+  // こうかんの画面を 開いている間：村人に「まっていて」と伝える。村人が いなくなったら 閉じる
+  tradeTick(dt) {
+    const e = this.ent; if (this.screen !== 'trade' || !e) return;
+    if (e.dead || e.hp <= 0 || Math.hypot(e.x - player.x, e.y - player.y, e.z - player.z) > 7) { this.close(); return; }
+    if (!e.remote) e.busy = 20;
+    else if ((this.tradeT -= dt) <= 0) { this.tradeT = 1; net.dm(e.owner, { t: 'use', n: e.rnid, a: 'busy', c: 0 }); }
   },
   // ちからの台：えらべる力を3つ ならべる（1つ目の名前だけ見える。レベルと粉が足りないものは おせない）
   paintEnch() {
@@ -881,6 +921,11 @@ function howtoHtml() {
 <dd>同じ動物2ひきに好物をあげると、子どもが生まれます（ウシ・ヒツジ＝小麦、ブタ＝ニンジン・ジャガイモ、ニワトリ＝種）。好物を持っていると ついてきます</dd>
 <dd>ハサミでヒツジの毛、バケツでウシのミルク。ヒツジに染料を使うと毛の色が変わります。ニワトリはときどき たまごを生みます</dd>
 <dd>森にいるイヌに肉をあげると、なつくことがあります。なついたイヌに「使う」で おすわり／ついてくる</dd>
+<dt>村と サトビト</dt>
+<dd>草原や砂漠などに、道と家のある「村」があります（開拓ノートに いちばん近い村の方向が出ます）。村人「サトビト」は 昼は外を歩き、夜は家にもどります</dd>
+<dd>サトビトに「使う」で こうかん。作物・石炭・糸などを わたすと 緑の石「ヒスイ」がもらえ、ヒスイで パン・道具・矢・くすり などと かえてもらえます。しごと（はたけの人・かじや・かりうど・ものしり）で 品物がちがいます</dd>
+<dd>同じ こうかんは 1日に できる回数が きまっていて、朝に もどります。村の家の宝箱や、野原の「見はり塔」の てっぺんにも ヒスイが 入っていることがあります</dd>
+<dd>スコップで 草の地面に「使う」と、村と同じ「ふみかためた道」になります</dd>
 <dt>弓矢と盾</dt>
 <dd>弓は「使う」を長くおして引き、はなすと矢が飛びます（1秒でいっぱい。長く引くほど遠くへ強く）。スマホは軽くタップでも、自動で引いてうちます</dd>
 <dd>矢は 火打ち石・棒・羽根で4本。ブロックにささった矢は 少しすると落ちて、ひろえます</dd>

@@ -166,6 +166,16 @@ const map = {
       if (this.sel && this.sel.pin === p) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2 * u; ctx.strokeRect(q[0] - 7 * u, q[1] - 19 * u, 26 * u, 24 * u); }
       label(p.n, q[0] + 3 * u, q[1]);
     }
+    // 村（歩いて 広場を見た所だけ）：井戸の形
+    if (game.world && !game.world.dim) {
+      const g = game.world.genOf(3, 0), vx0 = Math.floor(x0 / VIL_CELL), vx1 = Math.floor((x0 + W / sc) / VIL_CELL), vz0 = Math.floor(z0 / VIL_CELL), vz1 = Math.floor((z0 + H / sc) / VIL_CELL);
+      if ((vx1 - vx0 + 1) * (vz1 - vz0 + 1) <= 64) for (let vz = vz0; vz <= vz1; vz++) for (let vx = vx0; vx <= vx1; vx++) {
+        const V = g.village(vx, vz); if (!V || !this.has(V.x >> 4, V.z >> 4) || !game.vilOK(V)) continue;
+        const q = P(V.x + 0.5, V.z + 0.5, false); if (!inside(q)) continue;
+        box(q[0] - 5 * s, q[1] - 5 * s, 10 * s, 10 * s, '#000'); box(q[0] - 4 * s, q[1] - 4 * s, 8 * s, 3 * s, '#7a5230'); box(q[0] - 4 * s, q[1] - 1 * s, 8 * s, 5 * s, '#9a9a9a'); box(q[0] - 2 * s, q[1], 4 * s, 3 * s, '#3f76e4');
+        label('村', q[0], q[1]);
+      }
+    }
     // 最初の地点（家の形）
     const ws = game.worldSpawn;
     if (ws) { const q = P(ws.x, ws.z, mini); box(q[0] - 5 * s, q[1] - 1 * s, 10 * s, 6 * s, '#000'); box(q[0] - 4 * s, q[1], 8 * s, 4 * s, '#ffe08a'); box(q[0] - 3 * s, q[1] - 3 * s, 6 * s, 3 * s, '#000'); box(q[0] - 2 * s, q[1] - 2 * s, 4 * s, 2 * s, '#d6453a'); box(q[0] - 1 * s, q[1] + 1 * s, 2 * s, 3 * s, '#5b3d18'); label('はじまりの場所', q[0], q[1]); }

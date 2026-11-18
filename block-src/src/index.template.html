@@ -132,6 +132,15 @@ p { margin: 0 0 8px; }
 #enchOpts .btn span { color: #d9c2ff; white-space: nowrap; } #enchOpts .btn small { font-size: .78em; color: var(--ink-dim); white-space: nowrap; }
 #enchOpts .dim { line-height: 1.5; }
 #enchOpts .btn:disabled { opacity: .5; cursor: default; }
+#tradeOpts { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--s) * .1); width: calc(var(--s) * 9.2); }
+#tradeOpts .btn { flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: calc(var(--s) * 1.5); width: 100%; line-height: 1.2; padding: calc(var(--s) * .06) 4px; }
+#tradeOpts .tr { display: flex; align-items: center; gap: calc(var(--s) * .08); font-weight: 700; }
+#tradeOpts .tr i { width: calc(var(--s) * .72); height: calc(var(--s) * .72); background-size: contain; background-repeat: no-repeat; background-position: center; image-rendering: pixelated; }
+#tradeOpts .tr b { font-size: calc(var(--f, 14px) * 1.05); min-width: 1.4em; text-align: left; } #tradeOpts .tr em { font-style: normal; opacity: .6; margin: 0 calc(var(--s) * .08); }
+#tradeOpts small { font-size: .74em; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; } #tradeOpts small.no { color: #c0392b; }
+#tradeOpts .btn.off { opacity: .55; }
+#tradeOpts .btn.flash { animation: tradeFlash .5s ease-out; }
+@keyframes tradeFlash { 0% { background: #ffe58a; transform: scale(1.06); } 100% { transform: scale(1); } }
 
 .slot.trash::after { content: "すてる"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: calc(var(--s) * .27); color: #ffb4a4; }
 .rec.flash { animation: slotFlash .45s ease-out; }
@@ -296,7 +305,7 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
 .eqSh { grid-column: 3; grid-row: 5; }
 .crBox { display: flex; flex-direction: column; align-items: flex-start; gap: calc(var(--s) * .08); } .crBox .lbl { line-height: 1.5; }
 .crRow { display: flex; align-items: center; gap: calc(var(--s) * .22); }
-#screen[data-k="inv"], #screen[data-k="cre"] { --tr: 4.6; } #screen[data-k="table"] { --tr: 3.6; } #screen[data-k="ench"] { --tr: 3.3; }
+#screen[data-k="inv"], #screen[data-k="cre"] { --tr: 4.6; } #screen[data-k="table"] { --tr: 3.6; } #screen[data-k="ench"] { --tr: 3.3; } #screen[data-k="trade"] { --tr: 5.9; }
 #screen { --rw: 230px; --tr: 3; --pc: 9; --hb: calc((100vh - 62px) / (7.3 + var(--tr))); --s: min(96px, calc((100vw - 70px - var(--rw)) / 9.4), var(--hb)); --f: clamp(13px, calc(var(--s) * .34), 30px); }
 #screen.norec { --s: min(96px, calc((100vw - 62px) / 9.1), var(--hb)); }
 #screen.wide2 { --s: min(96px, calc((100vw - 74px) / (9.5 + var(--pc))), var(--hb)); }   /* クリエイティブ：左に持ち物、右に えらぶ一覧 */

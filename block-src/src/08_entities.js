@@ -126,6 +126,7 @@ const MOBS = {
   yumikage: { name: 'ユミカゲ', hw: 0.3, h: 1.95, hp: 18, speed: 2.2, model: 'yumikage', voice: 'yumi', hostile: true, dmg: 4, burns: true, drops: () => [[I.arrow, rnd(3)], [I.shadow_shard, rnd(2)], [I.bow, Math.random() < 0.06 ? 1 : 0]] },
   bakudake: { name: 'バクダケ', hw: 0.42, h: 1.2, hp: 18, speed: 2.1, model: 'bakudake', voice: 'dake', hostile: true, dmg: 26, drops: () => [[I.pop_powder, 1 + rnd(2)]] },
   itohaki: { name: 'イトハキ', hw: 0.4, h: 0.75, hp: 14, speed: 2.7, model: 'itohaki', voice: 'ito', hostile: true, dmg: 3, drops: () => [[I.string, 1 + rnd(2)]] },
+  sato: { name: 'サトビト', hw: 0.25, h: 1.8, hp: 20, speed: 1.25, model: 'sato', voice: 'sato', drops: () => [] },   // 村人。物を こうかんしてくれる
   dog: { name: 'イヌ', hw: 0.3, h: 0.78, hp: 20, speed: 1.9, model: 'dog', voice: 'dog', drops: () => [] },
   // ---- ホムラの底 ----
   homurabi: { name: 'ホムラビ', hw: 0.35, h: 1.5, hp: 20, speed: 2.2, model: 'homurabi', voice: 'homurabi', hostile: true, dmg: 5, fly: true, glow: true, fireproof: true, drops: () => Math.random() < 0.7 ? [[I.homura_rod, 1]] : [] },
@@ -167,6 +168,13 @@ function buildModels() {
   MODELS.dog.push(part('snout', -1.5, 8, -11, 1.5, 10.5, -8.5, 0, 10, -4.5), part('ear0', -3, 13, -6.5, -1.5, 15, -5, 0, 10, -4.5), part('ear1', 1.5, 13, -6.5, 3, 15, -5, 0, 10, -4.5),
     part('tail', -1, 9, 5.5, 1, 11, 10, 0, 10, 5.5), part('collar', -3.4, 7.6, -4.3, 3.4, 13.4, -3.3, 0, 10, -4.5));
   MODELS.yakebone = shade(); MODELS.hoshikage = shade();
+  // サトビト（村人）：長い上着と おび。しごとごとに かぶり物がちがう（j0＝むぎわら、j1＝はちまきと前かけ、j2＝羽根のぼうし、j3＝四角いぼうし）
+  MODELS.sato = [part('leg0', -3.5, 0, -1.5, -0.5, 6, 1.5, -2, 6, 0), part('leg1', 0.5, 0, -1.5, 3.5, 6, 1.5, 2, 6, 0), part('body', -4, 6, -2.5, 4, 20, 2.5, 0, 13, 0), part('sash', -4.4, 11, -2.9, 4.4, 13, 2.9, 0, 12, 0),
+    part('arm0', -6.5, 9, -1.5, -4, 20, 1.5, -5.25, 19, 0), part('arm1', 4, 9, -1.5, 6.5, 20, 1.5, 5.25, 19, 0), part('head', -3.5, 20, -3.5, 3.5, 27, 3.5, 0, 20, 0),
+    part('j0brim', -6, 26.4, -6, 6, 27.4, 6, 0, 20, 0), part('j0hat', -3, 27.4, -3, 3, 30, 3, 0, 20, 0),
+    part('j1band', -3.8, 24.6, -3.8, 3.8, 26, 3.8, 0, 20, 0), part('j1apron', -3.2, 7, -3.1, 3.2, 15, -2.5, 0, 13, 0),
+    part('j2cap', -3.8, 26, -3.8, 3.8, 28.6, 3.8, 0, 20, 0), part('j2feather', 2.6, 28, -1, 3.6, 32.5, 1, 0, 20, 0),
+    part('j3base', -3.2, 27, -3.2, 3.2, 28, 3.2, 0, 20, 0), part('j3board', -4.6, 28, -4.6, 4.6, 28.8, 4.6, 0, 20, 0)];
   // ユミカゲ：かさをかぶった ほそい影。左手に弓
   MODELS.yumikage = [part('body', -3, 11, -2, 3, 22, 2, 0, 16, 0), part('head', -3.5, 22, -3.5, 3.5, 29, 3.5, 0, 22, 0), part('brim', -6.5, 27.5, -6.5, 6.5, 29, 6.5, 0, 22, 0), part('hat', -3, 29, -3, 3, 32, 3, 0, 22, 0),
     part('arm0', -5.5, 9, -1, -3.5, 22, 1, -4.5, 21, 0), part('arm1', 3.5, 9, -1, 5.5, 22, 1, 4.5, 21, 0), part('bow', -5, 8.5, -8, -4, 9.5, 8, -4.5, 21, 0),
@@ -285,6 +293,30 @@ function paintMob(m, id, f, g) {
     if (isLeg) { if (f !== 2 && f !== 3) g.rect(0, g.h - 2, g.w, 2, cream[0]); return; }
     if (id === 'body') { if (f === 3) g.fill(cream); else if (!top) g.rect(0, g.h - 2, g.w, 2, cream[1]); }
     if (id === 'head' && front) { g.rect(1, 3, 4, 2, cream[0]); g.px(1, 1, C('#141414')); g.px(4, 1, C('#141414')); g.px(1, 0, C('#fffaf0')); g.px(4, 0, C('#fffaf0')); }
+  } else if (m === 'sato') {
+    const cloth = CP(['#f2efe6', '#e9e5da', '#f7f4ec', '#ece8de']), skin = CP(['#e6b98c', '#dfb083', '#ecc296']), hair = CP(['#3b2a20', '#33241b', '#44322a']), dark = C('#2a2320');
+    const straw = CP(['#dcc070', '#d0b262', '#e6cc82', '#c6a654']);
+    if (id === 'j0brim' || id === 'j0hat') { g.fill(straw); if (top) { for (let y = 0; y < g.h; y++) for (let x = (y & 1); x < g.w; x += 3) g.px(x, y, C('#b8964a')); } else if (id === 'j0hat') g.rect(0, g.h - 1, g.w, 1, C('#b0452f')); return; }
+    if (id === 'j1band') { g.fill(CP(['#f4f1ea', '#e8e4da'])); if (f === 4) g.rect((g.w >> 1) - 1, 0, 2, g.h, C('#c9c3b4')); return; }
+    if (id === 'j1apron') { g.fill(CP(['#4a3a2e', '#42332a', '#54433a'])); if (front) { g.rect(0, 0, g.w, 1, C('#2e241e')); g.rect(2, 3, 3, 2, C('#6a5648')); } return; }
+    if (id === 'j2cap') { g.fill(CP(['#5a6b3a', '#516232', '#647542'])); if (!top && f !== 3) g.rect(0, g.h - 1, g.w, 1, C('#3d4a26')); return; }
+    if (id === 'j2feather') { g.fill(CP(['#d8503a', '#c8432f', '#e86a4a'])); return; }
+    if (id === 'j3base' || id === 'j3board') { g.fill(CP(['#2c3350', '#262c46', '#333b5c'])); if (id === 'j3board' && top) g.rect((g.w >> 1) - 1, (g.h >> 1) - 1, 2, 2, C('#e6c860')); return; }
+    if (isLeg) { g.fill(CP(['#5a4a3e', '#514236', '#645346'])); if (f !== 2 && f !== 3) g.rect(0, g.h - 1, g.w, 1, C('#c9a66b')); return; }
+    if (id === 'sash') { g.fill(CP(['#b0452f', '#a53d28', '#bc4f38'])); if (front) g.rect((g.w >> 1) - 1, 0, 2, g.h, C('#d9a441')); return; }
+    if (id === 'head') {
+      g.fill(skin); if (top) { g.fill(hair); return; } if (f === 3) return;
+      g.rect(0, 0, g.w, 1, hair[0]);
+      if (front) { g.px(0, 1, hair[1]); g.px(g.w - 1, 1, hair[1]); g.px(1, 1, hair[2]); g.px(g.w - 2, 1, hair[2]); g.px(2, 3, dark); g.px(4, 3, dark); g.px(1, 4, C('#f0a090')); g.px(5, 4, C('#f0a090')); g.px(3, 5, C('#a8644a')); }
+      else if (f === 4) g.rect(0, 0, g.w, 5, hair[1]);
+      else g.rect(0, 0, g.w, 3, hair[2]);
+      return;
+    }
+    g.fill(cloth);   // 上着と そで（色は しごとごとに かけ算する）
+    if (id === 'body') {
+      if (front) { for (let y = 0; y < 5; y++) { g.px(3 - Math.min(3, y >> 1), y, C('#b9b3a4')); g.px(4 + Math.min(3, y >> 1), y, C('#b9b3a4')); } g.rect(3, 0, 2, 2, skin[0]); }
+      if (f !== 2 && f !== 3) g.rect(0, g.h - 1, g.w, 1, C('#b9b3a4'));
+    } else if (f !== 2 && f !== 3) g.rect(0, g.h - 2, g.w, 2, C('#c9c3b4'));
   } else if (m === 'yumikage') {
     const cloth = CP(['#2b3050', '#262b48', '#30365a', '#23284a']), straw = CP(['#cfae62', '#c2a056', '#d8b86c', '#b8964a']);
     if (id === 'bow') { g.fill(CP(['#8a5f33', '#7a5630', '#96693a'])); if (f === 0 || f === 1 || top) { g.px(0, 0, C('#e9e6d8')); g.px(g.w - 1, 0, C('#e9e6d8')); } return; }
@@ -373,7 +405,7 @@ function paintMob(m, id, f, g) {
 function spawnMob(type, x, y, z) {
   const d = MOBS[type];
   const e = { kind: 'mob', type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, hw: d.hw, h: d.h, hp: d.hp, maxHp: d.hp, yaw: Math.random() * 6.28, pyaw: 0, headPitch: 0,
-    age: 0, hurt: 0, death: 0, atkCd: 0, walk: 0, walkAmp: 0, state: 0, timer: 0, moveYaw: 0, moving: false, panic: 0, kb: 0, dead: false, onGround: false, hitH: false, awake: type !== 'rock', swing: 0, burst: 0, love: 0, breedCd: 0, baby: 0, sheared: false, color: 0, owner: null, tamer: null, fuse: 0, see: false, sit: false, eggT: 6000 + rnd(6000), shotCd: 60, summonCd: 200, slam: 0, voiceCd: 100 + rnd(300), fire: 0, spinOff0: Math.random() * 6.28, spinSeed0: Math.random() * 6.28 };
+    age: 0, hurt: 0, death: 0, atkCd: 0, walk: 0, walkAmp: 0, state: 0, timer: 0, moveYaw: 0, moving: false, panic: 0, kb: 0, dead: false, onGround: false, hitH: false, awake: type !== 'rock', swing: 0, burst: 0, love: 0, breedCd: 0, baby: 0, sheared: false, color: 0, owner: null, tamer: null, fuse: 0, see: false, sit: false, eggT: 6000 + rnd(6000), shotCd: 60, summonCd: 200, slam: 0, voiceCd: 100 + rnd(300), fire: 0, vs: 0, home: null, vst: 2, vt: 0, vin: 0, wt: 0, busy: 0, stk: 0, det: 0, path: null, pi: 0, spinOff0: Math.random() * 6.28, spinSeed0: Math.random() * 6.28 };
   e.pyaw = e.yaw;
   return addEnt(e);
 }
@@ -800,7 +832,7 @@ function spawnCycle(world) {
     if (e.kind !== 'mob' || e.dead) continue;
     const d = MOBS[e.type]; if (d.boss) continue;
     const dl = Math.hypot(e.x - player.x, e.y - player.y, e.z - player.z);
-    if (!d.hostile) { if (dl < 128) passive++; continue; }
+    if (!d.hostile) { if (dl < 128 && e.type !== 'sato') passive++; continue; }   // 村人は 動物の数に入れない（村のまわりにも 動物が出るように）
     if (dl < 128) hostile++;
     if (e.remote) continue;
     if (game.diff === 0 || game.rules.mobs === false) { e.dead = true; e.noCredit = true; continue; }
@@ -878,6 +910,15 @@ function drawMob(world, e, x, y, z, alpha) {
     let rx = 0, ry = 0, rz = 0, ox = 0, oy = 0, oz = 0, pr = r, pg = g, pb = b;
     const id = p.id;
     if (wc && id === 'body') { pr = r * wc[0]; pg = g * wc[1]; pb = b * wc[2]; }   // 毛の色（かられた後は はだの色）
+    if (d.model === 'sato') {
+      const job = e.vs & 3;
+      if (id.charCodeAt(0) === 106 && id.charCodeAt(1) - 48 !== job) continue;   // j0〜j3：そのしごとの かぶり物だけ
+      if (id === 'body' || id === 'arm0' || id === 'arm1') { const q = SATO_RGB[job]; pr = r * q[0]; pg = g * q[1]; pb = b * q[2]; }
+      const nod = e.swing > 0 ? Math.sin(e.swing / 12 * Math.PI) * 0.45 : 0;   // こうかんの時に うなずく
+      if (id === 'leg0') rx = sw * 0.8; else if (id === 'leg1') rx = -sw * 0.8;
+      else if (id === 'arm0') { rx = -sw * 0.6 - nod * 1.2; rz = 0.05; } else if (id === 'arm1') { rx = sw * 0.6; rz = -0.05; }
+      else if (id === 'head' || id.charCodeAt(0) === 106 && id !== 'j1apron') { rx = e.headPitch * 0.6 + nod; rz = Math.sin(t * 0.045 + e.spinSeed0) * 0.05; }
+    } else
     if (d.model === 'dog') {
       if (id === 'collar' && !e.tamer) continue;
       if (id === 'tail') { ry = Math.sin(t * (e.tamer ? 0.6 : 0.25)) * 0.5; rx = e.sit ? 0.9 : 0.5; }
@@ -956,6 +997,7 @@ function drawMob(world, e, x, y, z, alpha) {
   }
 }
 const SHEARED_RGB = [0.93, 0.72, 0.66];
+const SATO_RGB = [[0.56, 0.78, 0.46], [0.56, 0.52, 0.56], [0.86, 0.6, 0.36], [0.46, 0.56, 0.92]];   // 上着の色：はたけ・かじや・かりうど・ものしり
 // 視線が当たる生き物を探す
 function pickMob(ox, oy, oz, dx, dy, dz, maxDist) {
   let best = null, bt = maxDist;
@@ -1220,12 +1262,15 @@ function mobEx(e) {
   const o = {}; let any = false;
   if (e.baby > 0) { o.b = e.baby; any = true; } if (e.sheared) { o.s = 1; any = true; } if (e.color) { o.c = e.color; any = true; }
   if (e.tamer) { o.o = e.tamer; any = true; } if (e.sit) { o.t = 1; any = true; } if (e.breedCd > 0) { o.cd = e.breedCd; any = true; }
+  if (e.type === 'sato') { o.v = e.vs; if (e.home) o.hm = e.home; any = true; }
   return any ? o : 0;
 }
 function applyEx(e, o) {
   if (!o || typeof o !== 'object') return;
   if (o.b > 0) setBaby(e, Math.min(24000, o.b | 0)); if (o.s) e.sheared = true; if (o.c > 0 && o.c < 16) e.color = o.c | 0;
   if (typeof o.o === 'string') e.tamer = o.o.slice(0, 40); if (o.t) e.sit = true; if (o.cd > 0) e.breedCd = Math.min(12000, o.cd | 0);
+  if (o.v > 0) e.vs = o.v >>> 0; if (Array.isArray(o.hm) && o.hm.length === 5) e.home = o.hm.map(n => n | 0);
+  if (e.type === 'sato' && e.home) { e.vst = (e.home[4] !== 1 && Math.abs(e.x - e.home[0] - 0.5) < 2.6 && Math.abs(e.z - e.home[2] - 0.5) < 2.6) ? 0 : 2; e.vt = 100 + rnd(500); e.vin = 0; }   // 家の中で しまわれたなら、家の中から
 }
 // 毎回：育つ・こうふんがさめる・たまごを生む・毛がのびる
 function passiveLife(world, e, d) {
@@ -1254,6 +1299,7 @@ function ownerOf(e) {
 // 動物の行き先を決める。[x, z, 速さ, 止まる近さ] か null
 function passiveGoal(world, e, d) {
   if (e.type === 'dog') return dogGoal(world, e, d);
+  if (e.type === 'sato') return satoGoal(world, e, d);
   if (e.love > 0) {   // 相手を探して近づく。くっついたら 子どもが生まれる
     let best = null, bd = 10;
     for (const o of ents) { if (o === e || o.kind !== 'mob' || o.type !== e.type || o.dead || o.remote || !(o.love > 0) || o.baby > 0) continue; const dd = Math.hypot(o.x - e.x, o.z - e.z); if (dd < bd) { bd = dd; best = o; } }
@@ -1292,10 +1338,123 @@ function dogGoal(world, e, d) {
   if (dd > 3) return [O.x, O.z, d.speed * (dd > 7 ? 1.8 : 1.15), 2.4];
   return [O.x, O.z, 0, 99];   // そばにいるときは 飼い主のほうを向く
 }
+// サトビト（村人）：昼は 家の前や 村の中を歩き、夜は 家にもどる。こうかん中は 立ち止まって 相手を見る
+// home＝[家の中の x, y, z, 入口の向き, 0 ふつう／1 外ぐらし（畑）／2 入口から4マスおく]
+function nearPlayer(e, maxD) {
+  let best = null, bd = maxD;
+  if (!player.dead) { const dd = Math.hypot(player.x - e.x, player.y - e.y, player.z - e.z); if (dd < bd) { bd = dd; best = player; } }
+  if (net.on) for (const p of net.peers.values()) { if (p.dead || p.dim !== game.world.dim || !net.fresh(p)) continue; const dd = Math.hypot(p.x - e.x, p.y - e.y, p.z - e.z); if (dd < bd) { bd = dd; best = p; } }
+  return best;
+}
+function spawnSato(x, y, z, o) {
+  const e = spawnMob('sato', x + 0.5, y, z + 0.5);
+  e.vs = o.s >>> 0; e.home = [o.h[0] | 0, o.h[1] | 0, o.h[2] | 0, o.f & 3, o.o | 0]; e.vst = o.o === 1 ? 2 : 0; e.vt = 100 + rnd(500);
+  return e;
+}
+// 歩ける ます目を たどる 道さがし（はば優先。1だんの のぼりおり・ドアは通れる。水・フェンスは よける）。行けたら [x0, z0, x1, z1, …]
+let _wpY = null, _wpP = null, _wpQ = null;
+function walkOK(id) { return (!SOLID[id] && !FLUID[id]) || SHAPE[id] === S_DOOR; }
+function walkPath(world, e, tx, tz, R) {
+  const sx = Math.floor(e.x), sz = Math.floor(e.z), W = 2 * R + 1, N = W * W;
+  if (Math.abs(tx - sx) > R || Math.abs(tz - sz) > R) return null;
+  if (!_wpY || _wpY.length < N) { _wpY = new Int16Array(N); _wpP = new Int32Array(N); _wpQ = new Int32Array(N); }
+  _wpY.fill(-999, 0, N);
+  const stand = (x, y, z) => {
+    for (let k = 0; k < 3; k++) {
+      const yy = k === 0 ? y : k === 1 ? y + 1 : y - 1; if (yy < 1 || yy > 124) continue;
+      const b = world.getBlock(x, yy - 1, z);
+      if (SOLID[b] && SHAPE[b] !== S_DOOR && SHAPE[b] !== S_FENCE && SHAPE[b] !== S_WALL && walkOK(world.getBlock(x, yy, z)) && walkOK(world.getBlock(x, yy + 1, z))) return yy;
+    }
+    return -999;
+  };
+  const sy = stand(sx, Math.floor(e.y + 0.5), sz); if (sy === -999) return null;
+  const si = R * W + R, ti = (tz - sz + R) * W + (tx - sx + R);
+  _wpY[si] = sy; _wpP[si] = -1; let qh = 0, qt = 0; _wpQ[qt++] = si;
+  while (qh < qt) {
+    const i = _wpQ[qh++]; if (i === ti) break;
+    const cx = i % W, cz = (i / W) | 0, y = _wpY[i];
+    for (let k = 0; k < 4; k++) {
+      const nx = cx + F4[k][0], nz = cz + F4[k][1]; if (nx < 0 || nz < 0 || nx >= W || nz >= W) continue;
+      const j = nz * W + nx; if (_wpY[j] !== -999) continue;
+      const ny = stand(sx - R + nx, y, sz - R + nz); if (ny === -999) continue;
+      _wpY[j] = ny; _wpP[j] = i; _wpQ[qt++] = j;
+    }
+  }
+  if (_wpY[ti] === -999) return null;
+  const out = [];
+  for (let i = ti; i !== si; i = _wpP[i]) {
+    const x = sx - R + (i % W), z = sz - R + ((i / W) | 0); let ox = 0.5, oz = 0.5;
+    if (SHAPE[world.getBlock(x, _wpY[i], z)] === S_DOOR) { const sd = F4[((world.getMeta(x, _wpY[i], z) & 3) + 1) & 3]; ox -= sd[0] * 0.1; oz -= sd[1] * 0.1; }   // あいたドアの板を よけて通る
+    out.push(z + oz, x + ox);
+  }
+  out.reverse();
+  return out;
+}
+// 道の次の点へ。しまっているドアは あける。着いたら null
+function satoFollow(world, e, speed) {
+  const P = e.path; if (!P) return null;
+  while (e.pi < P.length) {
+    const wx = P[e.pi], wz = P[e.pi + 1];
+    if (Math.hypot(wx - e.x, wz - e.z) < 0.2) { e.pi += 2; continue; }
+    if (e.age % 5 === 0) {
+      const bx = Math.floor(wx), bz = Math.floor(wz), by = Math.floor(e.y + 0.5);
+      for (let y = by - 1; y <= by + 1; y++) { const id = world.getBlock(bx, y, bz), m = world.getMeta(bx, y, bz); if (SHAPE[id] === S_DOOR && !(m & 4)) { world.setBlock(bx, y, bz, id, m | 4, 1); sfxAt('door', bx, y, bz); } }
+    }
+    return [wx, wz, speed, 0.05];
+  }
+  e.path = null; return null;
+}
+function satoGo(world, e, tx, tz) { e.path = walkPath(world, e, Math.floor(tx), Math.floor(tz), 18); e.pi = 0; e.stk = 0; return !!e.path; }
+function satoGoal(world, e, d) {
+  if (e.age % 60 === 7) {   // 同じ しるしから 2人できてしまった時は、片方が消える（2台が同時に見つけた時）
+    for (const o of ents) if (o !== e && o.kind === 'mob' && o.type === 'sato' && !o.dead && o.vs === e.vs && (o.remote ? String(o.owner) < String(net.pid) : o.nid < e.nid)) { e.dead = true; return null; }
+  }
+  if (e.busy > 0) { e.busy--; const T = nearPlayer(e, 6); return T ? [T.x, T.z, 0, 99] : [e.x, e.z, 0, 99]; }
+  if (!e.home) return null;
+  if (e.det > 0) { e.det--; return [e.x - Math.sin(e.moveYaw) * 3, e.z - Math.cos(e.moveYaw) * 3, d.speed, 0]; }
+  const G = satoTarget(world, e, d);
+  if (G[2] > 0 && e.hitH) { if (++e.stk > 40) { e.stk = 0; e.path = null; e.det = 16 + rnd(16); e.moveYaw = Math.random() * 6.28; } }   // 長く つっかえたら 少し動いてから 道を さがし直す
+  else if (e.stk > 0) e.stk--;
+  return G;
+}
+// vst＝0 家の中／1 出ていく／2 外／3 もどる
+function satoTarget(world, e, d) {
+  const here = [e.x, e.z, 0, 99];
+  const hx = e.home[0] + 0.5, hz = e.home[2] + 0.5, f = F4[e.home[3] & 3], out = e.home[4] === 1, kd = e.home[4] === 2 ? 4 : 3;
+  const ox = out ? hx : hx + f[0] * kd, oz = out ? hz : hz + f[1] * kd;   // 入口の前
+  const night = world.isNight(), dist = (x, z) => Math.hypot(x - e.x, z - e.z);
+  if (e.vst === 0 && !out) {
+    if (!night && --e.vt <= 0) { if (satoGo(world, e, ox, oz)) e.vst = 1; else e.vt = 200; }
+    if (e.vst === 0) { const T = nearPlayer(e, 4); return dist(hx, hz) > 0.9 ? [hx, hz, d.speed * 0.7, 0.4] : T ? [T.x, T.z, 0, 99] : here; }
+  }
+  if (e.vst === 1) {
+    const g = satoFollow(world, e, d.speed); if (g) return g;
+    if (dist(ox, oz) < 1.2) { e.vst = 2; e.vt = 900 + rnd(1500); e.wt = 0; } else if (!satoGo(world, e, ox, oz)) { e.vst = 0; e.vt = 200; }
+    return here;
+  }
+  if (e.vst === 3) {   // もどる。道が見つからない・長く たどりつけない時は 家の前に 出なおす
+    const g = satoFollow(world, e, d.speed * 1.15); if (g) { if (++e.vt > 2400) { e.x = ox; e.z = oz; e.y = e.home[1] + 0.05; e.vx = e.vy = e.vz = 0; e.vt = 0; e.path = null; } return g; }
+    if (dist(hx, hz) < 0.8) { e.vst = out ? 2 : 0; e.vt = 300 + rnd(700); e.wt = 100; return here; }
+    if (e.age % 40 === 0 && !satoGo(world, e, hx, hz) && ++e.vin > 5 && !nearPlayer(e, 20)) { e.x = hx; e.z = hz; e.y = e.home[1] + 0.05; e.vx = e.vy = e.vz = 0; e.vin = 0; }
+    return here;
+  }
+  // 外
+  if (night ? dist(hx, hz) > (out ? 2 : 0.8) : (!out && --e.vt <= 0)) { e.vst = 3; e.vin = 0; e.vt = 0; e.path = null; satoGo(world, e, hx, hz); return here; }
+  if (night) return here;
+  const T = nearPlayer(e, 3.2);
+  if (T) return [T.x, T.z, 0, 99];   // 人が そばに来たら 立ち止まって そちらを見る
+  const g = satoFollow(world, e, d.speed * 0.85); if (g) return g;
+  if (--e.wt <= 0) {   // ときどき 行き先を決めて歩く
+    e.wt = 80 + rnd(200);
+    if (rnd(4)) { const a = Math.random() * 6.28, r = 2 + Math.random() * 10; satoGo(world, e, ox + Math.cos(a) * r, oz + Math.sin(a) * r); }
+  }
+  return here;
+}
 // 手に持った物を 動物に使うと どうなるか。'wait' は「いまは何も起きないが、この動物の好物」
 function mobUse(e, it) {
   if (!e || e.kind !== 'mob' || e.hp <= 0) return null;
   const id = it ? it.id : 0, baby = e.baby > 0, me = meId();
+  if (e.type === 'sato') return 'trade';
   if (e.type === 'dog') {
     const meat = MEATS.indexOf(id) >= 0;
     if (!e.tamer) return meat ? 'tame' : null;
@@ -1324,5 +1483,7 @@ function applyMobUse(e, act, who, arg) {
     else fxPuff(e.x, e.y + e.h, e.z, 6, 0.4, 0.4, 0.4, { speed: 0.8, life: 0.6, size: 0.08, up: 0.6 });
   }
   else if (act === 'heal') { e.hp = Math.min(e.maxHp, e.hp + 6); heartFx(e, 3); }
+  else if (act === 'busy') { if (e.type === 'sato') e.busy = 50; }
+  else if (act === 'traded') { if (e.type === 'sato') { e.busy = 50; e.swing = 12; sfxAt('say_sato', e.x, e.y, e.z); fxPuff(e.x, e.y + e.h + 0.1, e.z, 6, 0.4, 0.95, 0.5, { glow: true, speed: 0.5, life: 0.8, size: 0.07, up: 0.8, grav: 0, spread: 0.5 }); } }
   else if (act === 'sit') { if (e.tamer === who) { e.sit = !e.sit; sfxAt('say_dog', e.x, e.y, e.z); } }
 }

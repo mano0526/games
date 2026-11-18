@@ -181,6 +181,8 @@ function buildTextures() {
     for (let x = 0; x < 16; x++) { const dep = 2 + Math.floor(p.rng() * 2); for (let y = 0; y < dep; y++) p.px(x, y, pal[Math.floor(p.rng() * 3)]); p.px(x, dep, C('#3d2913')); }
   });
   newTex('mud', p => { p.blot(CP(['#3d3531', '#46403a', '#352e2a', '#4a433d', '#403832']), 4); p.dash(4, 3, C('#5a524b')); p.dots(6, C('#2a2421')); });
+  newTex('path_top', p => { p.speckle(CP(['#b0915c', '#a88852', '#b89a66', '#a07f4a', '#ad8d58'])); p.dots(10, C('#8a6c3e')); p.dots(8, C('#c9ae7c')); p.dash(3, 2, C('#96784a')); });
+  newTex('path_side', p => { p.copy('dirt'); for (let x = 0; x < 16; x++) { p.px(x, 0, C(x % 3 ? '#b0915c' : '#a07f4a')); if (p.rng() < 0.5) p.px(x, 1, C('#96784a')); } });
   newTex('coarse_dirt', p => { p.speckle(CP(['#7a5234', '#6c482c', '#86603f', '#5e3f27'])); p.dots(12, C('#9a8d80')); p.dots(8, C('#4a3220')); p.dots(5, C('#b3a698')); });
   newTex('moss', p => { p.blot(CP(['#5d8a3a', '#527e33', '#689642', '#487229', '#5d8a3a']), 2); p.dots(9, C('#7aa84f')); p.dots(6, C('#3c6222')); });
   const mycPal = CP(['#7a6a80', '#70617a', '#857590', '#695a72']);
@@ -668,6 +670,8 @@ function buildIcons() {
   S(I.gold_ingot, R_INGOT, { l: '#fff3a0', m: '#f6cf3e', s: '#c99a1e', d: '#7a5a0e' });
   S(I.brick, R_INGOT, { l: '#c96b55', m: '#a5503c', s: '#84402f', d: '#52251a' });
   S(I.diamond, R_GEM, { l: '#c8fbf6', m: '#5fe0d8', s: '#2fa59e', d: '#145e5a', w: '#ffffff' });
+  S(I.jade, ['', '', '......ddddd.....', '....ddllmmmd....', '...dllwlmmmmd...', '...dlld.dmmmsd..', '...dlmdddmmmsd..', '...dmmmmmmmssd..', '....dmmmmmmssd..', '.....ddmmmmssd..', '.......dmmssd...', '......dmmssd....', '....ddmssdd.....', '....dsddd.......', '.....dd.........', ''],
+    { l: '#c9f5d2', m: '#62c98a', s: '#3a9a62', d: '#1c5e3a', w: '#ffffff' });   // ヒスイ（まがたまの形）
   S(I.glow_dust, R_PILE, { m: '#ffd45c', l: '#fff6cf', d: '#c98a22' });
   const dyeC = { red: ['#d63a2f', '#f0705f', '#8a1f18'], yellow: ['#f0cc3a', '#fff0a0', '#a8851a'], blue: ['#3f66c9', '#7f9df0', '#22408a'], green: ['#5a8f3a', '#8cc060', '#355a20'], black: ['#2e2e33', '#5a5a62', '#101012'], pink: ['#f0a0bd', '#fbd3e0', '#b8607f'] };
   _dyes.forEach(([k], i) => S(286 + i, R_PILE, { m: dyeC[k][0], l: dyeC[k][1], d: dyeC[k][2] }));

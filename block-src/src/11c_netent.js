@@ -75,7 +75,7 @@ function netTake(m) {
   if (e && e !== true && e.kind === 'mob' && !e.dead) { p.ents.set(m.n, true); e.remote = false; e.owner = null; e.nid = _nid++; e._ns = ''; }
   else e = spawnMob(a[0], a[1], a[2], a[3]);
   e.x = e.px = a[1]; e.y = e.py = a[2]; e.z = e.pz = a[3]; e.yaw = e.pyaw = a[5] || 0; e.awake = !!a[8]; e.hp = a[9] || a[4]; e.vx = e.vy = e.vz = 0;
-  e.sheared = false; e.color = 0; e.tamer = null; e.sit = false; if (e.baby > 0) setBaby(e, 0); applyEx(e, a[7]);
+  e.sheared = false; e.color = 0; e.tamer = null; e.sit = false; e.home = null; if (e.baby > 0) setBaby(e, 0); applyEx(e, a[7]);
   if (MOBS[e.type].boss) bossSeen(e);
 }
 // ボスが自分の画面に現れた（体力バーを出す。暗くするのは カゲの王だけ）
@@ -88,7 +88,7 @@ function netShot(s) {
 }
 // ---- 送る側：自分が動かしているものの一覧 ----
 function entRec(e) {
-  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 || e.fuse > 0 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0) | (e.baby > 0 ? 64 : 0) | (e.sheared ? 128 : 0) | (e.sit ? 256 : 0) | (e.love > 0 ? 512 : 0) | (e.burnT > 0 ? 1024 : 0), e.type === 'sheep' ? e.color | 0 : e.type === 'dog' ? (e.tamer || 0) : 0];
+  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 || e.fuse > 0 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0) | (e.baby > 0 ? 64 : 0) | (e.sheared ? 128 : 0) | (e.sit ? 256 : 0) | (e.love > 0 ? 512 : 0) | (e.burnT > 0 ? 1024 : 0), e.type === 'sheep' ? e.color | 0 : e.type === 'dog' ? (e.tamer || 0) : e.type === 'sato' ? e.vs : 0];
   if (e.kind === 'item') return [e.nid, 1, e.id, e.n, e.d, r2(e.x), r2(e.y), r2(e.z)];
   if (e.kind === 'falling') return [e.nid, 2, e.id, r2(e.x), r2(e.y), r2(e.z)];
   if (e.kind === 'primed') return [e.nid, 4, e.fuse | 0, r2(e.x), r2(e.y), r2(e.z)];
@@ -142,7 +142,7 @@ function puppetLook(e, r) {
   const b = r[8] | 0, baby = !!(b & 64);
   if (baby !== (e.baby > 0)) setBaby(e, baby ? 1e9 : 0);
   e.sheared = !!(b & 128); e.sit = !!(b & 256); if ((b & 512) && !(e.love > 0)) heartFx(e, 5); e.love = (b & 512) ? 100 : 0;
-  if (e.type === 'sheep') e.color = clamp(r[9] | 0, 0, 15); else if (e.type === 'dog') e.tamer = typeof r[9] === 'string' ? r[9] : null;
+  if (e.type === 'sheep') e.color = clamp(r[9] | 0, 0, 15); else if (e.type === 'dog') e.tamer = typeof r[9] === 'string' ? r[9] : null; else if (e.type === 'sato') e.vs = (+r[9] || 0) >>> 0;
 }
 function updPuppet(e, r) {
   if (e.kind === 'mob') {

@@ -704,6 +704,10 @@ class World {
       if (!c.ents.size || c.stage < 2) continue;
       const mine = !this.net || this.net.owns(c.cx, c.cz);
       for (const [i, e] of c.ents) if (e.t === 'furnace') { if (mine) this.tickFurnace(c, i, e); else this.showFurnace(e); }
+        else if (e.t === 'vmark' && mine && this.onMark) {   // 村人のしるし：受け持ちの端末が 村人に かえる（しるしのブロックは消す＝ほかの人にも伝わる）
+          const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15);
+          if (c.blocks[i] === B.vmark) { this.setBlock(x, y, z, 0, 0); this.onMark(x, y, z, e); } else c.ents.delete(i);
+        }
     }
   }
   // ほかの人の端末が動かしているかまど：見た目の進み具合だけ進める（中身は変えない）
