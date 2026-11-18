@@ -67,10 +67,13 @@ function spawnDrop(x, y, z, id, n, d, vx, vy, vz, delay) {
     hw: 0.125, h: 0.25, id, n, d: d || 0, age: 0, life: 6000, delay: delay === undefined ? 8 : delay, spin: Math.random() * 6.28, dead: false, onGround: false };
   return addEnt(e);
 }
+// けいけんの玉を出す
+function spawnXp(x, y, z, n) { return n > 0 ? spawnDrop(x, y, z, I.xp_orb, n, 0, (Math.random() - 0.5) * 3, 3 + Math.random() * 2, (Math.random() - 0.5) * 3, 12) : null; }
 function spawnFalling(x, y, z, id) {
   return addEnt({ kind: 'falling', x: x + 0.5, y, z: z + 0.5, px: x + 0.5, py: y, pz: z + 0.5, vx: 0, vy: 0, vz: 0, hw: 0.49, h: 0.98, id, age: 0, dead: false, onGround: false });
 }
 function itemTick(world, e) {
+  if (e.dead) return;   // 同じ回に ほかの落とし物に まとめられた物は、もう動かさない（これが無いと、同時に落ちた同じ物どうしが おたがいを消して 両方なくなる）
   e.age++;
   if (e.age > e.life) { e.dead = true; return; }
   const fl = fluidAt(world, e.x, e.y + 0.1, e.z);
@@ -78,12 +81,13 @@ function itemTick(world, e) {
   if (fl === 1) { e.vy = e.vy * 0.8 + 0.5; e.vx *= 0.8; e.vz *= 0.8; } else e.vy -= 1.4;
   if (!player.dead && e.age > e.delay) {
     const dx = player.x - e.x, dy = player.y + 0.8 - e.y, dz = player.z - e.z, dd = dx * dx + dy * dy + dz * dz;
-    if (dd < 2.9 && player.canTake(e.id, e.d)) {
-      const d = Math.sqrt(dd) || 1;
-      e.vx += dx / d * 2.2; e.vy += dy / d * 2.2 + 0.6; e.vz += dz / d * 2.2;
-      if (dd < 1.1) {
+    const orb = e.id === I.xp_orb;   // けいけんの玉は 遠くからでも すいよせる
+    if ((dd < 2.9 || (orb && dd < 42)) && player.canTake(e.id, e.d)) {
+      const d = Math.sqrt(dd) || 1, pull = orb ? 3.4 : 2.2;
+      e.vx += dx / d * pull; e.vy += dy / d * pull + 0.6; e.vz += dz / d * pull; if (orb) { e.vx *= 0.9; e.vz *= 0.9; }
+      if (dd < (orb ? 1.7 : 1.1)) {
         const left = player.give(e.id, e.n, e.d);
-        if (left < e.n) { sfx('pop'); ui.pickupFx(e.id, e.n - left); player.stat('pick', e.id); }
+        if (left < e.n && !orb) { sfx('pop'); ui.pickupFx(e.id, e.n - left); player.stat('pick', e.id); }
         e.n = left; if (left <= 0) { e.dead = true; return; }
       }
     }
@@ -378,9 +382,11 @@ function hurtMob(e, dmg, fromX, fromZ, kb) {
   if (e.remote) {   // ほかの人が動かしている生き物：たたいたことを持ち主に伝える（体力は持ち主が決める）
     e.hurt = 10; sfxAt('hurt_' + MOBS[e.type].voice, e.x, e.y, e.z);
     fxPuff(e.x, e.y + e.h * 0.6, e.z, 5, 0.75, 0.1, 0.1, { speed: 2, life: 0.4, size: 0.05, grav: 10 });
-    net.dm(e.owner, { t: 'hit', n: e.rnid, d: r2(dmg), x: r2(fromX), z: r2(fromZ), k: kb === undefined ? 5.5 : kb });
+    net.dm(e.owner, { t: 'hit', n: e.rnid, d: r2(dmg), x: r2(fromX), z: r2(fromZ), k: kb === undefined ? 5.5 : kb, b: e.hb | 0, l: e.hl | 0 }); e.hb = e.hl = 0;
     return true;
   }
+  if (e.hb) { if (!MOBS[e.type].fireproof) e.burnT = Math.max(e.burnT | 0, e.hb); e.hb = 0; }   // 「もえる刃」「火の矢」
+  if (e.hl) { e.loot = e.hl; e.hl = 0; }   // 「えものふやし」
   e.hp -= dmg; e.hurt = 10; e.awake = true;
   const dx = e.x - fromX, dz = e.z - fromZ, d = Math.hypot(dx, dz) || 1, k = (kb === undefined ? 5.5 : kb) * (MOBS[e.type].boss ? 0.15 : 1);
   e.vx = dx / d * k; e.vz = dz / d * k; if (e.onGround || MOBS[e.type].fly) e.vy = MOBS[e.type].boss ? 1 : 4.5; e.kb = 6;
@@ -402,7 +408,8 @@ function mobTick(world, e) {
     if (e.death > dT) {
       e.dead = true;
       if (e.type === 'hoshikui') hoshiReward(world, e);
-      if (!(e.baby > 0)) for (const [id, n] of d.drops(e)) if (n > 0) spawnDrop(e.x, e.y + 0.4, e.z, id, n, 0);
+      if (!(e.baby > 0)) for (const [id, n] of d.drops(e)) if (n > 0) spawnDrop(e.x, e.y + 0.4, e.z, id, n + (e.loot ? rnd(e.loot + 1) : 0), 0);
+      if (e.pk && !(e.baby > 0)) spawnXp(e.x, e.y + 0.4, e.z, e.type === 'hoshikui' ? 300 : d.boss ? 80 : d.hostile ? 5 : 1 + rnd(3));   // 人が たおした時だけ 経験値
       fxPuff(e.x, e.y + e.h * 0.5, e.z, d.boss ? 60 : 10, 0.85, 0.85, 0.85, { speed: d.boss ? 5 : 1.5, life: 0.9, size: 0.1, spread: e.hw * 2 });
       if (e.lastBy && net.on && e.lastBy !== net.pid) net.dm(e.lastBy, { t: 'kill', ty: e.type }); else if (!e.noCredit) player.onKill(e);
     }
@@ -410,6 +417,10 @@ function mobTick(world, e) {
   }
   const fl = fluidAt(world, e.x, e.y + 0.3, e.z);
   if (fl === 2 && e.age % 10 === 0 && !d.fireproof) hurtMob(e, 4, e.x, e.z, 0);
+  if (e.burnT > 0) {   // もえている：1秒ごとに1ダメージ。水に入ると消える
+    e.burnT--; if (fl === 1 || d.fireproof) e.burnT = 0;
+    else { if (e.age % 2 === 0) fxPuff(e.x + (Math.random() - 0.5) * e.hw * 2, e.y + Math.random() * e.h, e.z + (Math.random() - 0.5) * e.hw * 2, 1, 1, 0.55 + Math.random() * 0.3, 0.15, { glow: true, speed: 0.3, life: 0.5, size: 0.08, up: 1.2, grav: 0 }); if (e.burnT % 20 === 0) { e.hurt = 0; hurtMob(e, 1, e.x, e.z, 0); if (e.hp <= 0) return; } }
+  }
   const T = mobTarget(e);   // いちばん近い人をねらう
   const pdx = T.x - e.x, pdy = T.y - e.y, pdz = T.z - e.z, pdist = Math.hypot(pdx, pdz), pd3 = Math.hypot(pdx, pdy, pdz);
   const canTarget = d.hostile && !T.dead && T.mode === 0 && game.diff > 0;
@@ -614,6 +625,7 @@ function arrowTick(world, e) {
       e.dead = true;
       if (!e.foreign) {
         const far = Math.hypot(m.x - e.ox, m.z - e.oz);
+        m.pk = 1; if (e.flame) m.hb = 100;
         if (hurtMob(m, e.dmg, e.x - e.vx, e.z - e.vz, 4)) { sfx('arrowding', 0.7); if (e.dmg >= 8) fxPuff(m.x, m.y + m.h * 0.7, m.z, 10, 1, 0.9, 0.3, { glow: true, speed: 3, life: 0.4, size: 0.06 }); game.onStat('arrow', far); }
         else if (m.hurt > 0 && !e.noPick) spawnDrop(e.x, e.y, e.z, I.arrow, 1, 0, 0, 2, 0, 6);   // 当たったばかりで きかなかった矢は 落ちる
       }
@@ -814,7 +826,11 @@ function drawEntities(world, cam, alpha) {
   for (const e of ents) {
     const x = e.px + (e.x - e.px) * alpha - cam.x, y = e.py + (e.y - e.py) * alpha - cam.y, z = e.pz + (e.z - e.pz) * alpha - cam.z;
     if (x * x + z * z > (e.type === 'hoshikui' ? 170 * 170 : 80 * 80)) continue;
-    if (e.kind === 'item') {
+    if (e.kind === 'item' && e.id === I.xp_orb) {   // けいけんの玉：光る小さな玉（数が多いほど大きい）
+      const s = 0.06 + Math.min(0.07, e.n * 0.004), pu = 0.72 + Math.sin((e.age + alpha) * 0.35 + e.spin) * 0.28;
+      m4Translate(_mm, x, y + 0.16 + Math.sin((e.age + alpha) * 0.15 + e.spin) * 0.05, z); m4RotY(_mr, (e.age + alpha) * 0.2); m4Mul(_mm, _mm, _mr);
+      addColorBox(dynGlow, _mm, -s, -s, -s, s, s, s, 0.3 * pu + 0.12, 0.85 * pu + 0.1, 0.1 * pu, 0.95);
+    } else if (e.kind === 'item') {
       lightRGB(world.getLightRaw(Math.floor(e.x), Math.floor(e.y + 0.3), Math.floor(e.z)), _lcE);
       const bob = Math.sin((e.age + alpha) * 0.12 + e.spin) * 0.06 + 0.22, isCube = isBlk(e.id) && !ICON[e.id], s = isCube ? 0.27 : 0.42;
       m4Translate(_mm, x, y + bob, z); m4RotY(_mr, (e.age + alpha) * 0.06 + e.spin); m4Mul(_mm, _mm, _mr); m4Scale(_mr, s, s, s); m4Mul(_mm, _mm, _mr);
@@ -1243,7 +1259,7 @@ function passiveGoal(world, e, d) {
     for (const o of ents) { if (o === e || o.kind !== 'mob' || o.type !== e.type || o.dead || o.remote || !(o.love > 0) || o.baby > 0) continue; const dd = Math.hypot(o.x - e.x, o.z - e.z); if (dd < bd) { bd = dd; best = o; } }
     if (best) {
       if (bd < 1.5 && e.nid < best.nid) {
-        const b = spawnMob(e.type, (e.x + best.x) / 2, Math.max(e.y, best.y) + 0.1, (e.z + best.z) / 2); setBaby(b, 12000);
+        const b = spawnMob(e.type, (e.x + best.x) / 2, Math.max(e.y, best.y) + 0.1, (e.z + best.z) / 2); setBaby(b, 12000); spawnXp(b.x, b.y + 0.3, b.z, 1 + rnd(4));
         if (e.type === 'sheep') b.color = rnd(2) ? e.color : best.color;
         e.love = best.love = 0; e.breedCd = best.breedCd = 6000;
         heartFx(e, 8); heartFx(best, 8); sfxAt('pop', b.x, b.y, b.z); sfxAt('say_' + d.voice, b.x, b.y, b.z);

@@ -98,13 +98,15 @@ const ui = {
   paintSlot(el, s) {
     const ic = el.firstChild, cnt = ic.nextSibling;
     let u = el.querySelector('u');
+    el.classList.toggle('ench', !!s && enchAny(s.d));   // 力のこもった物は 光る
     if (!s) { ic.style.backgroundImage = ''; cnt.textContent = ''; if (u) u.remove(); return; }
     ic.style.backgroundImage = 'url(' + ICON_URL[s.id] + ')';
     cnt.textContent = s.n > 1 ? s.n : '';
     const def = ITEMS[s.id], dur = def.tool ? def.tool.dur : def.armor ? def.armor.dur : 0;
-    if (dur && s.d > 0) {
+    const dm = itemDmg(s.d);
+    if (dur && dm > 0) {
       if (!u) { u = document.createElement('u'); u.innerHTML = '<s></s>'; el.appendChild(u); }
-      const f = Math.max(0, 1 - s.d / dur); u.firstChild.style.width = (f * 100) + '%'; u.firstChild.style.background = f > 0.5 ? '#6fd24a' : f > 0.2 ? '#f2c53d' : '#e0523a';
+      const f = Math.max(0, 1 - dm / dur); u.firstChild.style.width = (f * 100) + '%'; u.firstChild.style.background = f > 0.5 ? '#6fd24a' : f > 0.2 ? '#f2c53d' : '#e0523a';
     } else if (u) u.remove();
   },
 
@@ -117,7 +119,11 @@ const ui = {
   bumpHearts() { this.bump('hearts'); }, bumpFood() { this.bump('foods'); },
   updateHud(dt) {
     const p = player, creative = p.mode === 1;
-    $('status').style.visibility = creative ? 'hidden' : 'visible';
+    $('status').style.visibility = creative ? 'hidden' : 'visible'; $('xpbar').style.visibility = creative ? 'hidden' : 'visible';
+    let fk = ''; for (const k in p.fx) if (p.fx[k] > 0) fk += k + Math.ceil(p.fx[k] / 20) + ',';   // くすりの効き目：小さな絵と のこり時間
+    if (fk !== this.fxKey) { this.fxKey = fk; let h = ''; for (const k in p.fx) if (p.fx[k] > 0) { const t = Math.ceil(p.fx[k] / 20); h += '<div><i style="background-image:url(' + ICON_URL[I['potion_' + k]] + ')"></i>' + Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0') + '</div>'; } $('fxbar').innerHTML = h; }
+    const xk = p.xpLv * 1000 + Math.round(p.xpPt / xpNeed(p.xpLv) * 200);
+    if (xk !== this.xpKey) { this.xpKey = xk; $('xpFill').style.width = (p.xpPt / xpNeed(p.xpLv) * 100).toFixed(1) + '%'; $('xpLv').textContent = p.xpLv > 0 ? p.xpLv : ''; }
     const hp = Math.ceil(p.hp), food = Math.ceil(p.food), air = p.air >= 300 ? -1 : Math.max(0, Math.ceil(p.air / 30)) * 2, ar = p.armorPoints();
     if (hp !== this.hp) { this.hp = hp; this.setIcons('hearts', 10, HUD_URL.heart, HUD_URL.heart_half, HUD_URL.heart_empty, hp); }
     if (food !== this.food) { this.food = food; this.setIcons('foods', 10, HUD_URL.food, HUD_URL.food_half, HUD_URL.food_empty, food); }
@@ -150,7 +156,7 @@ const ui = {
     if (this.screen === 'furnace') this.paintFurnace();
   },
   paintHotbar() { const ch = $('hotbar').children; for (let i = 0; i < 9; i++) this.paintSlot(ch[i], player.inv[i]); },
-  showHeldName() { const s = player.held(), el = $('heldname'); if (!s) { el.classList.remove('on'); return; } el.textContent = itemName(s.id); el.classList.add('on'); this.heldT = 1.6; },
+  showHeldName() { const s = player.held(), el = $('heldname'); if (!s) { el.classList.remove('on'); return; } const en = enchList(s.id, s.d); el.textContent = itemName(s.id) + (en.length ? '（' + en.join('・') + '）' : ''); el.classList.add('on'); this.heldT = en.length ? 2.6 : 1.6; },
   toast(msg, sec) {
     const box = $('toasts'); if (box.lastChild && box.lastChild.textContent === msg) return;
     const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg; box.appendChild(el);
@@ -158,7 +164,10 @@ const ui = {
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 520); }, (sec || 2.6) * 1000);
   },
   hint(msg) { $('hint').textContent = msg || ''; },
+  // レベルが上がった：数字が はねる。5レベルごとに 一言
+  levelFx(lv) { const b = $('xpLv'); if (b) { b.classList.remove('up'); void b.offsetWidth; b.classList.add('up'); } if (lv % 5 === 0) this.toast('レベル ' + lv + ' になった！', 3); },
   pickupFx(id, n) {
+    if (id === I.xp_orb) return;
     let k = this.pick.find(o => o.id === id && !o.out);
     if (k) { k.n += n; k.t = 2.2; k.el.lastChild.textContent = '+' + k.n + ' ' + itemName(id); }
     else { const el = document.createElement('div'); el.innerHTML = '<i style="background-image:url(' + ICON_URL[id] + ')"></i><span>+' + n + ' ' + esc(itemName(id)) + '</span>'; $('pickups').appendChild(el); this.pick.push({ id, n, t: 2.2, el, out: false }); if (this.pick.length > 5) { const o = this.pick.shift(); o.el.remove(); } }
@@ -437,10 +446,11 @@ const ui = {
       this.moveCursor(e.clientX, e.clientY);
       if (e.pointerType !== 'mouse') return;
       const el = e.target.closest('.slot'), tip = $('tip');
-      if (el && el.dataset.i !== undefined) { const s = this.getS(this.slots[+el.dataset.i]); if (s && !player.cursor) { tip.textContent = itemName(s.id); tip.style.display = 'block'; tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 4, e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 30) + 'px'; return; } }
+      if (el && el.dataset.i !== undefined) { const s = this.getS(this.slots[+el.dataset.i]); if (s && !player.cursor) { tip.textContent = [itemName(s.id)].concat(enchList(s.id, s.d)).join('\n'); tip.style.display = 'block'; tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 4, e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 30) + 'px'; return; } }
       tip.style.display = 'none';
     });
     $('recTabs').addEventListener('click', (e) => { const b = e.target.closest('.btn'); if (!b) return; sfx('click'); this.recTab = b.dataset.t; this.paintRecipes(); });
+    $('scrTop').addEventListener('click', (e) => { const b = e.target.closest('.btn.enchb'); if (b && !b.disabled) this.doEnch(+b.dataset.t); });
     $('recList').addEventListener('click', (e) => { const b = e.target.closest('.btn'); if (!b || b.disabled) return; this.craftFromList(RECIPES[+b.dataset.r], e.shiftKey, b.closest('.rec')); });
   },
   moveCursor(x, y) { const c = $('cursorItem'); c.style.left = x + 'px'; c.style.top = y + 'px'; this._cx = x; this._cy = y; },
@@ -453,25 +463,36 @@ const ui = {
     this.screen = kind; this.ent = ent || null; this.entPos = pos || null; this.slots = [];
     const top = $('scrTop'); top.innerHTML = ''; $('scrInv').innerHTML = ''; $('scrHot').innerHTML = '';
     const creative = player.mode === 1 && kind === 'inv';
-    $('scrTitle').textContent = kind === 'table' ? '作業台' : kind === 'furnace' ? 'かまど' : kind === 'chest' ? 'チェスト' : '持ち物';
+    $('scrTitle').textContent = kind === 'table' ? '作業台' : kind === 'furnace' ? 'かまど' : kind === 'chest' ? 'チェスト' : kind === 'ench' ? 'ちからの台' : '持ち物';
+    this.enchS = null;
     const hasRec = (kind === 'inv' && !creative) || kind === 'table';
     $('recipes').style.display = hasRec ? '' : 'none';
     $('screen').classList.toggle('wide2', creative); $('screen').classList.toggle('norec', !hasRec && !creative);   // 画面の形（マスの大きさの決め方）
     const pb = $('palBox'); while (pb.children.length > 1) pb.removeChild(pb.lastChild);
-    $('screen').style.setProperty('--tr', kind === 'inv' ? (creative ? 1.6 : 2) : 3);   // 上のだんの数（少ない画面は そのぶん マスを大きくできる）
+    $('screen').dataset.k = creative ? 'cre' : kind;   // 画面の種類（上のだんの数 --tr は 見た目の決まりのほうで決める）   // 上のだんの数（少ない画面は そのぶん マスを大きくできる）
     const mk = (cls) => { const d = document.createElement('div'); d.className = cls; top.appendChild(d); return d; };
+    const el = (tag, cls, parent, text) => { const d = document.createElement(tag); d.className = cls; if (text) d.textContent = text; parent.appendChild(d); return d; };
+    // そうび（本家と同じ ならび）：左に 防具4つを たてに、まん中に 自分の姿、右下に 盾
+    const buildEq = () => {
+      const eq = mk('eqBox'); el('div', 'lbl eqL', eq, 'そうび');
+      const col = el('div', 'eqCol', eq); for (let i = 0; i < 4; i++) this.addSlot(col, { t: 'armor', a: player.armor, i }).title = ARMOR_TYPES[i][1].slice(1);
+      const doll = el('canvas', 'doll', eq); doll.width = 16; doll.height = 32; this.paintDoll(doll);
+      const sh = el('div', 'eqSh', eq); this.addSlot(sh, { t: 'armor', a: player.armor, i: 4 }).title = '盾（左手）';
+    };
     if (creative) {
       const pal = document.createElement('div'); pal.id = 'palette'; pb.appendChild(pal);   // えらぶ一覧は 右がわに大きく出す
       const ids = Object.keys(ITEMS).map(Number).filter(id => id !== B.furnace_lit && !ITEMS[id].hide).sort((a, b) => a - b);
       for (const id of ids) this.addSlot(pal, { t: 'pal', id });
-      const tr = mk('g1'); this.addSlot(tr, { t: 'trash' }, 'trash').title = 'ここに置くと消えます';
-      const lb = mk('lbl'); lb.textContent = '← いらない物は ここへ';
+      buildEq();
+      const tb = mk('crBox'); el('div', 'lbl', tb, 'すてる'); const tr = el('div', 'g1', tb); this.addSlot(tr, { t: 'trash' }, 'trash').title = 'ここに置くと消えます';
+      el('div', 'lbl sub', tb, 'いらない物を\nここに置く');
     } else if (kind === 'inv' || kind === 'table') {
       this.craftW = kind === 'table' ? 3 : 2; this.craft = new Array(this.craftW * this.craftW).fill(null);
-      if (kind === 'inv') { const ar = mk('g2'); for (let i = 0; i < 4; i++) this.addSlot(ar, { t: 'armor', a: player.armor, i }).title = ARMOR_TYPES[i][1].slice(1); const sh = mk('g1'); this.addSlot(sh, { t: 'armor', a: player.armor, i: 4 }).title = '盾（左手）'; }
-      const g = mk(kind === 'table' ? 'g3' : 'g2'); for (let i = 0; i < this.craft.length; i++) this.addSlot(g, { t: 'craft', a: this.craft, i });
-      const a = mk('arrow'); a.textContent = '▶';
-      const rs = mk('g1'); this.addSlot(rs, { t: 'result' }, 'big');
+      if (kind === 'inv') buildEq();
+      const cr = mk('crBox'); el('div', 'lbl', cr, 'つくる'); const row = el('div', 'crRow', cr);
+      const g = el('div', kind === 'table' ? 'g3' : 'g2', row); for (let i = 0; i < this.craft.length; i++) this.addSlot(g, { t: 'craft', a: this.craft, i });
+      el('div', 'arrow', row, '▶');
+      const rs = el('div', 'g1', row); this.addSlot(rs, { t: 'result' }, 'big');
     } else if (kind === 'furnace') {
       const f = mk(''); f.id = 'furn';
       this.addSlot(f, { t: 'fin', o: ent, k: 'in' }).style.cssText = 'grid-row:1;grid-column:1';
@@ -479,11 +500,16 @@ const ui = {
       this.addSlot(f, { t: 'ffuel', o: ent, k: 'fuel' }).style.cssText = 'grid-row:3;grid-column:1';
       const ar = document.createElement('div'); ar.id = 'furnArrow'; ar.innerHTML = '<i></i>'; f.appendChild(ar);
       this.addSlot(f, { t: 'fout', o: ent, k: 'out' }, 'big').style.cssText = 'grid-row:1 / 4;grid-column:3';
+    } else if (kind === 'ench') {   // 力をこめる：左に物、右に ひかりの粉。その右に えらべる力が3つ
+      this.enchS = [null, null];
+      const a = mk('g1'); this.addSlot(a, { t: 'ench', a: this.enchS, i: 0 }).title = '力をこめる物';
+      const b = mk('g1'); this.addSlot(b, { t: 'ench', a: this.enchS, i: 1 }).title = 'ひかりの粉';
+      const o = mk(''); o.id = 'enchOpts';
     } else if (kind === 'chest') { const g = mk('grid9'); for (let i = 0; i < 27; i++) this.addSlot(g, { t: 'chest', a: ent.items, i }); }
     for (let i = 9; i < 36; i++) this.addSlot($('scrInv'), { t: 'inv', a: player.inv, i });
     for (let i = 0; i < 9; i++) this.addSlot($('scrHot'), { t: 'inv', a: player.inv, i });
     $('scrHelp').textContent = touchSt.touchUsed ? 'タップで持つ・置く ／ 長押しで半分だけ持つ・1こだけ置く' : 'クリックで持つ・置く ／ 右クリックで半分・1こ ／ Shift+クリックでまとめて移す';
-    $('scrInfo').textContent = kind === 'furnace' ? '上に焼く物、下に燃料（木・石炭など）を入れます' : kind === 'inv' && !creative ? '4マスに材料を並べるか、右の一覧から作れます' : kind === 'table' ? '9マスに材料を並べるか、右の一覧から作れます' : '';
+    $('scrInfo').textContent = kind === 'ench' ? '力をこめると レベルと「ひかりの粉」を使います（今のレベル ' + player.xpLv + '）' : kind === 'furnace' ? '上に焼く物、下に燃料（木・石炭など）を入れます' : kind === 'inv' && !creative ? '4マスに材料を並べるか、右の一覧から作れます' : kind === 'table' ? '9マスに材料を並べるか、右の一覧から作れます' : '';
     this.recipe = null;
     $('screen').classList.add('on'); $('app').classList.add('uiopen');
     this.refresh();
@@ -518,6 +544,7 @@ const ui = {
     if (!this.screen) return;
     if (this.screen === 'map') { map.closeMap(silent); return; }
     if (this.screen === 'sign') { this.closeSign(false, silent); return; }
+    if (this.enchS) { for (const s of this.enchS) if (s) { const left = player.give(s.id, s.n, s.d); if (left) spawnDrop(player.x, player.eyeY() - 0.3, player.z, s.id, left, s.d); } this.enchS = null; }
     for (let i = 0; i < this.craft.length; i++) { const s = this.craft[i]; if (s) { const left = player.give(s.id, s.n, s.d); if (left) spawnDrop(player.x, player.eyeY() - 0.3, player.z, s.id, left, s.d); this.craft[i] = null; } }
     this.craft = [];
     if (player.cursor) { const s = player.cursor; const left = player.give(s.id, s.n, s.d); if (left) this.dropStack({ id: s.id, n: left, d: s.d }); player.cursor = null; }
@@ -534,7 +561,11 @@ const ui = {
   refresh() {
     if (!this.screen) return;
     if (this.craft.length) this.recipe = matchGrid(this.craft, this.craftW);
-    for (const r of this.slots) this.paintSlot(r.el, this.getS(r));
+    if (this.screen === 'ench') this.paintEnch();
+    for (const r of this.slots) {
+      const q = this.getS(r); this.paintSlot(r.el, q);
+      if (r.t === 'armor') { r.el.classList.toggle('ghost', !q); if (!q) r.el.querySelector('i').style.backgroundImage = 'url(' + ICON_URL[r.i === 4 ? I.shield : I['iron_' + ARMOR_TYPES[r.i][0]]] + ')'; }   // 空の防具のマスには「ここに何を入れるか」の うすい絵
+    }
     const c = $('cursorItem'), s = player.cursor;
     if (s && this.slots[0] && this.slots[0].el) c.style.setProperty('--s', this.slots[0].el.offsetWidth + 'px');   // つかんだ物の大きさを マスに合わせる
     if (s) { c.style.display = 'block'; c.firstChild.style.backgroundImage = 'url(' + ICON_URL[s.id] + ')'; c.lastChild.textContent = s.n > 1 ? s.n : ''; if (this._cx !== undefined) this.moveCursor(this._cx, this._cy); $('scrInfo').textContent = '持っている物：' + itemName(s.id) + (s.n > 1 ? ' ×' + s.n : ''); }
@@ -545,6 +576,7 @@ const ui = {
     if (r.t === 'result' || r.t === 'fout' || r.t === 'pal') return false;
     if (r.t === 'armor') return !!ITEMS[s.id].armor && ITEMS[s.id].armor.slot === r.i;
     if (r.t === 'ffuel') return !!FUEL[s.id];
+    if (r.t === 'ench') return r.i === 0 ? !!enchKind(s.id) : s.id === I.glow_dust;
     return true;
   },
   slotClick(idx, btn, shift) {
@@ -563,9 +595,9 @@ const ui = {
       if (!s) return;
       if (btn === 2 && s.n > 1) { const k = Math.ceil(s.n / 2); player.cursor = { id: s.id, n: k, d: s.d }; s.n -= k; }
       else { player.cursor = s; this.setS(r, null); }
-      if (r.t === 'fout') game.onStat('smelt', s.id);
+      if (r.t === 'fout') { game.onStat('smelt', s.id); player.smeltXp(s.id, player.cursor.n); }
     } else if (r.t === 'fout') {
-      if (s && s.id === cur.id && !s.d && cur.n + s.n <= maxStack(s.id)) { cur.n += s.n; this.setS(r, null); game.onStat('smelt', s.id); }
+      if (s && s.id === cur.id && !s.d && cur.n + s.n <= maxStack(s.id)) { cur.n += s.n; this.setS(r, null); game.onStat('smelt', s.id); player.smeltXp(s.id, s.n); }
       else { sfx('deny', 0.4); return; }
     } else if (!this.canPut(r, cur)) { sfx('deny', 0.4); return; }
     else {
@@ -596,9 +628,40 @@ const ui = {
         else if (r.i < 9) putArr(player.inv, 9, 36); else putArr(player.inv, 0, 9);
       } else if (def.armor && !player.armor[def.armor.slot]) { player.armor[def.armor.slot] = { id: s.id, n: 1, d: s.d }; s.n--; sfx('equip', 0.5); game.onStat('armor', 0); }
       else if (r.i < 9) putArr(player.inv, 9, 36); else putArr(player.inv, 0, 9);
-    } else { if (r.t === 'fout') game.onStat('smelt', s.id); s.n = player.give(s.id, s.n, s.d); }
+    } else { const n0 = s.n; s.n = player.give(s.id, s.n, s.d); if (r.t === 'fout') { game.onStat('smelt', s.id); player.smeltXp(s.id, n0 - s.n); } }
     if (s.n <= 0) this.setS(r, null);
     sfx('click', 0.35); this.refresh();
+  },
+  // 持ち物の画面の まん中に出す 自分の姿（前から見た絵。生き物の絵の画像から 体の前の面だけを ならべる）
+  paintDoll(cv) {
+    const src = MOB_CV, m = MODELS.pl0; if (!src || !m) return;
+    const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.clearRect(0, 0, 16, 32);
+    const P = { head: [4, 0], body: [4, 8], arm0: [12, 8], arm1: [0, 8], leg0: [8, 20], leg1: [4, 20] };
+    for (const p of m) { const d = P[p.id]; if (!d) continue; const uv = p.uv[5]; c.drawImage(src, uv[0], uv[1], uv[2], uv[3], d[0], d[1], uv[2], uv[3]); }
+  },
+  // ちからの台：えらべる力を3つ ならべる（1つ目の名前だけ見える。レベルと粉が足りないものは おせない）
+  paintEnch() {
+    const box = $('enchOpts'); if (!box || !this.enchS) return;
+    const it = this.enchS[0], dust = this.enchS[1], nd = dust ? dust.n : 0; let h = '';
+    if (!it) h = '<div class="dim">左のマスに 道具・武器・防具、右のマスに「ひかりの粉」を置こう</div>';
+    else if (enchAny(it.d)) h = '<div class="dim">これには もう力が こもっている：' + esc(enchList(it.id, it.d).join('・')) + '</div>';
+    else for (let t = 0; t < 3; t++) {
+      const names = enchList(it.id, enchRoll(it.id, t, player.enchSeed)), lvOk = player.mode === 1 || player.xpLv >= ENCH_NEED[t], ok = lvOk && nd >= t + 1;
+      h += '<button type="button" class="btn enchb" data-t="' + t + '"' + (ok ? '' : ' disabled') + '><span>' + esc(names[0] || '') + (names.length > 1 ? ' ほか' : '') + '</span><small>' + (lvOk ? '' : 'レベル' + ENCH_NEED[t] + 'から ／ ') + (t + 1) + 'レベルと 粉' + (t + 1) + 'こ</small></button>';
+    }
+    if (box._h !== h) { box.innerHTML = h; box._h = h; }
+    $('scrInfo').textContent = '力をこめると レベルと「ひかりの粉」を使います（今のレベル ' + player.xpLv + '）';
+  },
+  doEnch(t) {
+    const it = this.enchS && this.enchS[0], dust = this.enchS && this.enchS[1];
+    if (!it || enchAny(it.d) || !dust || dust.n < t + 1 || (player.mode !== 1 && player.xpLv < ENCH_NEED[t])) { sfx('deny', 0.4); return; }
+    const d = enchRoll(it.id, t, player.enchSeed); if (!d) { sfx('deny', 0.4); return; }
+    player.spendLevels(t + 1); dust.n -= t + 1; if (dust.n <= 0) this.enchS[1] = null;
+    it.d = itemDmg(it.d) | d; player.enchSeed = (Math.random() * 0x7fffffff) | 0;
+    sfx('enchant'); this.toast('力が こもった！ ' + enchList(it.id, it.d).join('・'), 4); game.onStat('ench', 0);
+    const p = this.enchPos; if (p) for (let i = 0; i < 3; i++) fxPuff(p.x + 0.5, p.y + 1.2 + i * 0.3, p.z + 0.5, 12, 0.6, 0.95, 0.9, { glow: true, speed: 1.6, life: 1.0, size: 0.07, up: 1.2, grav: 0, spread: 0.5 });
+    const el = this.slots.find(r => r.t === 'ench' && r.i === 0); if (el && el.el) { el.el.classList.remove('flash'); void el.el.offsetWidth; el.el.classList.add('flash'); }
+    this.refresh();
   },
   consumeGrid() { for (let i = 0; i < this.craft.length; i++) { const s = this.craft[i]; if (s) { s.n--; if (s.n <= 0) this.craft[i] = null; } } },
   takeResult(shift) {
@@ -679,7 +742,7 @@ const ui = {
       if (hot >= 0) player.sel = hot;
       else if (c === K.drop) { const s = player.held(); if (s && !player.dead) { this.dropStack({ id: s.id, n: 1, d: s.d }); if (player.mode === 0) { s.n--; if (s.n <= 0) player.inv[player.sel] = null; } player.invDirty = true; } }
       else if (c === K.jump) { const now = performance.now(); if (now - lastJumpTap < 300) player.toggleFly(); lastJumpTap = now; }
-      else if (c === K.fwd) { const now = performance.now(); if (settings.sprintTap && now - lastWTap < 280) sprintLatch = true; lastWTap = now; }
+      else if (c === K.fwd) { const now = performance.now(); if (settings.sprintTap && now - lastWTap < 340) sprintLatch = true; lastWTap = now; }
       else if (c === K.sneak) { if (settings.sneakToggle) sneakLatch = !sneakLatch; }
       else if (c === K.view) { settings.view = (settings.view + 1) % 3; saveSettings(); this.toast(['自分の目から見ます', 'うしろから見ます', '前から見ます'][settings.view], 2); }
       else if (c === K.map) map.toggle();
@@ -816,6 +879,13 @@ function howtoHtml() {
 <dd>矢は 火打ち石・棒・羽根で4本。ブロックにささった矢は 少しすると落ちて、ひろえます</dd>
 <dd>盾は 持ち物の「盾」のマスに入れます。「使う」をおしている間 かまえて、前から来た こうげき・矢・ばくはつを ふせぎます（歩くのは おそくなります）</dd>
 <dd>夜の敵：ユミカゲ（矢をうつ）、バクダケ（そばで ふくらんで はじける。はなれると しぼむ）、イトハキ（糸で足をおそくする。糸を落とす）</dd>
+<dt>経験値と ちからの台</dt>
+<dd>敵をたおす・鉱石をほる・かまどで焼く・動物をふやす と、緑の玉（経験値）が出ます。ひろうと 手もとの上の 緑のバーがのびて、レベルが上がります</dd>
+<dd>「ちからの台」（黒曜石4・ダイヤ2・ひかりの粉1）に、道具・武器・防具と「ひかりの粉」を置くと、力をこめられます（するどさ・はやほり・まもり など）。強い力ほど 高いレベルがいります</dd>
+<dd>力つきると、レベルは0にもどり、経験値の一部が その場に落ちます</dd>
+<dt>くすり</dt>
+<dd>ガラス3こで「ガラスびん」。水に使うと「水入りびん」になります。水入りびん＋ホムラの粉＋材料で くすりができます（作業台なら 3本まとめて）</dd>
+<dd>スイカ＝いやし、ひかりの粉＝さいせい、羽根＝はやあし、カゲのかけら＝ちから、マグマ石＝ひよけ、ニンジン＝よめ（暗い所が見える）。食べ物と同じように のみます</dd>
 <dt>べつの世界</dt>
 <dd>黒曜石で四角いわく（内がわが よこ2×たて3以上）を作り、内がわに「火打ち金」を使うと「ホムラの門」がひらきます。中にしばらく立つと「ホムラの底」へ</dd>
 <dd>ホムラの底の1ブロックは、もとの世界の8ブロックぶん。力つきると、もとの世界の復活地点にもどります</dd>

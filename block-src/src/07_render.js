@@ -334,7 +334,7 @@ function boxVisible(pl, x0, y0, z0, x1, y1, z1) {
 
 function lerp3(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
 function updateSky(world) {
-  const sk0 = R.sky, mb = R.minBase === undefined ? 0.045 : R.minBase; R.minLight = mb; R.dim = world.dim | 0;
+  const sk0 = R.sky, mb = Math.max(R.minBase === undefined ? 0.045 : R.minBase, player.fx.night > 0 ? 0.55 * Math.min(1, player.fx.night / 60) : 0); R.minLight = mb;   // 「よめの くすり」の間は 暗い所も明るい R.dim = world.dim | 0;
   if (world.dim === 1) {   // ホムラの底：空はなく、赤黒いもや
     sk0.day = 0; sk0.night = 0; sk0.zen = sk0.hor = sk0.fog = [0.27, 0.065, 0.04]; sk0.light = [0.3, 0.3, 0.3]; sk0.sun = [0, -1, 0]; sk0.glow = [0, 0, 0]; R.minLight = mb + 0.27; return;
   }

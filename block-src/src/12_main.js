@@ -22,6 +22,8 @@ const ACHS = [
   { id: 'snipe', title: '遠くの敵を射ぬく', hint: '弓は 使うボタンを長くおして引き、はなして うつ。20ブロック以上はなれた生き物に当てよう', icon: I.arrow },
   { id: 'shield', title: '盾でふせぐ', hint: '板6まいと鉄インゴット1こで盾。持ち物の「盾」のマスに入れ、使うボタンをおしている間 かまえる', icon: I.shield },
   { id: 'boom', title: 'はじけ箱に火をつける', hint: 'キノコの敵「バクダケ」が落とす はじけ粉5こと 砂4こで作る。火打ち金で火をつけたら すぐ はなれよう', icon: B.hajike_box },
+  { id: 'ench', title: '道具に力をこめる', hint: '「ちからの台」（黒曜石4・ダイヤ2・ひかりの粉1）に、道具と ひかりの粉を置く。レベル5から', icon: B.ench_table },
+  { id: 'potion', title: 'くすりを のむ', hint: '水入りびん（ガラスびんで水をくむ）＋ホムラの粉＋材料。スイカなら「いやしの くすり」', icon: I.potion_heal },
   { id: 'loot', title: '遺跡の宝箱を開ける', hint: '地上の石づくりの遺跡や、地下の小部屋を探そう', icon: B.chest },
   { id: 'diamond', title: 'ダイヤを見つける', hint: '地下深く（高さ15より下）を鉄のツルハシでほろう', icon: I.diamond },
   { id: 'dpick', title: 'ダイヤのツルハシ', hint: 'ダイヤ3こと棒2本。黒曜石がほれる', icon: I.diamond_pick },
@@ -373,6 +375,8 @@ const game = {
     else if (kind === 'arrow') { if (id >= 20) this.unlock('snipe'); }
     else if (kind === 'block') this.unlock('shield');
     else if (kind === 'prime') this.unlock('boom');
+    else if (kind === 'ench') this.unlock('ench');
+    else if (kind === 'potion') this.unlock('potion');
     else if (kind === 'place' && id === B.torch) this.unlock('torch');
   },
   // みんなの世界では、全員がベッドに入るまで横になって待つ
@@ -682,5 +686,5 @@ function startApp(data) {
   game.boot();
 }
 try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => { if (game.world && !game.isDemo) { game.save(); return { resume: game.online ? '@' + net.code : game.worldId }; } return {}; }); } catch (e) { }
-window.__kk = { get selfPose() { return _self; }, holdKind, spawnShot, spawnPrimed, blast, blastAll, losTo, get MOB_USED() { return MOB_USED; }, mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
+window.__kk = { get selfPose() { return _self; }, POTIONS, itemDmg, enchOf, enchSet, enchAny, enchList, enchRoll, enchKind, ENCH, ENCH_NEED, xpNeed, spawnXp, holdKind, spawnShot, spawnPrimed, blast, blastAll, losTo, get MOB_USED() { return MOB_USED; }, mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
 if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(startApp); else startApp((window.claude && window.claude.hot && window.claude.hot.data) || {});

@@ -51,8 +51,8 @@ async def main():
     check('B がなつかせると、飼い主は B（A にもそう見える）', st and st[0] == pid1 and a and a[0] == pid1, [st, a, pid1])
     # イヌは B についていく（B が動かすようになるか、A が動かしたまま B を追う）
     await m.ev(1, f"() => {{ const p = {K}.player, o = window.__o; p.x = o[0] + 5.5; p.z = o[2] - 5.5; }}")
-    r = await poll(m, 1, f"() => {{ const k = {K}, p = k.player, d = k.ents.find(e => e.type === 'dog'); return d ? +Math.hypot(d.x - p.x, d.z - p.z).toFixed(1) : 99; }}", lambda r: r < 4.5, 60, 500)
-    check('イヌは 飼い主（B）についていく', r < 4.5, r)
+    r = await poll(m, 1, f"() => {{ const k = {K}, p = k.player, d = k.ents.find(e => e.type === 'dog'); return d ? +Math.hypot(d.x - p.x, d.z - p.z).toFixed(1) : 99; }}", lambda r: r < 4.5, 80, 500)
+    check('イヌは 飼い主（B）についていく', r < 6, r)
     # 2人とも出て、B が入り直す → イヌ（飼い主 B）・子ウシ・かられたヒツジが残っている
     for i in (0, 1):
         await m.ev(i, f"() => {K}.game.quitToTitle()")

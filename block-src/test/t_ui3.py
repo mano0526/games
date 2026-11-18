@@ -16,8 +16,9 @@ async def run(tag, w, h, touch, want):
     await s.ev(f"() => {{ const k = {K}, p = k.player, I = k.I, B = k.B; p.inv[0] = {{ id: I.iron_pick, n: 1, d: 0 }}; p.inv[9] = {{ id: B.cobble, n: 64, d: 0 }}; p.invDirty = true; k.ui.open('inv'); }}")
     await s.wait(300); m = await s.ev(M)
     check(f'{tag} 持ち物：マスが大きい・画面におさまる', m['s'] >= want[0] and not m['over'] and m['out'] == 0, m)
-    r = await s.ev(f"() => {{ const k = {K}; return [k.ui.slots.filter(r => r.t === 'armor').map(r => r.i), document.querySelectorAll('#scrTop .g2').length, document.querySelectorAll('#scrTop .g1').length]; }}")
-    check(f'{tag} 防具4つ＋盾のマス', r[0] == [0, 1, 2, 3, 4] and r[1] == 2 and r[2] == 2, r)
+    r = await s.ev(f"() => {{ const k = {K}; const d = document.querySelector('#scrTop .doll'), c = getComputedStyle(document.querySelector('#screen .panel')).backgroundColor.match(/\\d+/g).map(Number); return [k.ui.slots.filter(r => r.t === 'armor').map(r => r.i), document.querySelectorAll('#scrTop .eqBox .slot.ghost').length, !!d && d.getBoundingClientRect().height > 60, Math.min(c[0], c[1], c[2]) > 215]; }}")
+    check(f'{tag} 防具4つ＋盾のマス（空のマスに うすい絵）。板は白っぽい色', r[0] == [0, 1, 2, 3, 4] and r[1] == 5 and r[3], r)
+    if tag in ('PC', 'たて'): check(f'{tag} まん中に 自分の姿', r[2], r)
     # つかんだ物の大きさが マスと同じ
     r = await s.ev(f"() => {{ const k = {K}, p = k.player; p.cursor = {{ id: k.I.stick, n: 3, d: 0 }}; k.ui.refresh(); const c = document.getElementById('cursorItem'); const w = c.getBoundingClientRect().width; p.cursor = null; k.ui.refresh(); return Math.round(w); }}")
     check(f'{tag} つかんだ物も 同じ大きさ', abs(r - m['s']) <= 1, [r, m['s']])
@@ -38,7 +39,7 @@ async def run(tag, w, h, touch, want):
     check(f'{tag} エラーなし', len(errs) == 0, errs[:4])
     await s.close()
 async def main():
-    await run('PC', 1280, 720, False, (68, 62, 62))
+    await run('PC', 1280, 720, False, (54, 58, 54))
     await run('スマホ横', 844, 390, True, (44, 39, 45))
     await run('小さいスマホ横', 667, 375, True, (41, 37, 34))
     await run('たて', 390, 844, True, (38, 38, 38))

@@ -261,7 +261,7 @@ const net = {
       p.buf.push({ t: now, x: P[0], y: P[1], z: P[2], yaw: P[3], pitch: P[4] });
       if (p.buf.length > 12) p.buf.shift();
       if (p.y < -900) { p.x = P[0]; p.y = P[1]; p.z = P[2]; p.yaw = P[3]; }
-      p.held = P[5] | 0; p.flags = P[6] | 0; p.sneaking = !!(p.flags & 1); p.sleeping = !!(p.flags & 2); p.dead = !!(p.flags & 4); p.mode = (p.flags & 16) ? 1 : 0; p.eating = !!(p.flags & 32); p.blocking = !!(p.flags & 64); p.shield = !!(p.flags & 128);
+      p.held = P[5] | 0; p.flags = P[6] | 0; p.sneaking = !!(p.flags & 1); p.sleeping = !!(p.flags & 2); p.dead = !!(p.flags & 4); p.mode = (p.flags & 16) ? 1 : 0; p.eating = !!(p.flags & 32); p.blocking = !!(p.flags & 64); p.shield = !!(p.flags & 128); p.sprinting = !!(p.flags & 512);
       if (p.swingN !== P[7]) { if (p.swingN >= 0) p.swingT = 1; p.swingN = P[7]; }
       p.open = P[8] || 0; p.dim = P[9] | 0;
     }
@@ -280,6 +280,7 @@ const net = {
       p.yaw = lerpAngle(a.yaw, c.yaw, k); p.pitch = a.pitch + (c.pitch - a.pitch) * k;
       const moved = Math.hypot(p.x - ox, p.z - oz);
       if (moved < 3) { p.walk += moved * 2.4; p.walkAmp += (Math.min(1, moved / Math.max(dt, 0.001) / 3.5) - p.walkAmp) * Math.min(1, dt * 10); }
+      p.swim = (p.swim || 0) + (((p.flags & 256) && p.walkAmp > 0.2 ? 1 : 0) - (p.swim || 0)) * Math.min(1, dt * 7);   // 水の中を動いている → 泳ぐ姿
       p.swingT = Math.max(0, p.swingT - dt * 3.4); if (p.hurtT > 0) p.hurtT -= dt;
     }
   },
@@ -340,7 +341,7 @@ const net = {
     this.accSt += dt; this.accIdle += dt; this.accEnt += dt; this.accFull += dt;
     if (this.accSt < 0.1) return;
     const p = player, h = p.held();
-    const fl = (p.sneaking ? 1 : 0) | (game.inBed ? 2 : 0) | (p.dead ? 4 : 0) | (p.flying ? 8 : 0) | (p.mode === 1 ? 16 : 0) | (p.eating > 0 ? 32 : 0) | (p.blocking ? 64 : 0) | (p.armor[4] ? 128 : 0);
+    const fl = (p.sneaking ? 1 : 0) | (game.inBed ? 2 : 0) | (p.dead ? 4 : 0) | (p.flying ? 8 : 0) | (p.mode === 1 ? 16 : 0) | (p.eating > 0 ? 32 : 0) | (p.blocking ? 64 : 0) | (p.armor[4] ? 128 : 0) | (p.inWater && !p.onGround && !p.flying ? 256 : 0) | (p.sprinting ? 512 : 0);
     const P = [r2(p.x), r2(p.y), r2(p.z), r2(p.yaw), r2(p.pitch), h ? (p.drawT > 0.55 ? I.bow_p2 : p.drawT > 0.02 ? I.bow_p1 : h.id) : 0, fl, this.swingN, ui.entPos ? posKey(ui.entPos.x, ui.entPos.y, ui.entPos.z) : 0, this.world.dim];
     const ps = P.join(',');
     let E = null, full = 0;

@@ -90,6 +90,11 @@ const audio = {
       return;
     }
     switch (name) {
+      case 'enchant': [523, 659, 784, 1047, 1319].forEach((f, i) => T(0.5, 'sine', f, f * 1.01, 0.14, 0.01, [6, 8], i * 0.07)); N(0.9, 'bandpass', 2500, 6000, 3, 0.12, 0.3); break;
+      case 'gulp': T(0.09, 'sine', 300, 180, 0.3); T(0.09, 'sine', 320, 190, 0.3, 0.004, null, 0.16); break;
+      case 'potion': T(0.5, 'sine', 660, 990, 0.16, 0.02, [9, 14]); T(0.5, 'sine', 990, 1480, 0.1, 0.05, [9, 14], 0.1); N(0.4, 'highpass', 4000, 7000, 1, 0.08, 0.05); break;
+      case 'xp': T(0.1, 'sine', (1100 + Math.random() * 500) * r, 1700 * r, 0.22, 0.003); break;
+      case 'levelup': [784, 988, 1175, 1568].forEach((f, i) => T(0.22, 'sine', f, f, 0.22, 0.004, null, i * 0.085)); T(0.5, 'triangle', 392, 392, 0.12, 0.01, null, 0.26); break;
       case 'pop': T(0.07, 'sine', 620 * r, 1250 * r, 0.3); break;
       case 'click': T(0.025, 'square', 760, 700, 0.12); break;
       case 'deny': T(0.09, 'square', 170, 150, 0.16); break;

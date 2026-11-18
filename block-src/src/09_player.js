@@ -15,6 +15,8 @@ class Player {
     this.target = null; this.targetMob = null; this.ray = [0, 0, -1]; this.eyeOff = 1.62; this.invDirty = true; this.deathPos = null; this.lastSel = -1;
     this.stats = { broken: 0, placed: 0, kills: 0, deaths: 0, crafted: 0, dist: 0 };
     this.burnT = 0; this.gateT = 0; this.gateWait = false;   // 火がついている残り時間／門の中にいる時間／門から出るまで待つ
+    this.fx = { regen: 0, speed: 0, str: 0, fire: 0, night: 0 };   // くすりの効き目の のこり（20＝1秒）
+    this.xpLv = 0; this.xpPt = 0; this.enchSeed = (Math.random() * 0x7fffffff) | 0;   // 経験値：レベルと、そのレベルの中で ためた数
     this.drawT = 0; this.autoBow = 0; this.blocking = false; this.blockK = 0; this.noBlockT = 0; this.webT = 0; this.noArrowT = 0;   // 弓を引いている時間／タップで自動で引く残り／盾をかまえているか／糸にからまっている残り
   }
   eyeY() { return this.y + this.eyeOff; }
@@ -25,6 +27,7 @@ class Player {
 
   // ---- 持ち物 ----
   give(id, n, d) {
+    if (id === I.xp_orb) { this.addXp(n); return 0; }
     const max = maxStack(id);
     if (max > 1 && !d) for (let i = 0; i < 36 && n > 0; i++) { const s = this.inv[i]; if (s && s.id === id && s.n < max && !s.d) { const k = Math.min(n, max - s.n); s.n += k; n -= k; } }
     for (let i = 0; i < 36 && n > 0; i++) if (!this.inv[i]) { const k = Math.min(n, max); this.inv[i] = { id, n: k, d: d || 0 }; n -= k; }
@@ -32,6 +35,7 @@ class Player {
     return n;
   }
   canTake(id, d) {
+    if (id === I.xp_orb) return true;
     const max = maxStack(id);
     for (let i = 0; i < 36; i++) { const s = this.inv[i]; if (!s) return true; if (max > 1 && !d && s.id === id && s.n < max && !s.d) return true; }
     return false;
@@ -45,9 +49,20 @@ class Player {
   wearHeld(n) {
     if (this.mode === 1) return;
     const s = this.inv[this.sel]; if (!s) return; const t = ITEMS[s.id].tool; if (!t) return;
+    const un = unbrLv(s.id, s.d); if (un && Math.random() < un / (un + 1)) return;   // 「じょうぶ」
     s.d += n; this.invDirty = true;
-    if (s.d >= t.dur) { this.inv[this.sel] = null; sfx('toolbreak'); ui.toast(itemName(s.id) + ' がこわれた'); fxPuff(this.x - Math.sin(this.yaw) * 0.6, this.eyeY() - 0.3, this.z - Math.cos(this.yaw) * 0.6, 8, 0.6, 0.5, 0.35, { speed: 2, life: 0.5, grav: 12 }); }
+    if (itemDmg(s.d) >= t.dur) { this.inv[this.sel] = null; sfx('toolbreak'); ui.toast(itemName(s.id) + ' がこわれた'); fxPuff(this.x - Math.sin(this.yaw) * 0.6, this.eyeY() - 0.3, this.z - Math.cos(this.yaw) * 0.6, 8, 0.6, 0.5, 0.35, { speed: 2, life: 0.5, grav: 12 }); }
   }
+  // 経験値をもらう。レベルが上がったら 音と表示
+  addXp(n) {
+    if (!(n > 0)) return;
+    this.xpPt += n; let up = false;
+    while (this.xpPt >= xpNeed(this.xpLv)) { this.xpPt -= xpNeed(this.xpLv); this.xpLv++; up = true; }
+    if (up) { sfx('levelup', 0.7); ui.levelFx(this.xpLv); } else sfx('xp', 0.45);
+  }
+  // レベルを使う（足りなければ false）
+  spendLevels(k) { if (this.mode === 1) return true; if (this.xpLv < k) return false; this.xpLv -= k; this.xpPt = Math.min(this.xpPt, xpNeed(this.xpLv) - 1); return true; }
+  smeltXp(id, n) { const x = n * (XP_SMELT[id] || 0.1), w = Math.floor(x) + (Math.random() < x - Math.floor(x) ? 1 : 0); if (w > 0) this.addXp(w); }
   armorPoints() { let p = 0; for (const a of this.armor) if (a) p += ITEMS[a.id].armor.def; return p; }
   swing() { this.swingT = 1; if (net.on) net.swingN = (net.swingN + 1) & 255; }
 
@@ -63,6 +78,7 @@ class Player {
     while (rem > 1e-5) { const st = Math.min(rem, 1 / 60); this.physics(world, st); rem -= st; }
     this.interact(world, dt);
     input.usePressed = input.breakPressed = false;
+    this.sprintK = (this.sprintK || 0) + ((this.sprinting ? 1 : 0) - (this.sprintK || 0)) * Math.min(1, dt * 8);   // 走り出すと 画面が なめらかに広がる
     const want = this.sneaking ? 1.47 : 1.62; this.eyeOff += (want - this.eyeOff) * Math.min(1, dt * 14);
     if (this.stepLift) { this.stepLift -= Math.max(this.stepLift * dt * 16, dt * 1.2); if (this.stepLift < 0.004) this.stepLift = 0; }
   }
@@ -88,7 +104,7 @@ class Player {
     if (f <= 0.1 || this.sneaking || (this.mode === 0 && this.food <= 6)) this.sprinting = false;
     let speed = this.flying ? (this.sprinting ? 21 : 10.5) : this.sneaking ? 1.3 : this.sprinting ? 5.6 : 4.3;
     if (this.onGround && !this.flying) { const ub = BLOCKS[world.getBlock(fx, Math.floor(this.y - 0.2), fz)]; if (ub && ub.slow) speed *= 0.45; }
-    if (!this.flying) { if (this.webT > 0) speed *= 0.4; if (this.blocking || this.drawT > 0) { speed *= 0.45; this.sprinting = false; } }   // 糸にからまった／盾をかまえている／弓を引いている
+    if (!this.flying) { if (this.fx.speed > 0) speed *= 1.25; if (this.webT > 0) speed *= 0.4; if (this.blocking || this.drawT > 0) { speed *= 0.45; this.sprinting = false; } }   // 糸にからまった／盾をかまえている／弓を引いている
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     const wx = (-sy * f + cy * s) * speed, wz = (-cy * f - sy * s) * speed;
     this.jumpCd -= dt;
@@ -110,7 +126,8 @@ class Player {
       const k = this.onGround ? 1 - Math.exp(-14 * dt) : 1 - Math.exp(-2.4 * dt);
       if (this.onGround || l > 0.05) { this.vx += (wx - this.vx) * k; this.vz += (wz - this.vz) * k; }
       this.vy = Math.max(this.vy - 30 * dt, -60);
-      if (jump && this.onGround && this.jumpCd <= 0) { this.vy = this.webT > 0 ? 5.6 : 8.7; this.jumpCd = 0.08; this.exh += this.sprinting ? 0.2 : 0.05; this.onGround = false; }
+      if (jump && this.onGround && this.jumpCd <= 0) { this.vy = this.webT > 0 ? 5.6 : 8.7; this.jumpCd = 0.08; if (this.sprinting && f > 0.5) { this.vx += -sy * 1.7; this.vz += -cy * 1.7; }   // 走りジャンプは 前へ のびる（本家と同じ）
+        this.exh += this.sprinting ? 0.2 : 0.05; this.onGround = false; }
     }
     let dx = this.vx * dt, dz = this.vz * dt; const dy = this.vy * dt;
     if (this.sneaking && this.onGround && dy <= 0) {
@@ -126,7 +143,7 @@ class Player {
     else if (this.y < oy) this.fallDist += oy - this.y;
     if (this.onGround) {
       if (this.flying) this.flying = false;
-      if (this.fallDist > 3.4 && this.mode === 0) { const dmg = Math.floor(this.fallDist - 3); if (dmg > 0) this.damage(dmg, this.x, this.z, 0, '落下', true); }
+      if (this.fallDist > 3.4 && this.mode === 0) { const bt = this.armor[3], dmg = Math.floor((this.fallDist - 3) * (1 - (bt ? enchOf(bt.d, 2) * 0.15 : 0))); if (dmg > 0) this.damage(dmg, this.x, this.z, 0, '落下', true); }
       if (this.fallDist > 0.7 && !wasG) { const below = world.getBlock(fx, Math.floor(this.y - 0.2), fz); if (below) sfx('step_' + BLOCKS[below].sound, 0.6); }
       this.fallDist = 0;
     }
@@ -203,9 +220,10 @@ class Player {
         this.food = Math.min(20, this.food + def.food[0]); this.sat = Math.min(20, this.sat + def.food[1]);
         if (def.heal) this.hp = Math.min(20, this.hp + def.heal);
         if (def.drink) this.burnT = 0;
+        if (def.potion) this.applyPotion(def.potion);
         const id = it.id; this.useHeldOne();
         if (def.leftover && this.mode === 0) { if (!this.inv[this.sel]) this.inv[this.sel] = { id: def.leftover, n: 1, d: 0 }; else if (this.give(def.leftover, 1, 0)) spawnDrop(this.x, this.y + 1, this.z, def.leftover, 1, 0); }
-        sfx('burp'); ui.bumpFood(); this.stat('eat', id); this.invDirty = true;
+        sfx(def.drink ? 'gulp' : 'burp'); ui.bumpFood(); this.stat('eat', id); this.invDirty = true;
       }
     } else {
       this.eating = 0;
@@ -219,7 +237,9 @@ class Player {
   // 矢をはなつ。t＝引いた秒数（1秒でいっぱい）
   shootBow(t) {
     const pw = Math.min(1, t), k = pw * pw * 0.6 + pw * 0.4, sp = 14 + 36 * k, dmg = Math.max(1, Math.round(2 + 7 * k)), r = this.ray;
-    const s = spawnShot(this.x + r[0] * 0.4, this.eyeY() - 0.1 + r[1] * 0.4, this.z + r[2] * 0.4, r[0] * sp, r[1] * sp + 1.2, r[2] * sp, dmg, 6);
+    const bd = this.held() ? this.held().d : 0, ep = enchOf(bd, 0);   // 「つよ弓」「火の矢」
+    const s = spawnShot(this.x + r[0] * 0.4, this.eyeY() - 0.1 + r[1] * 0.4, this.z + r[2] * 0.4, r[0] * sp, r[1] * sp + 1.2, r[2] * sp, ep ? Math.round(dmg * (1 + 0.25 * (ep + 1))) : dmg, 6);
+    s.flame = enchOf(bd, 1);
     s.ox = this.x; s.oz = this.z; s.noPick = this.mode === 1; netShot(s);
     if (this.mode !== 1) this.consumeSpec(I.arrow, 1);
     this.wearHeld(1); this.swing(); sfx('bowshot'); this.exh += 0.05; this.stat('shoot', dmg);
@@ -229,7 +249,8 @@ class Player {
     if (b.hard < 0) return Infinity; if (b.hard === 0) return 0;
     const tool = this.heldTool(), match = !!tool && tool.type === b.tool;
     const can = !b.needTool || (match && tool.tier >= b.level);
-    let t = b.hard * (can ? 1.5 : 5) / (match ? tool.speed : 1);
+    const ef = match && enchKind(this.held().id) === 'tool' ? enchOf(this.held().d, 0) : 0;   // 「はやほり」
+    let t = b.hard * (can ? 1.5 : 5) / (match ? tool.speed + (ef ? ef * ef + 1 : 0) : 1);
     if (this.headIn === 1) t *= 3;
     if (!this.onGround && !this.flying) t *= 2;
     return t;
@@ -260,6 +281,9 @@ class Player {
       const toWater = id === B.ice && (SOLID[world.getBlock(t.x, t.y - 1, t.z)] || FLUID[world.getBlock(t.x, t.y - 1, t.z)]);
       world.setBlock(t.x, t.y, t.z, toWater ? B.water : 0, 0);
       for (const [did, n] of drops) spawnDrop(t.x + 0.5, t.y + 0.35, t.z + 0.5, did, n, 0);
+      const fo = tool && XP_ORE[id] && drops.length && drops[0][0] !== id && enchKind(this.held().id) === 'tool' ? enchOf(this.held().d, 2) : 0;   // 「ほりあて」：鉱石から 多く出る
+      if (fo) { const ex = Math.max(0, rnd(fo + 2) - 1) * drops[0][1]; if (ex > 0) spawnDrop(t.x + 0.5, t.y + 0.35, t.z + 0.5, drops[0][0], ex, 0); }
+      const xo = XP_ORE[id]; if (xo && drops.length && drops[0][0] !== id) spawnXp(t.x + 0.5, t.y + 0.35, t.z + 0.5, xo[0] + rnd(xo[1] - xo[0] + 1));   // 鉱石をほると 経験値
       if (tool && b.hard > 0 && tool.type !== 'lighter') this.wearHeld(tool.type === 'sword' ? 2 : 1);
       this.exh += 0.005;
     } else world.setBlock(t.x, t.y, t.z, 0, 0);
@@ -269,11 +293,16 @@ class Player {
   attack(e) {
     if (e.type === 'dog' && e.tamer === meId()) { this.swing(); this.cool = 0.32; return; }   // 自分のイヌは たたけない
     const tool = this.heldTool(); let dmg = tool ? tool.dmg : 1;
+    const ed = tool && tool.type === 'sword' ? this.held().d : 0, sharp = enchOf(ed, 0);   // 剣に こめた力
+    if (sharp) dmg += 0.5 * sharp + 0.5;
+    if (this.fx.str > 0) dmg += 3;   // 「ちからの くすり」
     const crit = this.vy < -0.5 && !this.onGround && !this.inWater && !this.flying;
     if (crit) dmg *= 1.5;
     if (this.mode === 1) dmg = Math.max(dmg, 12);
     this.swing(); this.cool = 0.32;
-    if (hurtMob(e, dmg, this.x, this.z, this.sprinting ? 8 : 5.5)) {
+    e.pk = 1;   // 人が たたいた（たおれた時に 経験値が出る）
+    e.hb = enchOf(ed, 1) * 60; e.hl = enchOf(ed, 3);
+    if (hurtMob(e, dmg, this.x, this.z, (this.sprinting ? 8 : 5.5) + enchOf(ed, 2) * 3)) {
       sfx('hit');
       if (crit) fxPuff(e.x, e.y + e.h * 0.7, e.z, 10, 1, 0.9, 0.3, { glow: true, speed: 3, life: 0.4, size: 0.06 });
       if (tool && tool.type !== 'lighter' && tool.type !== 'shears' && tool.type !== 'bow') this.wearHeld(tool.type === 'sword' ? 1 : 2);
@@ -311,6 +340,7 @@ class Player {
     if (!it) return false;
     if (def.tool && def.tool.type === 'lighter') return t ? this.useLighter(world, t) : false;
     if (def.bucket) return this.useBucket(world, it, def);
+    if (def.bottle) return this.useBottle(world, it);
     if (def.tool && def.tool.type === 'hoe' && t && (t.id === B.grass || t.id === B.dirt)) {
       const ab = world.getBlock(t.x, t.y + 1, t.z);
       if (ab === 0 || SHAPE[ab] === S_CROSS || ab === B.snow_layer) {
@@ -411,6 +441,26 @@ class Player {
     } else if (t.id === B.obsidian) ui.toast('黒曜石で 四角いわくを作ろう（内がわが よこ2×たて3 以上）。火打ち金は わくの内がわに使う', 7);
     return true;
   }
+  // ガラスびんで 水をくむ（水は へらない）
+  useBottle(world, it) {
+    const ex = this.x, ey = this.eyeY(), ez = this.z, r = this.ray, maxT = this.target ? this.target.t : 5;
+    for (let d = 0.2; d <= maxT + 0.05; d += 0.12) {
+      if (world.getBlock(Math.floor(ex + r[0] * d), Math.floor(ey + r[1] * d), Math.floor(ez + r[2] * d)) !== B.water) continue;
+      sfx('splash', 0.5); this.swing();
+      if (this.mode === 0) { it.n--; if (it.n <= 0) this.inv[this.sel] = null; }
+      if (this.give(I.water_bottle, 1, 0)) spawnDrop(this.x, this.y + 1, this.z, I.water_bottle, 1, 0);
+      this.invDirty = true; return true;
+    }
+    return false;
+  }
+  // くすりを のんだ
+  applyPotion(k) {
+    const P = POTIONS[k]; if (!P) return;
+    if (k === 'heal') { this.hp = Math.min(20, this.hp + 8); ui.bumpHearts(); } else this.fx[k] = Math.max(this.fx[k], P[2]);
+    if (k === 'fire') this.burnT = 0;
+    const c = C(P[1]); for (let i = 0; i < 16; i++) { const a = Math.random() * 6.283, rr = 0.5 + Math.random() * 0.25; fxPuff(this.x + Math.cos(a) * rr, this.y + 0.1 + Math.random() * 1.0, this.z + Math.sin(a) * rr, 1, c[0] / 255, c[1] / 255, c[2] / 255, { glow: true, speed: 0.3, life: 0.9, size: 0.045, up: 1, grav: 0 }); }   // 目の前に出すと 画面いっぱいに見えてしまうので、足もとのまわりに
+    sfx('potion', 0.7); ui.toast(P[0] + '：' + P[4], 4); this.stat('potion', k); ui.fxKey = '';
+  }
   useBucket(world, it, def) {
     const ex = this.x, ey = this.eyeY(), ez = this.z, r = this.ray, t = this.target;
     if (def.bucket === 'empty') {
@@ -446,6 +496,7 @@ class Player {
   interactBlock(world, t, kind) {
     if ((kind === 'furnace' || kind === 'chest') && net.on) { const p = net.openBy(t.x, t.y, t.z); if (p) { ui.toast(p.name + ' が使っています'); sfx('deny', 0.4); return; } }
     if (kind === 'table') { ui.open('table'); sfx('click'); }
+    else if (kind === 'ench') { ui.open('ench'); ui.enchPos = { x: t.x, y: t.y, z: t.z }; sfx('click'); }
     else if (kind === 'furnace') {
       let e = world.getEnt(t.x, t.y, t.z);
       if (!e) { e = { t: 'furnace', in: null, fuel: null, out: null, burn: 0, burnMax: 0, cook: 0 }; world.setEnt(t.x, t.y, t.z, e); }
@@ -488,6 +539,13 @@ class Player {
       if (this.headIn === 1) { this.air--; if (this.air <= -20) { this.air = 0; this.damage(2, this.x, this.z, 0, '水', true); } }
       else this.air = Math.min(300, this.air + 6);
       if (this.inLava && world.tick % 10 === 0) { this.damage(4, this.x, this.z, 0, '溶岩', true); this.burnT = Math.max(this.burnT, 60); }
+      for (const k in this.fx) if (this.fx[k] > 0) {   // くすりの効き目
+        this.fx[k]--;
+        if (k === 'regen' && this.fx[k] % 50 === 0 && this.hp < 20) { this.hp = Math.min(20, this.hp + 1); ui.bumpHearts(); }
+        if (world.tick % 8 === 0) { const c = C(POTIONS[k][1]), a = Math.random() * 6.283; fxPuff(this.x + Math.cos(a) * 0.55, this.y + 0.1 + Math.random() * 0.8, this.z + Math.sin(a) * 0.55, 1, c[0] / 255, c[1] / 255, c[2] / 255, { glow: true, speed: 0.1, life: 0.7, size: 0.035, up: 0.6, grav: 0 }); }
+        if (this.fx[k] === 0) { ui.toast(POTIONS[k][0] + 'の 効き目が きれた'); sfx('fizz', 0.3); }
+      }
+      if (this.fx.fire > 0) this.burnT = 0;
       if (this.webT > 0) { this.webT--; if (world.tick % 3 === 0) fxPuff(this.x + (Math.random() - 0.5) * 0.6, this.y + 0.2 + Math.random() * 1.3, this.z + (Math.random() - 0.5) * 0.6, 1, 0.95, 0.97, 0.92, { speed: 0.2, life: 0.5, size: 0.06, up: 0, grav: 0 }); }
       if (this.burnT > 0) {   // 火がついている：水に入ると消える
         if (this.inWater) { this.burnT = 0; sfx('fizz', 0.5); }
@@ -517,12 +575,13 @@ class Player {
   }
   damage(amount, fromX, fromZ, kb, source, raw) {
     if (this.dead || this.mode === 1 || amount <= 0) return;
+    if (this.fx.fire > 0 && (source === '溶岩' || source === '火' || source === 'マグマ石')) return;   // 「ひよけの くすり」
     if (this.hurtT > 0 && !raw) return;
     if (!raw && this.blocking && this.armor[4]) {   // 盾：前から来たものは ふせぐ（盾が すりへる）
       const dx = fromX - this.x, dz = fromZ - this.z, dl = Math.hypot(dx, dz);
       if (dl > 0.05 && (dx * -Math.sin(this.yaw) + dz * -Math.cos(this.yaw)) / dl > 0.1) {
-        const a = this.armor[4]; a.d = (a.d || 0) + 1 + Math.floor(amount); this.invDirty = true;
-        if (a.d >= ITEMS[a.id].armor.dur) { this.armor[4] = null; this.blocking = false; sfx('toolbreak'); ui.toast('盾 がこわれた'); }
+        const a = this.armor[4], un = unbrLv(a.id, a.d || 0); if (!(un && Math.random() < un / (un + 1))) a.d = (a.d || 0) + 1 + Math.floor(amount); this.invDirty = true;
+        if (itemDmg(a.d) >= ITEMS[a.id].armor.dur) { this.armor[4] = null; this.blocking = false; sfx('toolbreak'); ui.toast('盾 がこわれた'); }
         if (kb) { this.vx -= dx / dl * kb * 0.25; this.vz -= dz / dl * kb * 0.25; }
         this.hurtT = 5; sfx('shieldhit'); game.camKick = 0.4; this.stat('block', 0);
         fxPuff(this.x - Math.sin(this.yaw) * 0.6, this.eyeY() - 0.35, this.z - Math.cos(this.yaw) * 0.6, 7, 1, 0.9, 0.6, { glow: true, speed: 2.4, life: 0.25, size: 0.05, grav: 8 });
@@ -531,7 +590,9 @@ class Player {
     }
     if (!raw) {
       amount *= 1 - Math.min(20, this.armorPoints()) * 0.04;
-      for (let i = 0; i < 4; i++) { const a = this.armor[i]; if (a) { a.d = (a.d || 0) + 1; if (a.d >= ITEMS[a.id].armor.dur) { this.armor[i] = null; sfx('toolbreak'); ui.toast(itemName(a.id) + ' がこわれた'); } } }
+      let prot = 0; for (let i = 0; i < 4; i++) if (this.armor[i]) prot += enchOf(this.armor[i].d || 0, 0);   // 「まもり」：1レベルごとに 4% へる（64%まで）
+      amount *= 1 - Math.min(0.64, prot * 0.04);
+      for (let i = 0; i < 4; i++) { const a = this.armor[i]; if (a) { const un = unbrLv(a.id, a.d || 0); if (!(un && Math.random() < un / (un + 1))) a.d = (a.d || 0) + 1; if (itemDmg(a.d) >= ITEMS[a.id].armor.dur) { this.armor[i] = null; sfx('toolbreak'); ui.toast(itemName(a.id) + ' がこわれた'); } } }
       this.invDirty = true;
     }
     this.hp -= amount; this.hurtT = 10; this.exh += 0.1; if (game.inBed) game.wake();
@@ -540,13 +601,14 @@ class Player {
     if (this.hp <= 0) { this.hp = 0; this.die(source); }
   }
   die(source) {
-    this.dead = true; this.stats.deaths++; this.burnT = 0; this.gateT = 0; this.drawT = 0; this.autoBow = 0; this.blocking = false; this.webT = 0;
+    this.dead = true; this.stats.deaths++; this.burnT = 0; this.gateT = 0; this.drawT = 0; this.autoBow = 0; this.blocking = false; this.webT = 0; for (const k in this.fx) this.fx[k] = 0;
     this.deathPos = { x: Math.floor(this.x), y: Math.floor(this.y), z: Math.floor(this.z) };
     let dropped = false;
     if (!game.rules.keep) {
       const all = this.inv.concat(this.armor);
       for (const s of all) if (s) { const e = spawnDrop(this.x, this.y + 0.6, this.z, s.id, s.n, s.d || 0, (Math.random() - 0.5) * 4, 3 + Math.random() * 2, (Math.random() - 0.5) * 4, 40); if (e) e.life = 12000; dropped = true; }
       this.inv.fill(null); this.armor = [null, null, null, null, null];
+      spawnXp(this.x, this.y + 0.6, this.z, Math.min(100, this.xpLv * 7)); this.xpLv = 0; this.xpPt = 0;   // 経験値も その場に落ちる（レベル×7、100まで）
     }
     this.invDirty = true; this.brk = null;
     if (ui.screen) ui.close(true);   // 持ち物や地図を開いたままにしない
@@ -563,10 +625,12 @@ class Player {
     game.needSafeSpot = sp === game.worldSpawn ? 1 : 2;
   }
   serialize() {
-    return { x: this.x, y: this.y, z: this.z, yaw: this.yaw, pitch: this.pitch, hp: this.hp, food: this.food, sat: this.sat, air: this.air, inv: this.inv, armor: this.armor, sel: this.sel, spawn: this.spawn, flying: this.flying, stats: this.stats, dead: this.dead, deathPos: this.deathPos };
+    return { x: this.x, y: this.y, z: this.z, yaw: this.yaw, pitch: this.pitch, hp: this.hp, food: this.food, sat: this.sat, air: this.air, inv: this.inv, armor: this.armor, sel: this.sel, spawn: this.spawn, flying: this.flying, stats: this.stats, dead: this.dead, deathPos: this.deathPos, xpLv: this.xpLv, xpPt: this.xpPt, enchSeed: this.enchSeed, fx: this.fx };
   }
   load(o) {
-    for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'hp', 'food', 'sat', 'air', 'sel', 'spawn', 'flying', 'deathPos']) if (o[k] !== undefined) this[k] = o[k];
+    for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'hp', 'food', 'sat', 'air', 'sel', 'spawn', 'flying', 'deathPos', 'xpLv', 'xpPt', 'enchSeed']) if (o[k] !== undefined) this[k] = o[k];
+    if (o.fx) for (const k in this.fx) this.fx[k] = Math.max(0, Math.min(12000, o.fx[k] | 0));
+    this.xpLv = Math.max(0, this.xpLv | 0); this.xpPt = Math.max(0, +this.xpPt || 0);
     if (o.inv) this.inv = o.inv.map(s => s ? { id: s.id, n: s.n, d: s.d || 0 } : null); while (this.inv.length < 36) this.inv.push(null);
     if (o.armor) this.armor = o.armor.map(s => s ? { id: s.id, n: s.n, d: s.d || 0 } : null); while (this.armor.length < 5) this.armor.push(null);   // 昔のセーブには 盾のマスがない
     if (o.stats) Object.assign(this.stats, o.stats);
@@ -581,7 +645,7 @@ class Player {
     cam.yaw = this.yaw; cam.pitch = this.pitch;
     cam.roll = Math.sin(this.bob * 1.9) * 0.006 * b + game.camKick * 0.09 * Math.sin(game.camKick * 9) + (game.shake > 0 ? (Math.random() - 0.5) * game.shake * 0.08 : 0);
     if (game.shake > 0) { cam.x += (Math.random() - 0.5) * game.shake * 0.2; cam.y += (Math.random() - 0.5) * game.shake * 0.2; }
-    cam.fov = settings.fov * (this.sprinting ? 1.08 : 1) * (this.flying && this.sprinting ? 1.05 : 1) * (this.drawT > 0 ? 1 - 0.15 * Math.min(1, this.drawT) : 1);   // 弓を引くと 少し ねらいやすく
+    cam.fov = settings.fov * (this.sprintK === undefined ? 1 : 1 + 0.13 * this.sprintK) * (this.flying && this.sprinting ? 1.05 : 1) * (this.drawT > 0 ? 1 - 0.15 * Math.min(1, this.drawT) : 1);   // 弓を引くと 少し ねらいやすく
     if (this.dead) { cam.roll = 0.5; cam.y = this.y + 0.4; }
     else if (settings.view) {   // うしろから／前から見る：かべにめりこまないよう、ぶつかる手前で止める
       const back = settings.view === 1 ? 1 : -1, cp = Math.cos(this.pitch);
@@ -597,7 +661,7 @@ class Player {
     if (this.dead) return;
     const it = this.held();
     lightRGB(world.getLightRaw(Math.floor(this.x), Math.floor(this.eyeY()), Math.floor(this.z)), _lcE);
-    const r = _lcE[0], g = _lcE[1], b = _lcE[2];
+    let r = _lcE[0], g = _lcE[1], b = _lcE[2];
     const p = 1 - this.swingT, s1 = Math.sin(Math.sqrt(p) * Math.PI), s2 = Math.sin(p * Math.PI);
     const ba = settings.bobbing ? this.bobAmp : 0;
     const bx = Math.sin(this.bob * 1.9) * 0.018 * ba, by = -Math.abs(Math.cos(this.bob * 1.9)) * 0.02 * ba - this.equipT * 0.45;
@@ -629,6 +693,7 @@ class Player {
       return;
     }
     const isCube = isBlk(it.id) && !ICON[it.id];
+    if (enchAny(it.d)) { const gl = 0.5 + 0.5 * Math.sin(R.time * 3.5); r *= 1 + 0.2 * gl; g *= 0.94; b *= 1.12 + 0.45 * gl; }   // 力のこもった物は むらさきに ゆらめく
     if (isCube) {
       m4Translate(_mm, hx * 0.56 - s1 * 0.34 * sc + bx - eat * hx * 0.45, -0.5 + s2 * 0.12 + by + ew, -1.0 - s2 * 0.2);
       m4RotX(_mr, 0.12 - s2 * 0.8); m4Mul(_mm, _mm, _mr); m4RotY(_mr, 0.78 + s1 * 0.5); m4Mul(_mm, _mm, _mr); m4Scale(_mr, 0.34 * sc, 0.34 * sc, 0.34 * sc); m4Mul(_mm, _mm, _mr);

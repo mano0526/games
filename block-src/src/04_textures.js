@@ -574,6 +574,14 @@ function buildTextures() {
     const g = s < 3 ? CP(['#5aa842', '#4f9a38']) : CP(['#b8a03a', '#9a8a30']), hgt = 4 + s * 3;
     let x = 8; for (let k = 0; k < hgt; k++) { p.px(x, 15 - k, g[k & 1]); p.px(x - 1, 15 - k, g[1]); if (k > 2 && p.rng() < 0.35) x += p.rng() < 0.5 ? 1 : -1; if (k % 4 === 3) { p.px(x + 2, 15 - k, g[0]); p.px(x - 3, 14 - k, g[0]); p.px(x + 3, 15 - k, g[1]); } }
   });
+  // ちからの台：黒曜石の台に、青緑に光る輪と 金のふち
+  newTex('ench_top', p => { p.copy('obsidian'); const gd = C('#d9b24a'), gl = C('#6ff0d8'), gl2 = C('#b8fff0');
+    for (let i = 0; i < 16; i++) { p.px(i, 0, gd); p.px(0, i, gd); p.px(i, 15, gd); p.px(15, i, gd); }
+    for (let a = 0; a < 24; a++) { const x = Math.round(7.5 + Math.cos(a / 24 * 6.283) * 4.6), y = Math.round(7.5 + Math.sin(a / 24 * 6.283) * 4.6); p.px(x, y, a % 3 ? gl : gl2); }
+    p.rect(7, 7, 2, 2, gl2); p.px(7, 5, gl); p.px(8, 10, gl); p.px(5, 8, gl); p.px(10, 7, gl); });
+  newTex('ench_side', p => { p.copy('obsidian'); const gd = C('#d9b24a'), gd2 = C('#a8842e'), gl = C('#6ff0d8');
+    for (let x = 0; x < 16; x++) { p.px(x, 0, gd); p.px(x, 1, gd2); p.px(x, 15, C('#0e0a1a')); }
+    for (const [x, y] of [[2, 5], [3, 6], [2, 7], [6, 5], [6, 6], [7, 7], [6, 8], [10, 5], [11, 5], [10, 7], [11, 8], [13, 6], [14, 7], [13, 8], [4, 10], [5, 11], [9, 10], [9, 11], [12, 11]]) p.px(x, y, gl); });
   // はじけ箱：木の箱に 赤い帯と はじけるしるし。上に 火なわ
   newTex('hajike_side', p => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const seam = (x % 5) === 4, c = C(seam ? '#8a6238' : ['#c0935a', '#b98a52', '#c79b62'][(x + (y >> 2)) % 3]); p.px(x, y, p.rng() < 0.08 ? shadeC(c, 0.92) : c); }
     for (let x = 0; x < 16; x++) { p.px(x, 0, C('#7a5630')); p.px(x, 15, C('#7a5630')); for (let y = 5; y <= 10; y++) p.px(x, y, C(y === 5 || y === 10 ? '#9c2f24' : '#c8473a')); }
@@ -706,6 +714,12 @@ function buildIcons() {
   S(I.egg, ['', '', '', '......dddd......', '.....dllmmd.....', '....dllmmmmd....', '....dlmmmmmd....', '...dlmmmmmmsd...', '...dmmmmmmmsd...', '...dmmmmmmssd...', '....dmmmmssd....', '.....dssssd.....', '......dddd......'], { l: '#fffaf0', m: '#f2e6d0', s: '#d6c4a6', d: '#8a785c' });
   S(I.fried_egg, ['', '', '', '', '....dddddd......', '..ddwwwwwwdd....', '.dwwwwyyywwwd...', '.dwwwyyoyywwwd..', '.dwwwyyyyywwwd..', '..dwwwyyywwwd...', '...ddwwwwwdd....', '.....ddddd......'], { w: '#fffaf0', y: '#ffd23a', o: '#fff0a0', d: '#b8a888' });
   S(I.milk_bucket, R_BUCKET, { l: '#f6f6f6', m: '#d0d0d0', s: '#a2a2a2', d: '#5f5f5f', f: '#fdfdf6' });
+  S(I.xp_orb, ['', '', '', '', '......dddd......', '.....dmmlld.....', '....dmmllwld....', '....dmmmllld....', '....dsmmmmmd....', '....dssmmmmd....', '.....dssmmd.....', '......dddd......'], { d: '#3f8f1f', s: '#6fc22a', m: '#a8e63a', l: '#dcff7a', w: '#ffffff' });   // けいけんの玉（世界では 光る玉として描く。絵は 念のため）
+  // ---- くすり：びんの中の色だけ ちがう ----
+  { const R_BOTTLE = ['', '', '......dddd......', '......dccd......', '.......dd.......', '......dggd......', '.....dgffgd.....', '....dgffffgd....', '....dffffffd....', '....dfflfffd....', '....dffffffd....', '.....dffffd.....', '......dddd......'];
+    S(I.glass_bottle, R_BOTTLE, { d: '#7f9aa8', c: '#b08a5a', g: '#d6ecf4', f: '#eaf6fa', l: '#ffffff' });
+    S(I.water_bottle, R_BOTTLE, { d: '#7f9aa8', c: '#b08a5a', g: '#d6ecf4', f: '#3f76e4', l: '#8fb4ff' });
+    for (const k in POTIONS) { const c = C(POTIONS[k][1]), hx = (v) => '#' + v.map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join(''); S(I['potion_' + k], R_BOTTLE, { d: '#7f9aa8', c: '#b08a5a', g: '#d6ecf4', f: POTIONS[k][1], l: hx([c[0] * 0.5 + 128, c[1] * 0.5 + 128, c[2] * 0.5 + 128]) }); } }
   // ---- 弓矢と盾 ----
   S(I.bow, ['', '.........HHHHH', '.......HHhhhs', '......Hhh..s', '.....Hhh..s', '....Hhh..s', '....Hh..s', '...Hhh.s', '...Hh.s', '..Hh.s', '..Hhs', '..Hh', '..H', '', '', ''], { h: '#9a7040', H: '#6e4c29', s: '#eeeee6' });
   S(I.bow_p1, ['', '.........HHHHH', '..tt...HHhhhs', '..tt..Hhh...s', '....aHhh....s', '....Hah....s', '....Hha...s', '...Hhh.a..s', '...Hh...a.s', '..Hh....sw', '..Hh..ss', '..Hhss', '..Hs', '', '', ''], { h: '#9a7040', H: '#6e4c29', s: '#eeeee6', a: '#c9a36a', t: '#b9bcc2', w: '#f6f6f6' });

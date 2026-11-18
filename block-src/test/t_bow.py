@@ -29,7 +29,7 @@ async def main():
     r = await s.ev(f"""() => {{ const k = {K}, B = k.B, I = k.I, g = (ids, w) => {{ const r = k.matchGrid(ids.map(id => id ? {{ id, n: 1, d: 0 }} : null), w); return r ? [k.ITEMS[r.out].name, r.n] : null; }};
       const S = I.stick, T = I.string, P = B.planks_oak, W = I.pop_powder, N = B.sand;
       return [g([0, S, T, S, 0, T, 0, S, T], 3), g([I.flint, 0, 0, S, 0, 0, I.feather, 0, 0], 3), g([P, I.iron_ingot, P, P, P, P, 0, P, 0], 3), g([W, N, W, N, W, N, W, N, W], 3), g([T, T, T, T], 2),
-        Object.values(k.ITEMS).filter(d => d.hide).length, k.MOB_USED]; }}""")
+        [I.bow_p1, I.bow_p2].every(id => k.ITEMS[id].hide) ? 2 : 0, k.MOB_USED]; }}""")
     check('レシピ（弓・矢4本・盾・はじけ箱・糸→羊毛）', r[:5] == [['弓', 1], ['矢', 4], ['盾', 1], ['はじけ箱', 1], ['白い羊毛', 1]] and r[5] == 2, r)
     check('生き物の絵が 画像におさまっている', 0 < r[6] < 512, r[6])
     # 2. 弓：長くおして引き、はなすと飛ぶ。矢が1本へり、弓が すりへる

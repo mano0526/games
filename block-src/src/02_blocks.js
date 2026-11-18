@@ -251,6 +251,8 @@ defBlock(713, 'melon_stem', 'スイカのつる', { shape: S_CROP, tex: 'stem_0'
 defBlock(714, 'pumpkin', 'カボチャ', { tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side' }, hard: 1, tool: 'axe', sound: 'wood' });
 defBlock(715, 'jack_lantern', 'カボチャのランタン', { tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side', front: 'pumpkin_face' }, hard: 1, tool: 'axe', sound: 'wood', light: 15, facing: true });
 defBlock(716, 'melon', 'スイカ', { tex: { top: 'melon_top', bottom: 'melon_top', side: 'melon_side' }, hard: 1, tool: 'axe', sound: 'wood', drop: (rng) => [[I.melon_slice, 3 + Math.floor(rng() * 5)]] });
+// ちからの台：道具・武器・防具に 力をこめる（経験値のレベルと ひかりの粉を使う）
+defBlock(718, 'ench_table', 'ちからの台', { tex: { top: 'ench_top', bottom: 'obsidian', side: 'ench_side' }, hard: 8, tool: 'pick', level: 3, needTool: true, interact: 'ench', light: 7 });
 // はじけ箱：火打ち金で火をつけると、4秒後に はじける
 defBlock(717, 'hajike_box', 'はじけ箱', { tex: { top: 'hajike_top', bottom: 'hajike_bottom', side: 'hajike_side' }, hard: 0.2, sound: 'wood' });
 // ほしの結晶：ソラのはての柱の上で、ボスの体力をもどす。こわすと はじける
@@ -330,6 +332,20 @@ defItem(360, 'bow_p1', '弓', { stack: 1, hide: true });
 defItem(361, 'bow_p2', '弓', { stack: 1, hide: true });
 defItem(362, 'shield', '盾', { stack: 1, armor: { slot: 4, def: 0, dur: 336, mat: 'shield' } });   // 防具の5つ目のマス（左手）
 defItem(363, 'pop_powder', 'はじけ粉', {});
+// ---- 経験値（364〜）。けいけんの玉は 落とし物として世界に出るが、ひろうと 持ち物ではなく 経験値になる ----
+defItem(364, 'xp_orb', 'けいけんの玉', { stack: 9999, hide: true });
+// ---- くすり（365〜）。POTIONS：[名前, 色, つづく長さ（20＝1秒。0＝その場で効く）, 材料, 説明] ----
+defItem(365, 'glass_bottle', 'ガラスびん', { bottle: true });
+defItem(366, 'water_bottle', '水入りびん', { stack: 16, food: [0, 0], drink: true, leftover: 365 });
+const POTIONS = {
+  heal: ['いやしの くすり', '#ff5a7a', 0, 351, '体力が 4つぶん もどる'],
+  regen: ['さいせいの くすり', '#ff8fd0', 900, 262, '45秒のあいだ 体力が 少しずつ もどる'],
+  speed: ['はやあしの くすり', '#7fd4ff', 3600, 279, '3分のあいだ 足が速くなる'],
+  str: ['ちからの くすり', '#b04adf', 3600, 292, '3分のあいだ こうげきが強くなる'],
+  fire: ['ひよけの くすり', '#ffa23a', 3600, 687, '3分のあいだ 火や溶岩で ダメージを受けない'],
+  night: ['よめの くすり', '#3a55d8', 3600, 346, '3分のあいだ 暗い所が 明るく見える']
+};
+{ let pi = 367; for (const k in POTIONS) defItem(pi++, 'potion_' + k, POTIONS[k][0], { stack: 16, food: [0, 0], drink: true, leftover: 365, potion: k }); }
 
 const TOOL_MATS = [
   { k: 'wood', n: '木', tier: 1, speed: 2, dur: 60, mat: '#planks' },
@@ -493,6 +509,10 @@ shaped(I.arrow, 4, ['F', 'S', 'E'], { F: I.flint, S: I.stick, E: I.feather }, 't
 shaped(I.shield, 1, ['PIP', 'PPP', ' P '], { P: '#planks', I: I.iron_ingot }, 'tool');
 shaped(B.hajike_box, 1, ['PSP', 'SPS', 'PSP'], { P: I.pop_powder, S: B.sand }, 'block');
 shaped(B.wool_white, 1, ['SS', 'SS'], { S: I.string }, 'block');
+// ---- 経験値と力・くすり ----
+shaped(I.glass_bottle, 3, ['G G', ' G '], { G: B.glass }, 'food');
+for (const k in POTIONS) { const out = I['potion_' + k], ing = POTIONS[k][3]; shapeless(out, 1, [I.water_bottle, I.homura_powder, ing], 'food'); shapeless(out, 3, [I.water_bottle, I.water_bottle, I.water_bottle, I.homura_powder, ing], 'food'); }
+shaped(B.ench_table, 1, [' G ', 'DOD', 'OOO'], { G: I.glow_dust, D: I.diamond, O: B.obsidian }, 'block');
 // ---- べつの世界 ----
 shapeless(I.flint_steel, 1, [I.iron_ingot, I.flint], 'tool');
 shapeless(I.homura_powder, 2, [I.homura_rod], 'misc');
@@ -540,3 +560,43 @@ function maxStack(id) { return ITEMS[id] ? ITEMS[id].stack : 64; }
 // ---------------- 動物の好物 ----------------
 const MOB_FOOD = { cow: [267], sheep: [267], pig: [346, 347], chicken: [266, 349, 350] };   // 小麦／ニンジン・ジャガイモ／種
 const MEATS = [271, 272, 273, 274, 275, 276, 277, 278];
+// 経験値：次のレベルまでに いる数（本家と同じ式）／鉱石をほった時の数 [少ない, 多い]／かまどから取り出した時の1こあたり
+function xpNeed(lv) { return lv >= 30 ? 112 + (lv - 30) * 9 : lv >= 15 ? 37 + (lv - 15) * 5 : 7 + lv * 2; }
+const XP_ORE = {}; XP_ORE[22] = [0, 2]; XP_ORE[25] = [3, 7]; XP_ORE[26] = [1, 4]; XP_ORE[685] = [2, 5];
+// ---- 力をこめる（エンチャント） ----
+// 持ち物の d：下の16ビット＝すりへり、その上に「力」のわく4つ（3ビットずつ＝レベル0〜7）。
+// d を そのまま運ぶ所（落とし物・チェスト・通信・セーブ）は 何も変えなくてよい。すりへりを読む所だけ itemDmg() を通す
+function itemDmg(d) { return d & 0xFFFF; }
+function enchOf(d, k) { return k < 0 ? 0 : (d >> (16 + k * 3)) & 7; }
+function enchSet(d, k, lv) { return (d & ~(7 << (16 + k * 3))) | ((lv & 7) << (16 + k * 3)); }
+function enchAny(d) { return (d >>> 16) !== 0; }
+// 種類ごとの「力」：[名前, いちばん上のレベル, 説明]。ならび順＝わくの番号（変えない）
+const ENCH = {
+  sword: [['するどさ', 4, 'こうげきが強くなる'], ['もえる刃', 2, 'たたいた相手が もえる'], ['おしかえし', 2, '相手を 遠くへ とばす'], ['えものふやし', 3, 'たおした時の 落とし物がふえる']],
+  tool: [['はやほり', 4, 'ほるのが速くなる'], ['じょうぶ', 3, 'すりへりにくい'], ['ほりあて', 3, '鉱石から 多く出る']],
+  bow: [['つよ弓', 4, '矢が強くなる'], ['火の矢', 1, '矢が当たった相手が もえる'], ['じょうぶ', 3, 'すりへりにくい']],
+  armor: [['まもり', 4, 'ダメージがへる'], ['じょうぶ', 3, 'すりへりにくい'], ['ふわり', 3, '落ちた時のダメージがへる']],
+  shield: [['じょうぶ', 3, 'すりへりにくい']]
+};
+const ENCH_UNBR = { tool: 1, bow: 2, armor: 1, shield: 0 };   // 「じょうぶ」が入っている わく
+function enchKind(id) {
+  const d = ITEMS[id]; if (!d) return null;
+  if (d.tool) { const t = d.tool.type; return t === 'sword' ? 'sword' : t === 'bow' ? 'bow' : (t === 'pick' || t === 'axe' || t === 'shovel' || t === 'hoe' || t === 'shears') ? 'tool' : null; }
+  if (d.armor) return d.armor.slot === 4 ? 'shield' : 'armor';
+  return null;
+}
+function unbrLv(id, d) { const k = enchKind(id); return k && ENCH_UNBR[k] !== undefined ? enchOf(d, ENCH_UNBR[k]) : 0; }
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+function enchList(id, d) { const kind = enchKind(id), out = []; if (kind && enchAny(d)) ENCH[kind].forEach((e, k) => { const lv = enchOf(d, k); if (lv) out.push(e[0] + (e[1] > 1 ? ' ' + ROMAN[lv] : '')); }); return out; }
+// 台で こめられる力（段 0〜2）を決める。種が同じなら いつも同じ答え（えらぶ前に 1つだけ見せるため）
+function enchRoll(id, tier, seed) {
+  const kind = enchKind(id); if (!kind) return 0;
+  const rng = mulberry32((seed ^ (id * 7919) ^ ((tier + 1) * 104729)) >>> 0), list = ENCH[kind]; let d = 0;
+  const cand = list.map((e, k) => k).filter(k => !(kind === 'armor' && k === 2 && ITEMS[id].armor.slot !== 3));   // 「ふわり」は くつだけ
+  const n = Math.min(cand.length, 1 + (tier >= 1 && rng() < 0.45 ? 1 : 0) + (tier >= 2 && rng() < 0.4 ? 1 : 0));
+  for (let i = 0; i < n; i++) { const k = cand.splice(Math.floor(rng() * cand.length), 1)[0], mx = list[k][1]; d = enchSet(d, k, clamp(Math.round(mx * (0.3 + tier * 0.3) + rng() * 0.9 - 0.2), 1, mx)); }
+  return d;
+}
+const ENCH_NEED = [5, 12, 20];   // その段に いるレベル（使うのは 段+1 レベルと ひかりの粉 段+1 こ）
+const XP_SMELT = {}; XP_SMELT[I.iron_ingot] = 0.7; XP_SMELT[I.gold_ingot] = 1; XP_SMELT[I.quartz] = 0.2;
+for (const k of ['cooked_pork', 'steak', 'cooked_mutton', 'cooked_chicken', 'baked_potato', 'fried_egg']) if (I[k] !== undefined) XP_SMELT[I[k]] = 0.35;

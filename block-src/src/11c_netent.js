@@ -88,7 +88,7 @@ function netShot(s) {
 }
 // ---- 送る側：自分が動かしているものの一覧 ----
 function entRec(e) {
-  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 || e.fuse > 0 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0) | (e.baby > 0 ? 64 : 0) | (e.sheared ? 128 : 0) | (e.sit ? 256 : 0) | (e.love > 0 ? 512 : 0), e.type === 'sheep' ? e.color | 0 : e.type === 'dog' ? (e.tamer || 0) : 0];
+  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 || e.fuse > 0 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0) | (e.baby > 0 ? 64 : 0) | (e.sheared ? 128 : 0) | (e.sit ? 256 : 0) | (e.love > 0 ? 512 : 0) | (e.burnT > 0 ? 1024 : 0), e.type === 'sheep' ? e.color | 0 : e.type === 'dog' ? (e.tamer || 0) : 0];
   if (e.kind === 'item') return [e.nid, 1, e.id, e.n, e.d, r2(e.x), r2(e.y), r2(e.z)];
   if (e.kind === 'falling') return [e.nid, 2, e.id, r2(e.x), r2(e.y), r2(e.z)];
   if (e.kind === 'primed') return [e.nid, 4, e.fuse | 0, r2(e.x), r2(e.y), r2(e.z)];
@@ -151,7 +151,7 @@ function updPuppet(e, r) {
     if (hp < e.hp) { e.hurt = 10; sfxAt((hp <= 0 ? 'die_' : 'hurt_') + d.voice, e.x, e.y, e.z); if (hp <= 0 && !e.death) e.death = 1; }
     e.hp = hp; e.awake = !!(b & 1); e.onGround = !!(b & 8);
     if ((b & 2) && !e._sw) e.swing = d.boss ? 20 : e.type === 'yumikage' ? 16 : 8; e._sw = !!(b & 2);
-    e.fuseOn = e.type === 'bakudake' && !!(b & 4);
+    e.fuseOn = e.type === 'bakudake' && !!(b & 4); e.burnT = (b & 1024) ? 1 : 0;
     if ((b & 4) && !e._sl) e.slam = 20; e._sl = !!(b & 4);
     e.breath = !!(b & 16); e.land = (b & 32) ? 1 : 0; puppetLook(e, r);
   } else if (e.kind === 'item') { e.n = r[3]; e.tx = r[5]; e.ty = r[6]; e.tz = r[7]; }
@@ -171,6 +171,7 @@ function puppetTick(world, e) {
   if (e.kind === 'mob') {
     if (e.swing > 0) e.swing--;
     if (e.slam > 0) { e.slam--; if (e.slam === 6 && MOBS[e.type].boss) kingSlamFx(e); }
+    if (e.burnT > 0 && e.age % 2 === 0) fxPuff(e.x + (Math.random() - 0.5) * e.hw * 2, e.y + Math.random() * e.h, e.z + (Math.random() - 0.5) * e.hw * 2, 1, 1, 0.55 + Math.random() * 0.3, 0.15, { glow: true, speed: 0.3, life: 0.5, size: 0.08, up: 1.2, grav: 0 });   // もえている（動かしているのは ほかの人）
     if (e.type === 'bakudake') e.fuse = e.fuseOn ? Math.min(30, (e.fuse || 0) + 1) : Math.max(0, (e.fuse || 0) - 1);
     if (e.hp <= 0) { e.death++; if (e.type === 'hoshikui' && e.segs && e.death % 2 === 0) { const s = e.segs[rnd(e.segs.length)]; fxPuff(s.x, s.y + 0.8, s.z, 8, 1, 0.9, 1, { glow: true, speed: 6, life: 1.1, size: 0.16, spread: 1 }); } }
     e.yaw = lerpAngle(e.yaw, e.tyaw, 0.45);
@@ -182,7 +183,11 @@ function puppetTick(world, e) {
 else if (e.kind === 'item') {
     if (!player.dead && (e.pickCd = (e.pickCd || 0) - 1) <= 0) {
       const dx = player.x - e.x, dy = player.y + 0.8 - e.y, dz = player.z - e.z;
-      if (dx * dx + dy * dy + dz * dz < 1.8 && player.canTake(e.id, e.d)) { e.pickCd = 14; net.dm(e.owner, { t: 'pick', n: e.rnid }); }
+      const orb = e.id === I.xp_orb;   // けいけんの玉は 少し はなれていても ひろえる（動かしているのが ほかの人でも、すいよせたように見せる）
+      if (dx * dx + dy * dy + dz * dz < (orb ? 12 : 1.8) && player.canTake(e.id, e.d)) {
+        e.pickCd = 14; net.dm(e.owner, { t: 'pick', n: e.rnid });
+        if (orb) for (let i = 1; i <= 5; i++) fxPuff(e.x + dx * i / 6, e.y + dy * i / 6, e.z + dz * i / 6, 1, 0.8, 1, 0.3, { glow: true, speed: 0.1, life: 0.25 + i * 0.04, size: 0.05, up: 0, grav: 0 });
+      }
     }
   }
 }
@@ -197,21 +202,21 @@ net.onDm = function (raw) {
   if (!m || !this.world) return;
   const from = this.peers.get(m.f);
   switch (m.t) {
-    case 'hit': { const e = ownEnt(m.n); if (e && e.kind === 'mob' && e.hurt <= 5) { e.hurt = 0; e.lastBy = m.f; hurtMob(e, +m.d || 1, +m.x || 0, +m.z || 0, m.k); } break; }   // たたいた側で間隔は見ているので、こちらでは少しゆるく受け付ける
+    case 'hit': { const e = ownEnt(m.n); if (e && e.kind === 'mob' && e.hurt <= 5) { e.hurt = 0; e.lastBy = m.f; e.pk = 1; e.hb = clamp(m.b | 0, 0, 200); e.hl = clamp(m.l | 0, 0, 3); hurtMob(e, +m.d || 1, +m.x || 0, +m.z || 0, m.k); } break; }   // たたいた側で間隔は見ているので、こちらでは少しゆるく受け付ける
     case 'dmg': if (!player.dead) player.damage(+m.a || 0, +m.x || 0, +m.z || 0, +m.k || 0, String(m.s || '')); break;
     case 'pvp': if (game.rules.pvp && !player.dead) player.damage(+m.a || 0, +m.x || 0, +m.z || 0, +m.k || 0, from ? from.name : 'だれか'); break;
     case 'pick': { const e = ownEnt(m.n); if (e && e.kind === 'item' && e.age > e.delay) { e.dead = true; this.dm(m.f, { t: 'got', id: e.id, c: e.n, d: e.d }); } break; }
     case 'got': {
       if (!ITEMS[m.id]) break;
       const left = player.give(m.id, m.c, m.d);
-      if (left < m.c) { sfx('pop'); ui.pickupFx(m.id, m.c - left); player.stat('pick', m.id); }
+      if (left < m.c && m.id !== I.xp_orb) { sfx('pop'); ui.pickupFx(m.id, m.c - left); player.stat('pick', m.id); }
       if (left > 0) spawnDrop(player.x, player.y + 0.8, player.z, m.id, left, m.d);
       break;
     }
     case 'give': netTake(m); break;
     case 'shot': {   // ほかの人（か、その人が動かす敵）が 矢をうった：自分の画面でも 同じ所から飛ばす
       const a = m.p; if (!from || from.dim !== this.world.dim || !Array.isArray(a) || a.length < 6 || (m.k !== 5 && m.k !== 6) || !a.every(v => typeof v === 'number' && isFinite(v))) break;
-      const sh = spawnShot(a[0], a[1], a[2], clamp(a[3], -70, 70), clamp(a[4], -70, 70), clamp(a[5], -70, 70), clamp(+m.d || 0, 0, 12), m.k); sh.foreign = true; sh.by = from.name; sfxAt('bowshot', a[0], a[1], a[2]);
+      const sh = spawnShot(a[0], a[1], a[2], clamp(a[3], -70, 70), clamp(a[4], -70, 70), clamp(a[5], -70, 70), clamp(+m.d || 0, 0, 24), m.k); sh.foreign = true; sh.by = from.name; sfxAt('bowshot', a[0], a[1], a[2]);
       break;
     }
     case 'boom': if (from && from.dim === this.world.dim) blast(this.world, +m.x || 0, +m.y || 0, +m.z || 0, clamp(+m.a || 0, 0, 40), clamp(+m.r || 0, 0, 8), String(m.s || '').slice(0, 20), false); break;   // ほかの人の端末が受け持つ はじけ（自分へのダメージは ここで決める）
@@ -314,10 +319,11 @@ function drawPeers(world, cam) {
   }
 }
 // 自分の姿（うしろから／前から見るとき）
-const _self = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, walk: 0, walkAmp: 0, swingT: 0, sneaking: false, sleeping: false, held: 0, hurtT: 0, eating: false, blocking: false, shield: false };
+const _self = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, walk: 0, walkAmp: 0, swingT: 0, sneaking: false, sleeping: false, held: 0, hurtT: 0, eating: false, blocking: false, shield: false, sprinting: false, swim: 0 };
 function drawSelf(world, cam) {
   const p = player, s = _self, h = p.held();
   s.x = p.x; s.y = p.y; s.z = p.z; s.yaw = p.yaw + (R.dbgYaw || 0); s.pitch = p.pitch; s.walk = p.bob * 1.9; s.walkAmp = p.bobAmp; s.swingT = p.swingT; s.sneaking = p.sneaking; s.sleeping = game.inBed;   // dbgYaw＝試験で 横から見るため
+  s.sprinting = p.sprinting; s.swim += ((p.inWater && !p.onGround && !p.flying && Math.hypot(p.vx, p.vz) > 0.6 ? 1 : 0) - s.swim) * 0.14;   // 走っている／泳いでいる（0〜1 で なめらかに）
   s.held = h ? (p.drawT > 0.55 ? I.bow_p2 : p.drawT > 0.02 ? I.bow_p1 : h.id) : 0; s.hurtT = p.hurtT > 0 ? 1 : 0; s.eating = p.eating > 0; s.blocking = p.blocking; s.shield = !!p.armor[4];
   drawHuman(world, MODELS.pl0, s, p.x - cam.x, p.y - cam.y, p.z - cam.z);
 }
@@ -330,17 +336,19 @@ function drawHuman(world, model, p, x, y, z) {
   m4Translate(_hm, x, y, z); m4RotY(_mr, p.yaw); m4Mul(_hm, _hm, _mr);
   if (p.sleeping) { m4Translate(_mr, 0, 0.22, -0.9); m4Mul(_hm, _hm, _mr); m4RotX(_mr, Math.PI / 2); m4Mul(_hm, _hm, _mr); }
   m4Scale(_mr, sc, sc, sc); m4Mul(_hm, _hm, _mr);
-  const sw = p.sleeping ? 0 : Math.sin(p.walk) * p.walkAmp, sn = p.sneaking && !p.sleeping, sp = p.swingT > 0 ? Math.sin((1 - p.swingT) * Math.PI) : 0;
+  const sk = p.sleeping ? 0 : (p.swim || 0), run = p.sprinting && !p.sleeping ? 1 : 0, st = R.time * 5.5;   // sk＝泳ぎの度合い、run＝走っている
+  if (sk > 0.01) { m4Translate(_mr, 0, 13 - 5 * sk, 0); m4Mul(_hm, _hm, _mr); m4RotX(_mr, -1.25 * sk); m4Mul(_hm, _hm, _mr); m4Translate(_mr, 0, -13, 0); m4Mul(_hm, _hm, _mr); }   // 泳ぐ：こしを中心に 体を前へ ねかせる
+  const sw = p.sleeping ? 0 : Math.sin(p.walk) * p.walkAmp * (1 - sk), sn = p.sneaking && !p.sleeping && sk < 0.5, sp = p.swingT > 0 ? Math.sin((1 - p.swingT) * Math.PI) : 0;
   let handM = null, shM = null;
   const aim = p.held === I.bow_p1 || p.held === I.bow_p2;   // 弓を引いている
   for (const pt of model) {
     let rx = 0, rz = 0, oy = sn ? -2 : 0, oz = 0; const id = pt.id;
-    if (id === 'head') { rx = p.sleeping ? 0 : clamp(p.pitch, -1.2, 1.2); if (sn) { oy -= 1; oz = -4.5; } }
-    else if (id === 'body') { if (sn) rx = -0.4; }
-    else if (id === 'arm0') { rx = -sw * 0.8; rz = -0.04; if (aim) { rx = 1.3 + p.pitch * 0.8; rz = -0.35; } else if (p.blocking) { rx = 1.0; rz = -0.5; } if (sn) { oy -= 1; oz = -4; rx += 0.25; } }
-    else if (id === 'arm1') { rx = sw * 0.8 + (p.held ? 0.32 : 0) + sp * 1.5 + (p.eating ? 1.2 + Math.sin(R.time * 22) * 0.12 : 0); rz = 0.04; if (aim) { rx = 1.45 + p.pitch * 0.8; rz = 0.1; } if (sn) { oy -= 1; oz = -4; rx += 0.25; } }
-    else if (id === 'leg0') rx = sw * 0.9;
-    else if (id === 'leg1') rx = -sw * 0.9;
+    if (id === 'head') { rx = p.sleeping ? 0 : clamp(p.pitch, -1.2, 1.2) + sk * 1.0; if (sn) { oy -= 1; oz = -4.5; } }
+    else if (id === 'body') { if (sn) rx = -0.45; else rx = -0.13 * run * p.walkAmp; }   // 走ると 少し前かがみ
+    else if (id === 'arm0') { rx = -sw * (0.8 + run * 0.55) + sk * (2.7 + Math.sin(st) * 0.75); rz = -0.04 - sk * 0.12; if (aim) { rx = 1.3 + p.pitch * 0.8; rz = -0.35; } else if (p.blocking) { rx = 1.0; rz = -0.5; } if (sn) { oy -= 1; oz = -4; rx += 0.25; } }
+    else if (id === 'arm1') { rx = sw * (0.8 + run * 0.55) + sk * (2.7 - Math.sin(st) * 0.75) + (p.held ? 0.32 * (1 - sk) : 0) + sp * 1.5 + (p.eating ? 1.2 + Math.sin(R.time * 22) * 0.12 : 0); rz = 0.04; if (aim) { rx = 1.45 + p.pitch * 0.8; rz = 0.1; } if (sn) { oy -= 1; oz = -4; rx += 0.25; } }
+    else if (id === 'leg0') rx = sw * (0.9 + run * 0.3) + sk * Math.sin(st * 1.7) * 0.5;
+    else if (id === 'leg1') rx = -sw * (0.9 + run * 0.3) - sk * Math.sin(st * 1.7) * 0.5;
     let M = _hm;
     if (rx || rz || oy || oz) {
       m4Translate(_hp, pt.pv[0], pt.pv[1] + oy, pt.pv[2] + oz);

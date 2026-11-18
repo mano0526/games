@@ -92,7 +92,15 @@ p { margin: 0 0 8px; }
 @keyframes dayIn { 0% { opacity: 0; transform: translateY(14px) scale(.96); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
 #heldname { position: absolute; left: 0; right: 0; bottom: calc(var(--s) + 62px); text-align: center; font-family: var(--font-display); text-shadow: 2px 2px 0 #000; opacity: 0; transition: opacity .4s; }
 #heldname.on { opacity: 1; transition: none; }
-#status { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--s) + 14px); width: calc(var(--s) * 9 + 4px); display: flex; justify-content: space-between; align-items: flex-end; }
+#fxbar { position: absolute; left: var(--gl, 8px); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 3px; font-family: var(--font-display); font-size: 14px; text-shadow: 1px 1px 0 #000; pointer-events: none; }
+#fxbar div { display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,.35); padding: 1px 6px 1px 2px; }
+#fxbar i { width: 22px; height: 22px; background-size: contain; image-rendering: pixelated; }
+#xpbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--s) + 13px); width: calc(var(--s) * 9 + 4px); height: 5px; background: rgba(0,0,0,.6); outline: 1px solid #000; }
+#xpbar i { display: block; height: 100%; width: 0; background: linear-gradient(#d6ff6a, #58c832); transition: width .25s; }
+#xpbar b { position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); font-family: var(--font-display); font-weight: 400; font-size: calc(var(--s) * .44); color: #c9ff6e; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; }
+#xpbar b.up { animation: lvUp .9s ease-out; }
+@keyframes lvUp { 0% { transform: translateX(-50%) scale(1); } 25% { transform: translateX(-50%) scale(2.4); color: #fff; } 100% { transform: translateX(-50%) scale(1); } }
+#status { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--s) + 22px); width: calc(var(--s) * 9 + 4px); display: flex; justify-content: space-between; align-items: flex-end; }
 #status .col { display: flex; flex-direction: column; gap: 2px; }
 #status .row { display: flex; height: calc(var(--s) * .45); }
 #status .row.rev { flex-direction: row-reverse; }
@@ -117,6 +125,14 @@ p { margin: 0 0 8px; }
 .slot u { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 3px; background: #000; pointer-events: none; }
 .slot u s { display: block; height: 100%; }
 .slot.hov { background: #4a4036; }
+.slot.ench i { animation: glint 2.4s ease-in-out infinite; }
+@keyframes glint { 0%, 100% { filter: drop-shadow(0 0 2px #a86cff) brightness(1); } 50% { filter: drop-shadow(0 0 5px #dcb0ff) brightness(1.3); } }
+#enchOpts { display: flex; flex-direction: column; gap: calc(var(--s) * .08); width: calc(var(--s) * 6.2); }
+#enchOpts .btn { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; min-height: calc(var(--s) * .98); width: 100%; text-align: left; line-height: 1.2; }
+#enchOpts .btn span { color: #d9c2ff; white-space: nowrap; } #enchOpts .btn small { font-size: .78em; color: var(--ink-dim); white-space: nowrap; }
+#enchOpts .dim { line-height: 1.5; }
+#enchOpts .btn:disabled { opacity: .5; cursor: default; }
+
 .slot.trash::after { content: "すてる"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: calc(var(--s) * .27); color: #ffb4a4; }
 .rec.flash { animation: slotFlash .45s ease-out; }
 .slot.flash { animation: slotFlash .45s ease-out; }
@@ -124,7 +140,7 @@ p { margin: 0 0 8px; }
 #cursorItem { position: fixed; width: var(--s); height: var(--s); pointer-events: none; z-index: 50; margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); display: none; }
 #cursorItem i { position: absolute; inset: 0; background-size: contain; image-rendering: pixelated; filter: drop-shadow(2px 3px 0 rgba(0,0,0,.5)); }
 #cursorItem b { position: absolute; right: 0; bottom: -4px; font-family: var(--font-display); font-weight: 400; font-size: calc(var(--s) * .36); text-shadow: 1px 1px 0 #000; }
-#tip { position: fixed; z-index: 51; pointer-events: none; background: rgba(14,10,22,.94); border: 2px solid #5b4a8a; padding: 2px 8px; font-family: var(--font-display); font-size: 14px; display: none; white-space: nowrap; }
+#tip { position: fixed; z-index: 51; pointer-events: none; background: rgba(14,10,22,.94); border: 2px solid #5b4a8a; padding: 2px 8px; font-family: var(--font-display); font-size: 14px; display: none; white-space: pre; }
 
 /* ---- 板とボタン ---- */
 .panel { background: var(--panel); border: 4px solid; border-color: var(--panel-hi) var(--panel-lo) var(--panel-lo) var(--panel-hi); box-shadow: 0 0 0 2px #000, 0 10px 0 rgba(0,0,0,.35); padding: 14px 16px; box-sizing: border-box; max-width: 100%; min-width: 0; }
@@ -260,6 +276,27 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
 /* せまい画面・低い画面 */
 /* 持ち物の画面の大きさ：マス1つ（--s）を 画面の はば・高さ から決める。字・ボタン・一覧も --s に合わせて大きくなる
    よこ＝マス9こ＋右の一覧（--rw 以上）、たて＝見出し・上の3だん・持ち物3だん・手もと1だん・説明 ≒ マス10.3こぶん */
+/* 色：本家にならって 明るい灰色〜白の板に、灰色のマス（ユーザーの希望「色は白に」）。ここで色の変数を入れかえる */
+#screen { --panel: #e9e9e9; --panel-hi: #ffffff; --panel-lo: #6a6a6a; --slot: #8b8b8b; --ink: #2c2c2c; --ink-dim: #5a5a5a; color: var(--ink); }
+#screen .slot { border-color: #373737 #ffffff #ffffff #373737; } #screen .slot.hov { background: #b4b4b4; } #screen .slot b { color: #fff; }
+#screen .slot.ghost i { opacity: .34; filter: grayscale(1) brightness(.2); }
+#screen .slot.trash::after { color: #ffe3de; }
+#screen .btn { background: #cfcfcf; color: #2c2c2c; border-color: #ffffff #6a6a6a #6a6a6a #ffffff; }
+#screen .btn:hover { background: #dcdcdc; } #screen .btn:active, #screen .btn.on { background: #8b8b8b; color: #fff; border-color: #6a6a6a #ffffff #ffffff #6a6a6a; }
+#screen .btn.pri { background: var(--accent); color: #2b1c08; border-color: #ffe08a var(--accent-lo) var(--accent-lo) #ffe08a; }
+#screen .btn:disabled { opacity: .45; }
+#screen .rec { background: #d4d4d4; border-left-color: #9a9a9a; } #screen .rec.ok { border-left-color: #2f9e44; } #screen .rec .need span.no { color: #b3261e; }
+#screen #enchOpts .btn span { color: #5b21b6; } #screen #enchOpts .btn:active span { color: #fff; }
+#scrTop .lbl { color: var(--ink-dim); } #scrTop .lbl.sub { font-size: calc(var(--f) * .78); white-space: pre-line; line-height: 1.3; text-align: center; }
+/* そうび：防具4つ（たて）・自分の姿・盾 */
+.eqBox { display: grid; grid-template-columns: var(--s) calc(var(--s) * 2.3) var(--s); grid-template-rows: auto repeat(4, var(--s)); column-gap: calc(var(--s) * .1); }
+.eqBox .eqL { grid-column: 1 / 4; grid-row: 1; line-height: 1.5; }
+.eqCol { grid-column: 1; grid-row: 2 / 6; display: grid; grid-template-columns: var(--s); }
+.eqBox .doll { grid-column: 2; grid-row: 2 / 6; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; background: #1d1d1d; border: 2px solid; border-color: #373737 #ffffff #ffffff #373737; box-sizing: border-box; padding: calc(var(--s) * .18); }
+.eqSh { grid-column: 3; grid-row: 5; }
+.crBox { display: flex; flex-direction: column; align-items: flex-start; gap: calc(var(--s) * .08); } .crBox .lbl { line-height: 1.5; }
+.crRow { display: flex; align-items: center; gap: calc(var(--s) * .22); }
+#screen[data-k="inv"], #screen[data-k="cre"] { --tr: 4.6; } #screen[data-k="table"] { --tr: 3.6; } #screen[data-k="ench"] { --tr: 3.3; }
 #screen { --rw: 230px; --tr: 3; --pc: 9; --hb: calc((100vh - 62px) / (7.3 + var(--tr))); --s: min(96px, calc((100vw - 70px - var(--rw)) / 9.4), var(--hb)); --f: clamp(13px, calc(var(--s) * .34), 30px); }
 #screen.norec { --s: min(96px, calc((100vw - 62px) / 9.1), var(--hb)); }
 #screen.wide2 { --s: min(96px, calc((100vw - 74px) / (9.5 + var(--pc))), var(--hb)); }   /* クリエイティブ：左に持ち物、右に えらぶ一覧 */
@@ -270,6 +307,10 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
 @media (max-height: 520px) and (orientation: landscape) {   /* スマホの横持ち：説明の行をしまって、そのぶん マスを大きく */
   #screen { --rw: 190px; --hb: calc((100vh - 40px) / (5.75 + var(--tr))); padding-block: 4px; }
   #screen.wide2 { --pc: 7; }
+  #screen[data-k="inv"], #screen[data-k="cre"] { --tr: 2; } #screen[data-k="table"] { --tr: 3; }   /* 高さが足りないので：防具は 2×2、自分の姿と 見出しは しまう */
+  #scrTop .lbl, .eqBox .doll { display: none; }
+  .eqBox { grid-template-columns: repeat(3, var(--s)); grid-template-rows: repeat(2, var(--s)); column-gap: 0; }
+  .eqCol { grid-column: 1 / 3; grid-row: 1 / 3; grid-template-columns: repeat(2, var(--s)); } .eqSh { grid-column: 3; grid-row: 2; }
   #screen > .panel { padding: 6px 10px; }
   #scrHelp, #scrInfo { display: none; }
   #recipes { max-height: calc(var(--s) * (5.5 + var(--tr))); } #palette { max-height: calc(var(--s) * (3.9 + var(--tr))); }
@@ -310,8 +351,10 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
     <div id="pickups"></div>
     <div id="status">
       <div class="col"><div class="row" id="armorRow"></div><div class="row" id="hearts"></div></div>
-      <div class="col"><div class="row rev" id="bubbles"></div><div class="row rev" id="foods"></div></div>
+      <div class="col"><div class="row rev" id="bubbles"></div><div class="row" id="foods"></div></div>
     </div>
+    <div id="fxbar"></div>
+    <div id="xpbar"><i id="xpFill"></i><b id="xpLv"></b></div>
     <div id="hotbar"></div>
     <div id="touch">
       <div id="stick"><div id="stickBase"><div id="stickKnob"></div></div></div>
