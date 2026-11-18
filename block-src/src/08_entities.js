@@ -119,6 +119,9 @@ const MOBS = {
   rock: { name: 'イワコロ', hw: 0.4, h: 0.8, hp: 14, speed: 0, model: 'rock', voice: 'rock', hostile: true, dmg: 3, hop: true, drops: () => [[B.cobble, 1 + rnd(2)], [I.coal, rnd(2)], [B.ore_iron, Math.random() < 0.12 ? 1 : 0]] },
   wisp: { name: 'ヒトダマ', hw: 0.25, h: 0.55, hp: 8, speed: 2.4, model: 'wisp', voice: 'wisp', hostile: true, dmg: 3, fly: true, glow: true, drops: () => [[I.glow_dust, 1 + rnd(2)]] },
   king: { name: 'カゲの王', hw: 0.7, h: 4.1, hp: 160, speed: 2.0, model: 'king', voice: 'king', hostile: true, dmg: 7, boss: true, scale: 2.2, drops: () => [[B.crown_block, 1], [I.shadow_shard, 6], [I.diamond, 3], [I.golden_apple, 2]] },
+  yumikage: { name: 'ユミカゲ', hw: 0.3, h: 1.95, hp: 18, speed: 2.2, model: 'yumikage', voice: 'yumi', hostile: true, dmg: 4, burns: true, drops: () => [[I.arrow, rnd(3)], [I.shadow_shard, rnd(2)], [I.bow, Math.random() < 0.06 ? 1 : 0]] },
+  bakudake: { name: 'バクダケ', hw: 0.42, h: 1.2, hp: 18, speed: 2.1, model: 'bakudake', voice: 'dake', hostile: true, dmg: 26, drops: () => [[I.pop_powder, 1 + rnd(2)]] },
+  itohaki: { name: 'イトハキ', hw: 0.4, h: 0.75, hp: 14, speed: 2.7, model: 'itohaki', voice: 'ito', hostile: true, dmg: 3, drops: () => [[I.string, 1 + rnd(2)]] },
   dog: { name: 'イヌ', hw: 0.3, h: 0.78, hp: 20, speed: 1.9, model: 'dog', voice: 'dog', drops: () => [] },
   // ---- ホムラの底 ----
   homurabi: { name: 'ホムラビ', hw: 0.35, h: 1.5, hp: 20, speed: 2.2, model: 'homurabi', voice: 'homurabi', hostile: true, dmg: 5, fly: true, glow: true, fireproof: true, drops: () => Math.random() < 0.7 ? [[I.homura_rod, 1]] : [] },
@@ -160,6 +163,17 @@ function buildModels() {
   MODELS.dog.push(part('snout', -1.5, 8, -11, 1.5, 10.5, -8.5, 0, 10, -4.5), part('ear0', -3, 13, -6.5, -1.5, 15, -5, 0, 10, -4.5), part('ear1', 1.5, 13, -6.5, 3, 15, -5, 0, 10, -4.5),
     part('tail', -1, 9, 5.5, 1, 11, 10, 0, 10, 5.5), part('collar', -3.4, 7.6, -4.3, 3.4, 13.4, -3.3, 0, 10, -4.5));
   MODELS.yakebone = shade(); MODELS.hoshikage = shade();
+  // ユミカゲ：かさをかぶった ほそい影。左手に弓
+  MODELS.yumikage = [part('body', -3, 11, -2, 3, 22, 2, 0, 16, 0), part('head', -3.5, 22, -3.5, 3.5, 29, 3.5, 0, 22, 0), part('brim', -6.5, 27.5, -6.5, 6.5, 29, 6.5, 0, 22, 0), part('hat', -3, 29, -3, 3, 32, 3, 0, 22, 0),
+    part('arm0', -5.5, 9, -1, -3.5, 22, 1, -4.5, 21, 0), part('arm1', 3.5, 9, -1, 5.5, 22, 1, 4.5, 21, 0), part('bow', -5, 8.5, -8, -4, 9.5, 8, -4.5, 21, 0),
+    part('leg0', -3, 0, -1.5, -0.5, 11, 1.5, -1.5, 11, 0), part('leg1', 0.5, 0, -1.5, 3, 11, 1.5, 1.5, 11, 0)];
+  // バクダケ：歩くキノコ。ふくらんで はじける
+  MODELS.bakudake = [part('stem', -3.5, 2, -3.5, 3.5, 10, 3.5, 0, 6, 0), part('cap', -7, 10, -7, 7, 16, 7, 0, 10, 0), part('top', -5, 16, -5, 5, 19, 5, 0, 10, 0),
+    part('foot0', -3.5, 0, -2.5, -0.5, 2, 2.5, -2, 2, 0), part('foot1', 0.5, 0, -2.5, 3.5, 2, 2.5, 2, 2, 0)];
+  // イトハキ：糸をはく けむし
+  MODELS.itohaki = [part('head', -4, 2, -10, 4, 9, -4, 0, 5, -4), part('seg0', -4.5, 1, -4, 4.5, 9, 2, 0, 5, -1), part('seg1', -4, 1, 2, 4, 8, 7, 0, 5, 4), part('tail', -2.5, 2, 7, 2.5, 6, 10, 0, 4, 7),
+    part('ant0', -3, 9, -9, -2, 13, -8, -2.5, 9, -8.5), part('ant1', 2, 9, -9, 3, 13, -8, 2.5, 9, -8.5)];
+  [[-4.5, -6], [3, -6], [-4.5, -1], [3, -1], [-4.5, 4], [3, 4]].forEach(([x, z], i) => MODELS.itohaki.push(part('leg' + i, x, 0, z, x + 1.5, 2, z + 1.5, x + 0.75, 2, z + 0.75)));
   MODELS.homurabi = [part('fl0', -4, 2, -4, 4, 10, 4, 0, 6, 0), part('fl1', -3, 10, -3, 3, 16, 3, 0, 13, 0), part('fl2', -2, 16, -2, 2, 21, 2, 0, 18, 0), part('fl3', -1, 21, -1, 1, 24, 1, 0, 22, 0),
     part('mask', -4, 8, -6, 4, 17, -4, 0, 12, -5), part('hand0', 6, 8, -2, 9, 11, 1, 0, 9, 0), part('hand1', -9, 8, -2, -6, 11, 1, 0, 9, 0)];
   MODELS.ukikurage = [part('cap', -9, 11, -9, 9, 16, 9, 0, 13, 0), part('dome', -6, 16, -6, 6, 19, 6, 0, 17, 0), part('core', -3, 8, -3, 3, 11, 3, 0, 9, 0)];
@@ -267,6 +281,37 @@ function paintMob(m, id, f, g) {
     if (isLeg) { if (f !== 2 && f !== 3) g.rect(0, g.h - 2, g.w, 2, cream[0]); return; }
     if (id === 'body') { if (f === 3) g.fill(cream); else if (!top) g.rect(0, g.h - 2, g.w, 2, cream[1]); }
     if (id === 'head' && front) { g.rect(1, 3, 4, 2, cream[0]); g.px(1, 1, C('#141414')); g.px(4, 1, C('#141414')); g.px(1, 0, C('#fffaf0')); g.px(4, 0, C('#fffaf0')); }
+  } else if (m === 'yumikage') {
+    const cloth = CP(['#2b3050', '#262b48', '#30365a', '#23284a']), straw = CP(['#cfae62', '#c2a056', '#d8b86c', '#b8964a']);
+    if (id === 'bow') { g.fill(CP(['#8a5f33', '#7a5630', '#96693a'])); if (f === 0 || f === 1 || top) { g.px(0, 0, C('#e9e6d8')); g.px(g.w - 1, 0, C('#e9e6d8')); } return; }
+    if (id === 'brim' || id === 'hat') { g.fill(straw); if (top || f === 3) { for (let i = 0; i < g.w; i += 2) for (let y = 0; y < g.h; y++) if ((i + y) % 4 === 0) g.px(i, y, C('#a8873e')); } else if (id === 'hat') g.rect(0, g.h - 1, g.w, 1, C('#7a2f2a')); return; }
+    g.fill(cloth);
+    if (id === 'head') { g.fill(CP(['#15172a', '#1a1c32', '#121426'])); if (front) { g.rect(1, 3, 2, 1, C('#bfe8ff')); g.rect(4, 3, 2, 1, C('#bfe8ff')); g.px(1, 4, C('#7fc4ee')); g.px(5, 4, C('#7fc4ee')); } }
+    else if (id === 'body') { if (front) { for (let y = 0; y < g.h; y++) g.px(Math.min(g.w - 1, 1 + (y >> 1)), y, C('#3d4470')); g.rect(0, g.h - 4, g.w, 1, C('#7a2f2a')); } else if (f !== 2 && f !== 3) g.rect(0, g.h - 4, g.w, 1, C('#7a2f2a')); }
+    else if (id.startsWith('arm')) { if (f !== 2 && f !== 3) g.rect(0, g.h - 2, g.w, 2, C('#15172a')); }
+    else if (isLeg) { if (f !== 2 && f !== 3) { g.rect(0, g.h - 2, g.w, 2, C('#15172a')); g.rect(0, g.h - 5, g.w, 1, C('#cfae62')); } }
+  } else if (m === 'bakudake') {
+    const capP = CP(['#d9532e', '#cf4a28', '#e25d36', '#d44f2b']), cream = CP(['#efe2c4', '#e8d9b8', '#f4e9cf']), spot = C('#f8ecc8');
+    if (id.startsWith('foot')) { g.fill(CP(['#8a6a4a', '#7c5e40'])); return; }
+    if (id === 'stem') {
+      g.fill(cream); if (f !== 2 && f !== 3) { g.rect(0, 0, g.w, 1, C('#c9b48a')); for (let x = 0; x < g.w; x += 2) g.px(x, 1, C('#d8c8a0')); }
+      if (front) { g.rect(1, 3, 2, 1, C('#2a2320')); g.rect(4, 3, 2, 1, C('#2a2320')); g.px(1, 2, C('#6b5a4e')); g.px(2, 2, C('#6b5a4e')); g.px(4, 2, C('#6b5a4e')); g.px(5, 2, C('#6b5a4e')); g.rect(3, 5, 1, 1, C('#8a5a4a')); }
+      return;
+    }
+    g.fill(capP);
+    if (f === 3) { g.fill(CP(['#e9d6b0', '#dcc79e'])); for (let x = 0; x < g.w; x += 2) g.rect(x, 0, 1, g.h, C('#c9b48a')); return; }
+    const n = Math.max(2, Math.floor(g.w * g.h / 22));
+    for (let k = 0; k < n; k++) { const cx = 1 + Math.floor(g.rng() * (g.w - 2)), cy = (top ? 1 : 0) + Math.floor(g.rng() * Math.max(1, g.h - 2)), big = g.rng() < 0.45; g.rect(cx, cy, big ? 2 : 1, big ? 2 : 1, spot); }
+    if (!top && id === 'cap') g.rect(0, g.h - 1, g.w, 1, C('#a83a1e'));
+  } else if (m === 'itohaki') {
+    const fur = CP(['#e9efe0', '#dfe7d4', '#f2f6ea', '#e3ebd8']), teal = C('#5fa8a0');
+    if (id.startsWith('leg')) { g.fill(CP(['#4f8f88', '#458078'])); return; }
+    if (id.startsWith('ant')) { g.fill(CP(['#5fa8a0', '#4f968e'])); if (f !== 3) g.px(0, 0, C('#ffe08a')); return; }
+    g.fill(fur);
+    for (let i = 0; i < g.w * g.h / 7; i++) g.px(Math.floor(g.rng() * g.w), Math.floor(g.rng() * g.h), C('#cfd8c2'));
+    if (id === 'head') { if (front) { g.rect(1, 2, 2, 2, C('#1d2422')); g.rect(5, 2, 2, 2, C('#1d2422')); g.px(1, 2, C('#ffffff')); g.px(5, 2, C('#ffffff')); g.rect(3, 5, 2, 1, C('#3a4a46')); g.px(0, 5, C('#ffd0a8')); g.px(7, 5, C('#ffd0a8')); } }
+    else if (id !== 'tail') { if (f === 0 || f === 1) { g.rect(0, 0, 1, g.h, teal); } else if (top) { g.rect(0, 0, g.w, 1, teal); g.rect(Math.floor(g.w / 2) - 1, 2, 2, 2, C('#ffe08a')); } }
+    else if (f === 4) g.rect(1, 1, g.w - 2, g.h - 2, teal);
   } else if (m === 'yakebone') {
     const bone = CP(['#3a3436', '#2e292b', '#463f41', '#262123']);
     g.fill(bone);
@@ -324,7 +369,7 @@ function paintMob(m, id, f, g) {
 function spawnMob(type, x, y, z) {
   const d = MOBS[type];
   const e = { kind: 'mob', type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, hw: d.hw, h: d.h, hp: d.hp, maxHp: d.hp, yaw: Math.random() * 6.28, pyaw: 0, headPitch: 0,
-    age: 0, hurt: 0, death: 0, atkCd: 0, walk: 0, walkAmp: 0, state: 0, timer: 0, moveYaw: 0, moving: false, panic: 0, kb: 0, dead: false, onGround: false, hitH: false, awake: type !== 'rock', swing: 0, burst: 0, love: 0, breedCd: 0, baby: 0, sheared: false, color: 0, owner: null, tamer: null, sit: false, eggT: 6000 + rnd(6000), shotCd: 60, summonCd: 200, slam: 0, voiceCd: 100 + rnd(300), fire: 0, spinOff0: Math.random() * 6.28, spinSeed0: Math.random() * 6.28 };
+    age: 0, hurt: 0, death: 0, atkCd: 0, walk: 0, walkAmp: 0, state: 0, timer: 0, moveYaw: 0, moving: false, panic: 0, kb: 0, dead: false, onGround: false, hitH: false, awake: type !== 'rock', swing: 0, burst: 0, love: 0, breedCd: 0, baby: 0, sheared: false, color: 0, owner: null, tamer: null, fuse: 0, see: false, sit: false, eggT: 6000 + rnd(6000), shotCd: 60, summonCd: 200, slam: 0, voiceCd: 100 + rnd(300), fire: 0, spinOff0: Math.random() * 6.28, spinSeed0: Math.random() * 6.28 };
   e.pyaw = e.yaw;
   return addEnt(e);
 }
@@ -387,7 +432,38 @@ function mobTick(world, e) {
       if (e.atkCd === 0 && Math.abs(pdx) < e.hw + 0.45 && Math.abs(pdz) < e.hw + 0.45 && pdy > -1.8 && pdy < e.h + 0.2) { e.atkCd = 18; hitTarget(T, d.dmg * DIFF_DMG[game.diff], e.x, e.z, 6, d.name); }
     } else if (pd3 > 26) e.awake = false;
   } else if (d.hostile) {
-    if (canTarget && pd3 < 22) {
+    if (e.type === 'yumikage') {   // はなれて 弓をうつ。近づかれると さがる
+      if (canTarget && pd3 < 20) {
+        chasing = true; wantYaw = Math.atan2(-pdx, -pdz);
+        if (e.age % 5 === 0) e.see = losTo(world, e, T);
+        wantSpeed = !e.see ? d.speed : pdist > 12 ? d.speed : pdist < 5 ? -d.speed * 0.7 : 0;
+        if (e.swing > 0) wantSpeed *= 0.3;
+        if (e.see && pd3 < 17) {
+          if (e.shotCd > 0) e.shotCd--;
+          if (e.shotCd === 0 && e.swing === 0) { e.swing = 16; e.shotCd = 50 + rnd(30); sfxAt('bowdraw', e.x, e.y, e.z); }   // 弓を引く
+          if (e.swing === 2) shootArrowAt(e, T, d.dmg);   // はなつ
+        }
+      } else wander(world, e, d);
+    } else if (e.type === 'bakudake') {   // そばまで来て ふくらみ、はじける。はなれると しぼむ
+      if (canTarget && pd3 < 18) {
+        chasing = true; wantYaw = Math.atan2(-pdx, -pdz); wantSpeed = d.speed;
+        if (pd3 < (e.fuse > 0 ? 4.5 : 2.8)) { if (e.fuse === 0) sfxAt('fuse', e.x, e.y, e.z); e.fuse++; wantSpeed = 0; }
+        else if (e.fuse > 0) e.fuse--;
+        if (e.fuse >= 30) { e.dead = true; blastAll(world, e.x, e.y + 0.6, e.z, d.dmg, 5, d.name, 2); return; }
+      } else { if (e.fuse > 0) e.fuse--; wander(world, e, d); }
+    } else if (e.type === 'itohaki') {   // とびかかる・かむ・糸をはいて 足をおそくする
+      if (canTarget && pd3 < 18) {
+        chasing = true; wantYaw = Math.atan2(-pdx, -pdz); wantSpeed = d.speed;
+        if (pdist < 1.3 && Math.abs(pdy) < 1.6) { wantSpeed = 0; if (e.atkCd === 0) { e.atkCd = 22; e.swing = 8; hitTarget(T, d.dmg * DIFF_DMG[game.diff], e.x, e.z, 5, d.name); } }
+        else if (e.onGround && pdist > 2.5 && pdist < 6 && --e.timer <= 0) { e.timer = 45 + rnd(30); e.vy = 7.2; e.vx = pdx / pdist * 7.5; e.vz = pdz / pdist * 7.5; e.kb = 8; sfxAt('hop', e.x, e.y, e.z); }
+        if (e.shotCd > 0) e.shotCd--;
+        if (e.shotCd === 0 && pd3 > 3.5 && pd3 < 13 && losTo(world, e, T)) {
+          e.shotCd = 70 + rnd(50); e.swing = 8;
+          const sx = e.x - Math.sin(e.yaw) * 0.5, sy = e.y + 0.45, sz = e.z - Math.cos(e.yaw) * 0.5, ax = T.x - sx, ay = T.y + 1.1 - sy, az = T.z - sz, al = Math.hypot(ax, ay, az) || 1;
+          spawnShot(sx, sy, sz, ax / al * 15, ay / al * 15, az / al * 15, 1, 7); sfxAt('spit', e.x, e.y, e.z);
+        }
+      } else wander(world, e, d);
+    } else if (canTarget && pd3 < 22) {
       chasing = true;
       wantYaw = Math.atan2(-pdx, -pdz); wantSpeed = d.speed;
       if (pdist < 1.25 && Math.abs(pdy) < 1.8) {
@@ -495,23 +571,96 @@ function kingTick(world, e, canTarget, pdx, pdz, pdist, pd3, T) {
   }
 }
 // 弾の種類（dark）：0 ヒトダマ 1 カゲの王 2 ホムラビ（火がつく） 3 ウキクラゲ（当たると はじける） 4 ホシクイ
-const SHOT_COL = [[0.45, 0.8, 1], [0.55, 0.3, 1], [1, 0.55, 0.15], [1, 0.42, 0.12], [0.8, 0.7, 1]], SHOT_SRC = ['ヒトダマ', 'カゲの王', 'ホムラビ', 'ウキクラゲ', 'ホシクイ'];
+const SHOT_COL = [[0.45, 0.8, 1], [0.55, 0.3, 1], [1, 0.55, 0.15], [1, 0.42, 0.12], [0.8, 0.7, 1], [1, 1, 1], [1, 1, 1], [0.95, 0.97, 0.92]], SHOT_SRC = ['ヒトダマ', 'カゲの王', 'ホムラビ', 'ウキクラゲ', 'ホシクイ', 'ユミカゲ', '矢', 'イトハキ'];
+// 弾の種類（dark）：0〜4 光の弾、5 敵の矢、6 人の矢、7 イトハキの糸
+const ARROW_G = 20;   // 矢が落ちる速さ（ブロック/秒²）
+// 目から相手まで、かべに じゃまされずに見えるか
+function losTo(world, e, T) {
+  const ex = e.x, ey = e.y + e.h * 0.85, ez = e.z, dx = T.x - ex, dy = T.y + 1.4 - ey, dz = T.z - ez, d = Math.hypot(dx, dy, dz) || 1;
+  const hit = world.raycast(ex, ey, ez, dx / d, dy / d, dz / d, d);
+  return !hit || !SOLID[hit.id];
+}
+// 敵が矢をうつ（落ちるぶんを見こして 上をねらう。むずかしさで ねらいの正しさが変わる）
+function shootArrowAt(e, T, dmg) {
+  const sx = e.x - Math.sin(e.yaw) * 0.45, sy = e.y + e.h * 0.74, sz = e.z - Math.cos(e.yaw) * 0.45;
+  const dx = T.x - sx, dy = T.y + 1.0 - sy, dz = T.z - sz, dh = Math.hypot(dx, dz) || 1, sp = 24, t = dh / sp, j = [0, 2.6, 1.5, 0.8][game.diff] || 1.5;
+  netShot(spawnShot(sx, sy, sz, dx / dh * sp + (Math.random() - 0.5) * j, dy / t + 0.5 * ARROW_G * t + (Math.random() - 0.5) * j, dz / dh * sp + (Math.random() - 0.5) * j, dmg, 5));
+  sfxAt('bowshot', e.x, e.y, e.z);
+}
+// 矢：重力で落ちる。ブロックに ささると しばらく残る。人の矢（6）は うった人の端末だけが 生き物へのダメージを決める
+function arrowTick(world, e) {
+  e.age++;
+  if (e.stuck > 0) { if (--e.stuck === 0) { e.dead = true; if (e.dark === 6 && !e.foreign && !e.noPick) spawnDrop(e.x, e.y, e.z, I.arrow, 1, 0, 0, 0, 0, 6); } return; }
+  if (e.age > 240) { e.dead = true; return; }
+  e.vy -= ARROW_G * 0.05; e.vx *= 0.995; e.vz *= 0.995;
+  const len = Math.hypot(e.vx, e.vy, e.vz) * 0.05, n = Math.max(1, Math.ceil(len / 0.35)), sx = e.vx * 0.05 / n, sy = e.vy * 0.05 / n, sz = e.vz * 0.05 / n;
+  for (let i = 0; i < n; i++) {
+    const nx = e.x + sx, ny = e.y + sy, nz = e.z + sz, bx = Math.floor(nx), by = Math.floor(ny), bz = Math.floor(nz), id = world.getBlock(bx, by, bz);
+    if (SOLID[id]) {   // ささる
+      e.stuck = 26; e.px = e.x; e.py = e.y; e.pz = e.z; sfxAt('arrowhit', e.x, e.y, e.z); fxBlockBits(nx, ny, nz, id, 3, 0.5);
+      if (id === B.hajike_box && e.dark === 6 && !e.foreign && e.dmg >= 8) { world.setBlock(bx, by, bz, 0, 0); spawnPrimed(bx + 0.5, by, bz + 0.5, 80); e.dead = true; }   // 力いっぱいの矢で はじけ箱に火がつく
+      return;
+    }
+    e.x = nx; e.y = ny; e.z = nz;
+    if (!e.spent && (e.dark === 5 || (e.foreign && game.rules.pvp)) && !player.dead && Math.abs(player.x - e.x) < 0.42 && Math.abs(player.z - e.z) < 0.42 && e.y > player.y - 0.1 && e.y < player.y + 1.9) {
+      const res = player.damage(e.dmg * (e.dark === 5 ? DIFF_DMG[game.diff] : 1), e.x - e.vx, e.z - e.vz, 3, e.dark === 6 && e.by ? e.by : SHOT_SRC[e.dark]);
+      if (res === 'block') { e.vx *= -0.25; e.vz *= -0.25; e.vy = 3; e.dark = 5; e.dmg = 0; e.spent = true; }   // 盾で はじいた
+      else e.dead = true;
+      return;
+    }
+    if (e.dark === 6 && !e.spent) for (const m of ents) {
+      if (m.kind !== 'mob' || m.dead || m.hp <= 0 || Math.abs(m.x - e.x) > m.hw + 0.18 || Math.abs(m.z - e.z) > m.hw + 0.18 || e.y < m.y - 0.15 || e.y > m.y + m.h + 0.15) continue;
+      if (m.type === 'dog' && m.tamer === meId()) continue;
+      e.dead = true;
+      if (!e.foreign) {
+        const far = Math.hypot(m.x - e.ox, m.z - e.oz);
+        if (hurtMob(m, e.dmg, e.x - e.vx, e.z - e.vz, 4)) { sfx('arrowding', 0.7); if (e.dmg >= 8) fxPuff(m.x, m.y + m.h * 0.7, m.z, 10, 1, 0.9, 0.3, { glow: true, speed: 3, life: 0.4, size: 0.06 }); game.onStat('arrow', far); }
+        else if (m.hurt > 0 && !e.noPick) spawnDrop(e.x, e.y, e.z, I.arrow, 1, 0, 0, 2, 0, 6);   // 当たったばかりで きかなかった矢は 落ちる
+      }
+      return;
+    }
+  }
+}
 function spawnShot(x, y, z, vx, vy, vz, dmg, dark) { return addEnt({ kind: 'shot', x, y, z, px: x, py: y, pz: z, vx, vy, vz, hw: 0.15, h: 0.3, dmg, dark: dark | 0, age: 0, dead: false }); }
 // はじける（まわりの人にダメージ。やわらかいブロックをこわすのは、その弾を動かしている端末だけ）
-function blast(world, x, y, z, dmg, rad, src, dig) {
+// own＝このはじけを 自分の端末が受け持っている（生き物へのダメージと、大きく こわすのは ここだけ）。digR＝こわす広さ
+function blast(world, x, y, z, dmg, rad, src, dig, own, digR) {
   sfxAt('boom', x, y, z); if (Math.hypot(player.x - x, player.y - y, player.z - z) < 20) game.shake = Math.max(game.shake, 0.4);
   fxPuff(x, y, z, 26, 1, 0.6, 0.2, { glow: true, speed: 5, life: 0.5, size: 0.13, spread: 0.6 }); fxPuff(x, y, z, 18, 0.35, 0.32, 0.3, { speed: 2.5, life: 1.1, size: 0.16, spread: 1, up: 1 });
   const dd = Math.hypot(player.x - x, player.y + 0.9 - y, player.z - z);
   if (!player.dead && dd < rad) player.damage(dmg * (1 - dd / (rad + 0.6)) * DIFF_DMG[game.diff], x, z, 7, src);
+  if (own) for (const m of ents) {   // まわりの生き物
+    if (m.kind !== 'mob' || m.dead || m.hp <= 0) continue;
+    const md = Math.hypot(m.x - x, m.y + m.h * 0.5 - y, m.z - z);
+    if (md < rad) hurtMob(m, dmg * (1 - md / (rad + 0.6)), x, z, 7);
+  }
   if (dig && game.rules.grief !== false) {
-    for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
-      if (Math.abs(dx) + Math.abs(dy) + Math.abs(dz) > 2) continue;
+    const R = digR || 1, maxHard = R > 1 ? 4 : 2.2;
+    for (let dy = -R; dy <= R; dy++) for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+      if (R === 1 ? Math.abs(dx) + Math.abs(dy) + Math.abs(dz) > 2 : dx * dx + dy * dy + dz * dz > (R + 0.2 + Math.random() * 0.6) * (R + 0.2 + Math.random() * 0.6)) continue;
       const bx = Math.floor(x) + dx, by = Math.floor(y) + dy, bz = Math.floor(z) + dz, id = world.getBlock(bx, by, bz);
-      if (id && BLOCKS[id].hard >= 0 && BLOCKS[id].hard < 2.2 && !FLUID[id] && !BLOCKS[id].ent && SHAPE[id] !== S_PORTAL) { fxBlockBits(bx + 0.5, by + 0.5, bz + 0.5, id, 4, 0.8); world.setBlock(bx, by, bz, 0, 0); }
+      if (!id || BLOCKS[id].hard < 0 || BLOCKS[id].hard >= maxHard || FLUID[id] || BLOCKS[id].ent || SHAPE[id] === S_PORTAL) continue;
+      fxBlockBits(bx + 0.5, by + 0.5, bz + 0.5, id, R > 1 ? 2 : 4, 0.8);
+      if (id === B.hajike_box) { world.setBlock(bx, by, bz, 0, 0); spawnPrimed(bx + 0.5, by, bz + 0.5, 8 + rnd(16)); }   // となりの はじけ箱にも 火がうつる
+      else if (R > 1 && Math.random() < 0.3) world.breakNatural(bx, by, bz);   // 3つに1つは 落とし物になる
+      else world.setBlock(bx, by, bz, 0, 0);
     }
   }
 }
+// 自分の端末が受け持つ はじけ。同じ世界の人にも知らせる（それぞれの画面で、自分へのダメージを決める）
+function blastAll(world, x, y, z, dmg, rad, src, digR) {
+  blast(world, x, y, z, dmg, rad, src, true, true, digR);
+  if (net.on) for (const p of net.peers.values()) if (p.dim === world.dim && Math.hypot(p.x - x, p.z - z) < 48) net.dm(p.pid, { t: 'boom', x: r2(x), y: r2(y), z: r2(z), a: dmg, r: rad, s: src });
+}
+// 火のついた はじけ箱
+function spawnPrimed(x, y, z, fuse) { sfxAt('fuse', x, y, z); return addEnt({ kind: 'primed', x, y, z, px: x, py: y, pz: z, vx: 0, vy: 4, vz: 0, hw: 0.49, h: 0.98, fuse, age: 0, dead: false, onGround: false }); }
+function primedTick(world, e) {
+  e.age++; e.vy -= 1.4; moveAABB(world, e, 0, e.vy * 0.05, 0); if (e.onGround) e.vy = 0;
+  if (e.age % 3 === 0) fxPuff(e.x, e.y + 1.05, e.z, 1, 0.75, 0.75, 0.75, { speed: 0.3, life: 0.7, size: 0.08, up: 1.2, grav: 0 });
+  if (--e.fuse <= 0) { e.dead = true; blastAll(world, e.x, e.y + 0.5, e.z, 26, 6.5, 'はじけ箱', 3); }
+}
 function shotTick(world, e) {
+  if (e.dark === 5 || e.dark === 6) { arrowTick(world, e); return; }
   e.age++;
   const K = e.dark | 0, col = SHOT_COL[K] || SHOT_COL[0];
   if (e.age > (K === 3 ? 170 : 90)) { e.dead = true; return; }
@@ -527,7 +676,13 @@ function shotTick(world, e) {
   if (!player.dead && Math.abs(player.x - e.x) < hr && Math.abs(player.z - e.z) < hr && e.y > player.y - 0.2 - (hr - 0.45) && e.y < player.y + 1.9 + (hr - 0.45)) {
     e.dead = true;
     if (K === 3) blast(world, e.x, e.y, e.z, e.dmg, 3.2, SHOT_SRC[3], false);
-    else { player.damage(e.dmg * DIFF_DMG[game.diff], e.x - e.vx, e.z - e.vz, 4, SHOT_SRC[K] || SHOT_SRC[0]); if (K === 2 && player.mode === 0) player.burnT = Math.max(player.burnT || 0, 70); }
+    else {
+      const res = player.damage(e.dmg * DIFF_DMG[game.diff], e.x - e.vx, e.z - e.vz, K === 7 ? 1.5 : 4, SHOT_SRC[K] || SHOT_SRC[0]);
+      if (res !== 'block') {
+        if (K === 2 && player.mode === 0) player.burnT = Math.max(player.burnT || 0, 70);
+        if (K === 7 && player.mode === 0) { if (!(player.webT > 0)) ui.toast('糸が からまった！ 足がおそくなる'); player.webT = 70; sfx('web'); }
+      }
+    }
   }
   fxPuff(e.x, e.y, e.z, K === 3 ? 2 : 1, col[0], col[1], col[2], { glow: true, speed: 0.4, life: K === 3 ? 0.55 : 0.35, size: K === 3 ? 0.14 : 0.08, up: 0, grav: 0 });
 }
@@ -542,6 +697,7 @@ function tickEntities(world) {
     if (e.kind === 'item') itemTick(world, e);
     else if (e.kind === 'mob') { mobTick(world, e); if (mp && !e.dead && e.type !== 'hoshikui' && (e.age & 15) === (e.nid & 15)) handOver(e); }   // 空を飛び回るボスは 持ち主を変えない（変えるたびに 動きが最初からになるため）
     else if (e.kind === 'falling') fallingTick(world, e);
+    else if (e.kind === 'primed') primedTick(world, e);
     else shotTick(world, e);
   }
   let w = 0;
@@ -585,9 +741,9 @@ function trySpawnHostile(world, R) {
   if (world.biomeAt(x, z) === BIOME.MUSHROOM) return false;   // キノコの島には敵が出ない
   const under = (world.getLightRaw(x, y, z) >> 4) < 4, below = world.getBlock(x, y - 1, z), rr = Math.random();
   let type = 'shade';
-  if (under) type = (rr < 0.35 && y < 46 && (below === B.stone || below === B.cobble || below === B.gravel || (below >= B.granite && below <= B.andesite))) ? 'rock' : (rr > 0.88 && y < 34) ? 'wisp' : 'shade';
-  else type = rr > 0.9 ? 'wisp' : 'shade';
-  const n = type === 'shade' ? 1 + rnd(3) : type === 'rock' ? 1 + rnd(2) : 1;
+  if (under) type = (rr < 0.3 && y < 46 && (below === B.stone || below === B.cobble || below === B.gravel || (below >= B.granite && below <= B.andesite))) ? 'rock' : (rr > 0.9 && y < 34) ? 'wisp' : rr > 0.78 ? 'itohaki' : rr > 0.66 ? 'yumikage' : rr > 0.56 ? 'bakudake' : 'shade';
+  else type = rr > 0.93 ? 'wisp' : rr > 0.83 ? 'itohaki' : rr > 0.67 ? 'yumikage' : rr > 0.53 ? 'bakudake' : 'shade';
+  const n = type === 'shade' ? 1 + rnd(3) : type === 'rock' || type === 'itohaki' ? 1 + rnd(2) : 1;
   let made = 0;
   for (let k = 0; k < n; k++) {
     const mx = k ? x + rnd(9) - 4 : x, mz = k ? z + rnd(9) - 4 : z, my = k ? findFloor(world, mx, y + 3, mz) : y;
@@ -666,15 +822,32 @@ function drawEntities(world, cam, alpha) {
     } else if (e.kind === 'falling') {
       lightRGB(world.getLightRaw(Math.floor(e.x), Math.floor(e.y + 0.5), Math.floor(e.z)), _lcE);
       m4Translate(_mm, x, y + 0.5, z); addBlockCube(dynTex, _mm, e.id, _lcE[0], _lcE[1], _lcE[2], 1);
+    } else if (e.kind === 'primed') {   // 火のついた はじけ箱：白く点めつし、さいごに ふくらむ
+      const fl = (e.fuse % 10) < 5 ? 1.9 : 1, sw = e.fuse < 12 ? 1 + (12 - e.fuse) * 0.02 : 1;
+      lightRGB(world.getLightRaw(Math.floor(e.x), Math.floor(e.y + 0.5), Math.floor(e.z)), _lcE);
+      m4Translate(_mm, x, y + 0.5, z); m4Scale(_mr, sw, sw, sw); m4Mul(_mm, _mm, _mr); addBlockCube(dynTex, _mm, B.hajike_box, _lcE[0] * fl, _lcE[1] * fl, _lcE[2] * fl, 1);
+    } else if (e.kind === 'shot' && (e.dark === 5 || e.dark === 6)) {
+      drawArrow(world, e, x, y, z);
     } else if (e.kind === 'shot') {
       m4Translate(_mm, x, y, z); m4RotY(_mr, e.age * 0.5); m4Mul(_mm, _mm, _mr);
       const K = e.dark | 0, sc = SHOT_COL[K] || SHOT_COL[0], s = K === 3 ? 0.3 : K ? 0.14 : 0.11; addColorBox(dynGlow, _mm, -s, -s, -s, s, s, s, sc[0], sc[1], sc[2], 0.9);
     } else drawMob(world, e, x, y, z, alpha);
   }
 }
+// 矢：とんでいる向きに ほそい棒・やじり・羽根。ささった直後は ぶるぶる ふるえる
+function drawArrow(world, e, x, y, z) {
+  lightRGB(world.getLightRaw(Math.floor(e.x), Math.floor(e.y), Math.floor(e.z)), _lcE);
+  const r = Math.max(0.35, _lcE[0]), g = Math.max(0.35, _lcE[1]), b = Math.max(0.35, _lcE[2]);
+  const yaw = Math.atan2(-e.vx, -e.vz), pitch = Math.atan2(e.vy, Math.hypot(e.vx, e.vz)) + (e.stuck > 14 ? Math.sin(e.stuck * 2.4) * 0.012 * (e.stuck - 14) : 0);
+  m4Translate(_mm, x, y, z); m4RotY(_mr, yaw); m4Mul(_mm, _mm, _mr); m4RotX(_mr, pitch); m4Mul(_mm, _mm, _mr);
+  addColorBox(dynCol, _mm, -0.025, -0.025, -0.4, 0.025, 0.025, 0.3, 0.79 * r, 0.64 * g, 0.42 * b, 1);
+  addColorBox(dynCol, _mm, -0.045, -0.045, -0.5, 0.045, 0.045, -0.4, 0.72 * r, 0.74 * g, 0.78 * b, 1);
+  addColorBox(dynCol, _mm, -0.09, -0.012, 0.16, 0.09, 0.012, 0.34, 0.96 * r, 0.96 * g, 0.96 * b, 1);
+  addColorBox(dynCol, _mm, -0.012, -0.09, 0.16, 0.012, 0.09, 0.34, 0.9 * r, 0.9 * g, 0.9 * b, 1);
+}
 function drawMob(world, e, x, y, z, alpha) {
   if (e.type === 'hoshikui') { drawHoshi(world, e, x, y, z, alpha); return; }
-  const d = MOBS[e.type], model = MODELS[d.model], sc = (d.scale || 1) / 16 * (e.baby > 0 ? 0.55 : 1);
+  const d = MOBS[e.type], model = MODELS[d.model], sc = (d.scale || 1) / 16 * (e.baby > 0 ? 0.55 : 1) * (e.fuse > 0 ? 1 + e.fuse / 30 * 0.28 : 1);
   if (d.glow) { _lcE[0] = _lcE[1] = _lcE[2] = 1; } else lightRGB(world.getLightRaw(Math.floor(e.x), Math.floor(e.y + e.h * 0.6), Math.floor(e.z)), _lcE);
   let r = _lcE[0], g = _lcE[1], b = _lcE[2];
   if (e.hurt > 0 || e.hp <= 0) { r = Math.min(1.2, r * 1.6 + 0.2); g *= 0.45; b *= 0.45; }
@@ -697,7 +870,23 @@ function drawMob(world, e, x, y, z, alpha) {
       else if (id === 'body') { if (e.sit) { rx = -0.42; oy = -1.2; } }
       else { rx = e.headPitch + Math.sin(t * 0.05 + e.spinSeed0) * 0.06 - (e.swing > 0 ? 0.4 : 0); if (e.sit) oy = 1.4; }
     } else
-    if (d.model === 'rock') {
+    if (d.model === 'yumikage') {
+      const aim = e.swing > 0 ? Math.min(1, (17 - e.swing) / 6) : 0;   // 弓をかまえる
+      if (id === 'leg0') rx = sw * 0.9; else if (id === 'leg1') rx = -sw * 0.9;
+      else if (id === 'arm0' || id === 'bow') { rx = -0.25 - aim * 1.3 + (aim ? 0 : -sw * 0.3); rz = 0.06; }
+      else if (id === 'arm1') { rx = aim ? -1.2 + aim * 0.5 : sw * 0.5; rz = -0.06 - aim * 0.5; }
+      else if (id === 'head' || id === 'brim' || id === 'hat') { rx = 0.08 + aim * 0.05; rz = Math.sin(t * 0.04) * 0.06; }
+    } else if (d.model === 'bakudake') {
+      const k = e.fuse > 0 ? e.fuse / 30 : 0;
+      if (k > 0 && ((e.fuse >> 1) & 1)) { pr = Math.min(1.6, r * 1.5 + 0.3); pg = Math.min(1.6, g * 1.5 + 0.3); pb = Math.min(1.6, b * 1.5 + 0.3); }   // 白く点めつ
+      if (id === 'foot0') rx = sw * 0.9; else if (id === 'foot1') rx = -sw * 0.9;
+      else { oy = Math.abs(Math.sin(e.walk)) * 0.5 * e.walkAmp + (id !== 'stem' ? k * 1.2 + Math.sin(t * 0.08) * 0.25 : 0); if (id === 'cap' || id === 'top') rz = Math.sin(t * 0.06) * 0.04 + (k ? Math.sin(t * 1.9) * 0.05 * k : 0); }
+    } else if (d.model === 'itohaki') {
+      const kk = id === 'head' ? 0 : id === 'seg0' ? 1 : id === 'seg1' ? 2 : 3;
+      if (id.startsWith('leg')) rx = Math.sin(e.walk * 2 + id.charCodeAt(3)) * 0.7 * e.walkAmp;
+      else if (id.startsWith('ant')) { rx = -0.3 + Math.sin(t * 0.13 + id.charCodeAt(3)) * 0.2; oy = Math.sin(e.walk * 2) * 0.5 * e.walkAmp; }
+      else { oy = Math.sin(e.walk * 2 - kk * 1.1) * 0.7 * e.walkAmp + (e.onGround ? 0 : 0.5); if (id === 'head') rx = e.swing > 0 ? -0.35 : Math.sin(t * 0.05) * 0.06; else if (id === 'tail') ry = Math.sin(t * 0.12) * 0.3; }
+    } else if (d.model === 'rock') {
       if (!e.awake && (id.startsWith('eye') || id.startsWith('foot'))) continue;
       if (!e.awake) oy = -1; else if (id.startsWith('eye')) oy = Math.sin(t * 0.3) * 0.2;
     } else if (d.model === 'homurabi') {

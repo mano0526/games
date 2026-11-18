@@ -117,7 +117,7 @@ p { margin: 0 0 8px; }
 .slot u { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 3px; background: #000; pointer-events: none; }
 .slot u s { display: block; height: 100%; }
 .slot.hov { background: #4a4036; }
-.slot.trash::after { content: "すてる"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 11px; color: #ffb4a4; }
+.slot.trash::after { content: "すてる"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: calc(var(--s) * .27); color: #ffb4a4; }
 .rec.flash { animation: slotFlash .45s ease-out; }
 .slot.flash { animation: slotFlash .45s ease-out; }
 @keyframes slotFlash { 0% { background: #fff3c4; box-shadow: 0 0 0 4px rgba(242,179,61,.8); } 100% { box-shadow: 0 0 0 12px rgba(242,179,61,0); } }
@@ -200,35 +200,41 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
 #endStats span:nth-child(even) { text-align: right; color: var(--accent); }
 
 /* ---- 持ち物・作業台などの画面 ---- */
-#screen > .panel { margin: auto; display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; justify-content: center; max-width: min(100%, 860px); }
-#scrMain { display: flex; flex-direction: column; gap: 8px; min-width: 0; width: calc(var(--s) * 9); }
+#screen > .panel { margin: auto; display: flex; flex-wrap: nowrap; gap: calc(var(--s) * .34); align-items: flex-start; justify-content: center; max-width: 100%; font-size: var(--f); }
+#scrMain { display: flex; flex-direction: column; gap: calc(var(--s) * .15); min-width: 0; width: calc(var(--s) * 9); flex: none; }
 #scrHead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-#scrHead h2 { margin: 0; font-size: 19px; }
+#scrHead h2 { margin: 0; font-size: calc(var(--f) * 1.35); }
+#screen .btn { font-size: var(--f); min-height: calc(var(--s) * .8); padding: 2px calc(var(--f) * .8); }
+#screen .rowf { gap: calc(var(--s) * .12); }
 .grid9 { display: grid; grid-template-columns: repeat(9, var(--s)); }
-#scrTop { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
-#scrTop .arrow { font-family: var(--font-display); font-size: 26px; color: var(--ink-dim); }
+#scrTop { display: flex; gap: calc(var(--s) * .25); align-items: center; justify-content: center; flex-wrap: wrap; }
+#scrTop .arrow { font-family: var(--font-display); font-size: calc(var(--s) * .65); color: var(--ink-dim); }
+#scrTop .lbl { font-family: var(--font-display); color: var(--ink-dim); font-size: calc(var(--f) * .95); }
 .g2 { display: grid; grid-template-columns: repeat(2, var(--s)); }
 .g3 { display: grid; grid-template-columns: repeat(3, var(--s)); }
 .g1 { display: grid; grid-template-columns: var(--s); }
 .slot.big { width: calc(var(--s) * 1.3); height: calc(var(--s) * 1.3); }
-#furn { display: grid; grid-template-columns: var(--s) 56px calc(var(--s) * 1.3); grid-template-rows: var(--s) 22px var(--s); gap: 4px 8px; align-items: center; justify-items: center; }
-#furnFire { width: 20px; height: 20px; background: #000; border: 2px solid var(--panel-hi); position: relative; overflow: hidden; }
+#furn { display: grid; grid-template-columns: var(--s) calc(var(--s) * 1.4) calc(var(--s) * 1.3); grid-template-rows: var(--s) calc(var(--s) * .55) var(--s); gap: calc(var(--s) * .1) calc(var(--s) * .2); align-items: center; justify-items: center; }
+#furnFire { width: calc(var(--s) * .5); height: calc(var(--s) * .5); background: #000; border: 2px solid var(--panel-hi); position: relative; overflow: hidden; }
 #furnFire i { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(#ffd23d, #ff6a1c); }
-#furnArrow { width: 56px; height: 12px; background: #000; border: 2px solid var(--panel-hi); box-sizing: border-box; grid-row: 1 / 4; grid-column: 2; }
+#furnArrow { width: calc(var(--s) * 1.4); height: calc(var(--s) * .3); background: #000; border: 2px solid var(--panel-hi); box-sizing: border-box; grid-row: 1 / 4; grid-column: 2; }
 #furnArrow i { display: block; height: 100%; background: var(--accent); }
-#scrInfo { min-height: 1.5em; font-family: var(--font-display); color: var(--ink-dim); font-size: 14px; text-align: center; }
-#recipes { width: min(100%, 330px); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#scrInfo { min-height: 1.4em; font-family: var(--font-display); color: var(--ink-dim); font-size: calc(var(--f) * .95); text-align: center; }
+#scrHelp { font-size: calc(var(--f) * .85); }
+#recipes { flex: 1 1 var(--rw); max-width: calc(var(--s) * 8.6); display: flex; flex-direction: column; gap: calc(var(--s) * .12); min-width: 0; }
+#palBox { flex: none; display: none; flex-direction: column; gap: calc(var(--s) * .15); }
+#palBox h2 { margin: 0; font-size: calc(var(--f) * 1.35); min-height: calc(var(--s) * .8); display: flex; align-items: center; }
 #recTabs { display: flex; flex-wrap: wrap; gap: 4px; }
-#recList { display: flex; flex-direction: column; gap: 3px; max-height: min(52vh, 420px); overflow-y: auto; touch-action: pan-y; padding-right: 2px; }
-.rec { display: grid; grid-template-columns: 32px 1fr auto; gap: 2px 8px; align-items: center; background: var(--slot); padding: 4px 6px; border-left: 4px solid var(--panel-hi); }
+#recList { display: flex; flex-direction: column; gap: 3px; max-height: calc(var(--s) * 7.3); overflow-y: auto; touch-action: pan-y; padding-right: 2px; }
+.rec { display: grid; grid-template-columns: calc(var(--s) * .8) 1fr auto; gap: 2px calc(var(--s) * .2); align-items: center; background: var(--slot); padding: calc(var(--s) * .1) calc(var(--s) * .15); border-left: 4px solid var(--panel-hi); }
 .rec.ok { border-left-color: var(--good); }
-.rec > i { width: 32px; height: 32px; background-size: contain; image-rendering: pixelated; grid-row: 1 / 3; }
-.rec .nm { font-family: var(--font-display); font-size: 15px; line-height: 1.25; }
-.rec .need { grid-column: 2; display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 12px; color: var(--ink-dim); line-height: 1.3; }
+.rec > i { width: calc(var(--s) * .8); height: calc(var(--s) * .8); background-size: contain; image-rendering: pixelated; grid-row: 1 / 3; }
+.rec .nm { font-family: var(--font-display); font-size: calc(var(--f) * 1.08); line-height: 1.25; }
+.rec .need { grid-column: 2; display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: calc(var(--f) * .86); color: var(--ink-dim); line-height: 1.3; }
 .rec .need span.no { color: #ff9c8a; }
-.rec .need i { display: inline-block; width: 14px; height: 14px; background-size: contain; image-rendering: pixelated; vertical-align: -2px; margin-right: 2px; }
+.rec .need i { display: inline-block; width: 1.15em; height: 1.15em; background-size: contain; image-rendering: pixelated; vertical-align: -2px; margin-right: 2px; }
 .rec .btn { grid-row: 1 / 3; grid-column: 3; }
-#palette { display: grid; grid-template-columns: repeat(9, var(--s)); max-height: calc(var(--s) * 5); overflow-y: auto; touch-action: pan-y; }
+#palette { display: grid; grid-template-columns: repeat(9, var(--s)); max-height: calc(var(--s) * 7.6); overflow-y: auto; touch-action: pan-y; }
 #notes { display: flex; flex-direction: column; gap: 3px; max-height: min(64vh, 520px); overflow-y: auto; touch-action: pan-y; width: min(100%, 420px); }
 .note { display: grid; grid-template-columns: 26px 1fr; gap: 8px; background: var(--slot); padding: 5px 8px; align-items: start; }
 .note::before { content: ""; width: 18px; height: 18px; border: 2px solid var(--panel-hi); margin-top: 3px; }
@@ -252,13 +258,30 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
 #tInv { right: var(--gr); top: 8px; height: 40px; width: 68px; }
 #tPause { right: calc(var(--gr) + 74px); top: 8px; height: 40px; width: 68px; }
 /* せまい画面・低い画面 */
-#screen { --s: min(40px, calc((100vw - 60px) / 9)); }
-@media (max-width: 480px) { #screen > .panel { padding: 10px 8px; gap: 10px; } #screen { --s: min(40px, calc((100vw - 58px) / 9)); } }
+/* 持ち物の画面の大きさ：マス1つ（--s）を 画面の はば・高さ から決める。字・ボタン・一覧も --s に合わせて大きくなる
+   よこ＝マス9こ＋右の一覧（--rw 以上）、たて＝見出し・上の3だん・持ち物3だん・手もと1だん・説明 ≒ マス10.3こぶん */
+#screen { --rw: 230px; --tr: 3; --pc: 9; --hb: calc((100vh - 62px) / (7.3 + var(--tr))); --s: min(96px, calc((100vw - 70px - var(--rw)) / 9.4), var(--hb)); --f: clamp(13px, calc(var(--s) * .34), 30px); }
+#screen.norec { --s: min(96px, calc((100vw - 62px) / 9.1), var(--hb)); }
+#screen.wide2 { --s: min(96px, calc((100vw - 74px) / (9.5 + var(--pc))), var(--hb)); }   /* クリエイティブ：左に持ち物、右に えらぶ一覧 */
+#screen.wide2 #palBox { display: flex; }
+#palette { grid-template-columns: repeat(var(--pc), var(--s)); max-height: calc(var(--s) * (4.7 + var(--tr))); }
+#recipes { max-height: calc(var(--s) * (7 + var(--tr))); } #recList { max-height: none; flex: 1 1 auto; min-height: 0; }   /* 右の一覧は 左の持ち物より 高くしない */
+#scrHot { margin-top: calc(var(--s) * .12); }
+@media (max-height: 520px) and (orientation: landscape) {   /* スマホの横持ち：説明の行をしまって、そのぶん マスを大きく */
+  #screen { --rw: 190px; --hb: calc((100vh - 40px) / (5.75 + var(--tr))); padding-block: 4px; }
+  #screen.wide2 { --pc: 7; }
+  #screen > .panel { padding: 6px 10px; }
+  #scrHelp, #scrInfo { display: none; }
+  #recipes { max-height: calc(var(--s) * (5.5 + var(--tr))); } #palette { max-height: calc(var(--s) * (3.9 + var(--tr))); }
+  #recTabs { flex-wrap: nowrap; overflow-x: auto; touch-action: pan-x; } #recTabs .btn { flex: none; }
+}
+@media (orientation: portrait), (max-width: 560px) {   /* たて持ち・せまい画面：一覧は下にまわす */
+  #screen, #screen.norec, #screen.wide2 { --pc: 9; --s: min(64px, calc((100vw - 34px) / 9.1)); }
+  #screen > .panel { flex-wrap: wrap; padding: 10px 8px; }
+  #recipes { flex-basis: 100%; max-width: calc(var(--s) * 9); max-height: none; } #recList { max-height: 42vh; }
+  #palette { max-height: calc(var(--s) * 4); }
+}
 @media (max-height: 480px) {
-  #screen { --s: min(34px, calc((100vw - 60px) / 9), calc((100vh - 130px) / 7.4)); }
-  #screen > .panel { padding: 8px 12px; gap: 10px; flex-wrap: nowrap; }
-  #scrMain { gap: 4px; } #scrHelp { display: none; } #scrHead h2 { font-size: 16px; }
-  #recList { max-height: calc(100vh - 110px); }
   #mTitle.on { display: grid !important; grid-template-columns: 1fr 1fr; gap: 6px 10px; width: min(100%, 560px); }
   #mTitle #logo, #mTitle #tagline, #mTitle #titleNote { grid-column: 1 / 3; } #mTitle .btn { width: 100%; min-height: 40px; } #tagline { margin: 0 0 4px; }
   .panel { padding: 10px 14px; } .col { gap: 6px; } .btn { min-height: 38px; } h2 { margin-bottom: 6px; }
@@ -338,13 +361,14 @@ kbd { font-family: var(--font-display); background: var(--slot); border: 2px sol
         <div id="scrTop"></div>
         <div id="scrInfo"></div>
         <div class="grid9" id="scrInv"></div>
-        <div class="grid9" id="scrHot" style="margin-top:6px"></div>
+        <div class="grid9" id="scrHot"></div>
         <div class="dim" id="scrHelp"></div>
       </div>
       <div id="recipes">
         <div id="recTabs"></div>
         <div id="recList"></div>
       </div>
+      <div id="palBox"><h2>ブロックをえらぶ</h2></div>
     </div>
   </div>
 

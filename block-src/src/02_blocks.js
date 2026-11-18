@@ -251,6 +251,8 @@ defBlock(713, 'melon_stem', 'スイカのつる', { shape: S_CROP, tex: 'stem_0'
 defBlock(714, 'pumpkin', 'カボチャ', { tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side' }, hard: 1, tool: 'axe', sound: 'wood' });
 defBlock(715, 'jack_lantern', 'カボチャのランタン', { tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side', front: 'pumpkin_face' }, hard: 1, tool: 'axe', sound: 'wood', light: 15, facing: true });
 defBlock(716, 'melon', 'スイカ', { tex: { top: 'melon_top', bottom: 'melon_top', side: 'melon_side' }, hard: 1, tool: 'axe', sound: 'wood', drop: (rng) => [[I.melon_slice, 3 + Math.floor(rng() * 5)]] });
+// はじけ箱：火打ち金で火をつけると、4秒後に はじける
+defBlock(717, 'hajike_box', 'はじけ箱', { tex: { top: 'hajike_top', bottom: 'hajike_bottom', side: 'hajike_side' }, hard: 0.2, sound: 'wood' });
 // ほしの結晶：ソラのはての柱の上で、ボスの体力をもどす。こわすと はじける
 defBlock(708, 'hoshi_crystal', 'ほしの結晶', { tex: 'hoshi_crystal', hard: 0.4, cutout: true, opac: 0, light: 15, sound: 'glass', drop: () => [] });
 defBlock(709, 'hoshi_egg', 'ホシのたまご', { tex: 'hoshi_egg', hard: 3, light: 9, sound: 'stone' });
@@ -320,6 +322,14 @@ defItem(353, 'shears', 'ハサミ', { stack: 1, tool: { type: 'shears', tier: 0,
 defItem(354, 'egg', 'たまご', { stack: 16 });
 defItem(355, 'fried_egg', '目玉焼き', { food: [4, 4.8] });
 defItem(356, 'milk_bucket', 'ミルク入りバケツ', { stack: 1, food: [2, 2.4], leftover: 282, drink: true });
+// ---- 弓矢と盾（357〜）。bow_p1・bow_p2 は 弓を引いている絵だけに使う（持ち物には出ない） ----
+defItem(357, 'string', '糸', {});
+defItem(358, 'arrow', '矢', {});
+defItem(359, 'bow', '弓', { stack: 1, tool: { type: 'bow', tier: 0, speed: 1, dur: 384, dmg: 1, mat: 'wood' } });
+defItem(360, 'bow_p1', '弓', { stack: 1, hide: true });
+defItem(361, 'bow_p2', '弓', { stack: 1, hide: true });
+defItem(362, 'shield', '盾', { stack: 1, armor: { slot: 4, def: 0, dur: 336, mat: 'shield' } });   // 防具の5つ目のマス（左手）
+defItem(363, 'pop_powder', 'はじけ粉', {});
 
 const TOOL_MATS = [
   { k: 'wood', n: '木', tier: 1, speed: 2, dur: 60, mat: '#planks' },
@@ -477,6 +487,12 @@ shapeless(I.melon_seeds, 1, [I.melon_slice], 'food');
 shaped(B.melon, 1, ['MMM', 'MMM', 'MMM'], { M: I.melon_slice }, 'food');
 shapeless(B.jack_lantern, 1, [B.pumpkin, B.torch], 'block');
 shapeless(I.pumpkin_pie, 1, [B.pumpkin, I.egg, I.wheat], 'food');
+// ---- 弓矢と盾 ----
+shaped(I.bow, 1, [' SI', 'S I', ' SI'], { S: I.stick, I: I.string }, 'tool');
+shaped(I.arrow, 4, ['F', 'S', 'E'], { F: I.flint, S: I.stick, E: I.feather }, 'tool');
+shaped(I.shield, 1, ['PIP', 'PPP', ' P '], { P: '#planks', I: I.iron_ingot }, 'tool');
+shaped(B.hajike_box, 1, ['PSP', 'SPS', 'PSP'], { P: I.pop_powder, S: B.sand }, 'block');
+shaped(B.wool_white, 1, ['SS', 'SS'], { S: I.string }, 'block');
 // ---- べつの世界 ----
 shapeless(I.flint_steel, 1, [I.iron_ingot, I.flint], 'tool');
 shapeless(I.homura_powder, 2, [I.homura_rod], 'misc');

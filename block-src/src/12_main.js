@@ -18,6 +18,10 @@ const ACHS = [
   { id: 'dog', title: 'イヌとなかよくなる', hint: '森や雪の森にいるイヌに、肉をあげてみよう（何回か必要）。なつくと ついてきて、敵にかみつく', icon: I.cooked_pork },
   { id: 'armor', title: 'よろいを身につける', hint: '鉄で防具を作り、持ち物の左のマスに入れよう', icon: I.iron_chest },
   { id: 'shade', title: 'ヨルカゲをたおす', hint: '夜に現れる影の敵。たおすと「カゲのかけら」を落とす', icon: I.shadow_shard },
+  { id: 'bow', title: '弓をつくる', hint: '棒3本と糸3本。糸は 夜に出る けむし「イトハキ」が落とす。矢は 火打ち石・棒・羽根', icon: I.bow },
+  { id: 'snipe', title: '遠くの敵を射ぬく', hint: '弓は 使うボタンを長くおして引き、はなして うつ。20ブロック以上はなれた生き物に当てよう', icon: I.arrow },
+  { id: 'shield', title: '盾でふせぐ', hint: '板6まいと鉄インゴット1こで盾。持ち物の「盾」のマスに入れ、使うボタンをおしている間 かまえる', icon: I.shield },
+  { id: 'boom', title: 'はじけ箱に火をつける', hint: 'キノコの敵「バクダケ」が落とす はじけ粉5こと 砂4こで作る。火打ち金で火をつけたら すぐ はなれよう', icon: B.hajike_box },
   { id: 'loot', title: '遺跡の宝箱を開ける', hint: '地上の石づくりの遺跡や、地下の小部屋を探そう', icon: B.chest },
   { id: 'diamond', title: 'ダイヤを見つける', hint: '地下深く（高さ15より下）を鉄のツルハシでほろう', icon: I.diamond },
   { id: 'dpick', title: 'ダイヤのツルハシ', hint: 'ダイヤ3こと棒2本。黒曜石がほれる', icon: I.diamond_pick },
@@ -39,7 +43,7 @@ for (const id of TAGS['#planks']) ACH_ITEM[id] = 'planks';
 ACH_ITEM[B.cobble] = 'stone'; ACH_ITEM[I.iron_ingot] = 'iron'; ACH_ITEM[I.diamond] = 'diamond'; ACH_ITEM[B.obsidian] = 'obsidian';
 ACH_ITEM[I.flint_steel] = 'flint'; ACH_ITEM[I.homura_rod] = 'rod'; ACH_ITEM[I.hoshi_eye] = 'eye';
 const ACH_CRAFT = {}; ACH_CRAFT[B.crafting_table] = 'table'; ACH_CRAFT[I.wood_pick] = 'wpick'; ACH_CRAFT[I.stone_pick] = 'spick'; ACH_CRAFT[B.furnace] = 'furnace'; ACH_CRAFT[B.torch] = 'torch';
-ACH_CRAFT[I.iron_pick] = 'ipick'; ACH_CRAFT[I.diamond_pick] = 'dpick'; ACH_CRAFT[I.bread] = 'bread'; ACH_CRAFT[B.altar] = 'altar'; ACH_CRAFT[I.flint_steel] = 'flint'; ACH_CRAFT[I.hoshi_eye] = 'eye';
+ACH_CRAFT[I.iron_pick] = 'ipick'; ACH_CRAFT[I.diamond_pick] = 'dpick'; ACH_CRAFT[I.bread] = 'bread'; ACH_CRAFT[B.altar] = 'altar'; ACH_CRAFT[I.flint_steel] = 'flint'; ACH_CRAFT[I.hoshi_eye] = 'eye'; ACH_CRAFT[I.bow] = 'bow';
 
 function b64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
 function unb64(str) { const s = atob(str), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
@@ -366,6 +370,9 @@ const game = {
     else if (kind === 'armor') { if (player.armor.some(a => a)) this.unlock('armor'); }
     else if (kind === 'kill') { if (id === 'shade') this.unlock('shade'); else if (id === 'king') this.unlock('king'); else if (id === 'hoshikui') this.unlock('hoshikui'); }
     else if (kind === 'loot') this.unlock('loot');
+    else if (kind === 'arrow') { if (id >= 20) this.unlock('snipe'); }
+    else if (kind === 'block') this.unlock('shield');
+    else if (kind === 'prime') this.unlock('boom');
     else if (kind === 'place' && id === B.torch) this.unlock('torch');
   },
   // みんなの世界では、全員がベッドに入るまで横になって待つ
@@ -675,5 +682,5 @@ function startApp(data) {
   game.boot();
 }
 try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => { if (game.world && !game.isDemo) { game.save(); return { resume: game.online ? '@' + net.code : game.worldId }; } return {}; }); } catch (e) { }
-window.__kk = { mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
+window.__kk = { holdKind, spawnShot, spawnPrimed, blast, blastAll, losTo, get MOB_USED() { return MOB_USED; }, mobUse, applyMobUse, passiveLife, setBaby, meId, CULL, get VIS_VER() { return VIS_VER; }, DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
 if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(startApp); else startApp((window.claude && window.claude.hot && window.claude.hot.data) || {});

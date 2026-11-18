@@ -453,17 +453,22 @@ const ui = {
     this.screen = kind; this.ent = ent || null; this.entPos = pos || null; this.slots = [];
     const top = $('scrTop'); top.innerHTML = ''; $('scrInv').innerHTML = ''; $('scrHot').innerHTML = '';
     const creative = player.mode === 1 && kind === 'inv';
-    $('scrTitle').textContent = kind === 'table' ? '作業台' : kind === 'furnace' ? 'かまど' : kind === 'chest' ? 'チェスト' : creative ? 'ブロックをえらぶ' : '持ち物';
-    $('recipes').style.display = (kind === 'inv' && !creative) || kind === 'table' ? '' : 'none';
+    $('scrTitle').textContent = kind === 'table' ? '作業台' : kind === 'furnace' ? 'かまど' : kind === 'chest' ? 'チェスト' : '持ち物';
+    const hasRec = (kind === 'inv' && !creative) || kind === 'table';
+    $('recipes').style.display = hasRec ? '' : 'none';
+    $('screen').classList.toggle('wide2', creative); $('screen').classList.toggle('norec', !hasRec && !creative);   // 画面の形（マスの大きさの決め方）
+    const pb = $('palBox'); while (pb.children.length > 1) pb.removeChild(pb.lastChild);
+    $('screen').style.setProperty('--tr', kind === 'inv' ? (creative ? 1.6 : 2) : 3);   // 上のだんの数（少ない画面は そのぶん マスを大きくできる）
     const mk = (cls) => { const d = document.createElement('div'); d.className = cls; top.appendChild(d); return d; };
     if (creative) {
-      const pal = mk(''); pal.id = 'palette';
-      const ids = Object.keys(ITEMS).map(Number).filter(id => id !== B.furnace_lit).sort((a, b) => a - b);
+      const pal = document.createElement('div'); pal.id = 'palette'; pb.appendChild(pal);   // えらぶ一覧は 右がわに大きく出す
+      const ids = Object.keys(ITEMS).map(Number).filter(id => id !== B.furnace_lit && !ITEMS[id].hide).sort((a, b) => a - b);
       for (const id of ids) this.addSlot(pal, { t: 'pal', id });
       const tr = mk('g1'); this.addSlot(tr, { t: 'trash' }, 'trash').title = 'ここに置くと消えます';
+      const lb = mk('lbl'); lb.textContent = '← いらない物は ここへ';
     } else if (kind === 'inv' || kind === 'table') {
       this.craftW = kind === 'table' ? 3 : 2; this.craft = new Array(this.craftW * this.craftW).fill(null);
-      if (kind === 'inv') { const ar = mk('g2'); for (let i = 0; i < 4; i++) this.addSlot(ar, { t: 'armor', a: player.armor, i }).title = ARMOR_TYPES[i][1].slice(1); }
+      if (kind === 'inv') { const ar = mk('g2'); for (let i = 0; i < 4; i++) this.addSlot(ar, { t: 'armor', a: player.armor, i }).title = ARMOR_TYPES[i][1].slice(1); const sh = mk('g1'); this.addSlot(sh, { t: 'armor', a: player.armor, i: 4 }).title = '盾（左手）'; }
       const g = mk(kind === 'table' ? 'g3' : 'g2'); for (let i = 0; i < this.craft.length; i++) this.addSlot(g, { t: 'craft', a: this.craft, i });
       const a = mk('arrow'); a.textContent = '▶';
       const rs = mk('g1'); this.addSlot(rs, { t: 'result' }, 'big');
@@ -531,6 +536,7 @@ const ui = {
     if (this.craft.length) this.recipe = matchGrid(this.craft, this.craftW);
     for (const r of this.slots) this.paintSlot(r.el, this.getS(r));
     const c = $('cursorItem'), s = player.cursor;
+    if (s && this.slots[0] && this.slots[0].el) c.style.setProperty('--s', this.slots[0].el.offsetWidth + 'px');   // つかんだ物の大きさを マスに合わせる
     if (s) { c.style.display = 'block'; c.firstChild.style.backgroundImage = 'url(' + ICON_URL[s.id] + ')'; c.lastChild.textContent = s.n > 1 ? s.n : ''; if (this._cx !== undefined) this.moveCursor(this._cx, this._cy); $('scrInfo').textContent = '持っている物：' + itemName(s.id) + (s.n > 1 ? ' ×' + s.n : ''); }
     else c.style.display = 'none';
     if (this.screen === 'inv' || this.screen === 'table') this.paintRecipes();
@@ -805,6 +811,11 @@ function howtoHtml() {
 <dd>同じ動物2ひきに好物をあげると、子どもが生まれます（ウシ・ヒツジ＝小麦、ブタ＝ニンジン・ジャガイモ、ニワトリ＝種）。好物を持っていると ついてきます</dd>
 <dd>ハサミでヒツジの毛、バケツでウシのミルク。ヒツジに染料を使うと毛の色が変わります。ニワトリはときどき たまごを生みます</dd>
 <dd>森にいるイヌに肉をあげると、なつくことがあります。なついたイヌに「使う」で おすわり／ついてくる</dd>
+<dt>弓矢と盾</dt>
+<dd>弓は「使う」を長くおして引き、はなすと矢が飛びます（1秒でいっぱい。長く引くほど遠くへ強く）。スマホは軽くタップでも、自動で引いてうちます</dd>
+<dd>矢は 火打ち石・棒・羽根で4本。ブロックにささった矢は 少しすると落ちて、ひろえます</dd>
+<dd>盾は 持ち物の「盾」のマスに入れます。「使う」をおしている間 かまえて、前から来た こうげき・矢・ばくはつを ふせぎます（歩くのは おそくなります）</dd>
+<dd>夜の敵：ユミカゲ（矢をうつ）、バクダケ（そばで ふくらんで はじける。はなれると しぼむ）、イトハキ（糸で足をおそくする。糸を落とす）</dd>
 <dt>べつの世界</dt>
 <dd>黒曜石で四角いわく（内がわが よこ2×たて3以上）を作り、内がわに「火打ち金」を使うと「ホムラの門」がひらきます。中にしばらく立つと「ホムラの底」へ</dd>
 <dd>ホムラの底の1ブロックは、もとの世界の8ブロックぶん。力つきると、もとの世界の復活地点にもどります</dd>

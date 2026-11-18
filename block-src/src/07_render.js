@@ -620,6 +620,15 @@ function addItemModel(texBuf, colBuf, m, id, r, g, b) {
   else addItemMesh(colBuf, m, id, r, g, b, 1);
 }
 
+// 手での持ち方：0＝ブロック（立方体や形のまま）、2＝柄をにぎる道具（絵は 左下が柄・右上が先。ツルハシ・剣・弓・棒・矢など）、1＝そのほかの平たい物（下を持って たてる）
+const _holdKind = {};
+function holdKind(id) {
+  let k = _holdKind[id]; if (k !== undefined) return k;
+  if (isBlk(id) && !ICON[id]) k = 0;
+  else { const d = ITEMS[id], t = d && d.tool ? d.tool.type : ''; k = (t && t !== 'lighter' && t !== 'shears') || id === I.stick || id === I.arrow || id === I.bow_p1 || id === I.bow_p2 ? 2 : 1; }
+  return (_holdKind[id] = k);
+}
+
 // ---- 粒（こわれたかけら・けむり・きらめき） ----
 const PT = { n: 0, max: 1400, x: new Float32Array(1400), y: new Float32Array(1400), z: new Float32Array(1400), vx: new Float32Array(1400), vy: new Float32Array(1400), vz: new Float32Array(1400),
   life: new Float32Array(1400), max0: new Float32Array(1400), size: new Float32Array(1400), layer: new Float32Array(1400), u: new Float32Array(1400), v: new Float32Array(1400),

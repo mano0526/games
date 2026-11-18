@@ -8,13 +8,14 @@ class Player {
     this.x = 0; this.y = 80; this.z = 0; this.vx = 0; this.vy = 0; this.vz = 0; this.yaw = 0; this.pitch = 0;
     this.onGround = false; this.hitH = false; this.mode = 0; this.flying = false;
     this.hp = 20; this.food = 20; this.sat = 5; this.exh = 0; this.air = 300; this.dead = false;
-    this.inv = new Array(36).fill(null); this.armor = [null, null, null, null]; this.sel = 0; this.cursor = null;
+    this.inv = new Array(36).fill(null); this.armor = [null, null, null, null, null]; this.sel = 0;   // 防具4つ＋盾 this.cursor = null;
     this.spawn = null; this.brk = null; this.brkDelay = 0; this.swingT = 0; this.cool = 0; this.useCool = 0; this.eating = 0; this.eatSnd = 0; this.equipT = 0;
     this.sneaking = false; this.sprinting = false; this.inWater = false; this.inLava = false; this.headIn = 0;
     this.fallDist = 0; this.hurtT = 0; this.regenT = 0; this.starveT = 0; this.stepAcc = 0; this.bob = 0; this.bobAmp = 0; this.jumpCd = 0;
     this.target = null; this.targetMob = null; this.ray = [0, 0, -1]; this.eyeOff = 1.62; this.invDirty = true; this.deathPos = null; this.lastSel = -1;
     this.stats = { broken: 0, placed: 0, kills: 0, deaths: 0, crafted: 0, dist: 0 };
     this.burnT = 0; this.gateT = 0; this.gateWait = false;   // 火がついている残り時間／門の中にいる時間／門から出るまで待つ
+    this.drawT = 0; this.autoBow = 0; this.blocking = false; this.blockK = 0; this.noBlockT = 0; this.webT = 0; this.noArrowT = 0;   // 弓を引いている時間／タップで自動で引く残り／盾をかまえているか／糸にからまっている残り
   }
   eyeY() { return this.y + this.eyeOff; }
   held() { return this.inv[this.sel]; }
@@ -87,6 +88,7 @@ class Player {
     if (f <= 0.1 || this.sneaking || (this.mode === 0 && this.food <= 6)) this.sprinting = false;
     let speed = this.flying ? (this.sprinting ? 21 : 10.5) : this.sneaking ? 1.3 : this.sprinting ? 5.6 : 4.3;
     if (this.onGround && !this.flying) { const ub = BLOCKS[world.getBlock(fx, Math.floor(this.y - 0.2), fz)]; if (ub && ub.slow) speed *= 0.45; }
+    if (!this.flying) { if (this.webT > 0) speed *= 0.4; if (this.blocking || this.drawT > 0) { speed *= 0.45; this.sprinting = false; } }   // 糸にからまった／盾をかまえている／弓を引いている
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     const wx = (-sy * f + cy * s) * speed, wz = (-cy * f - sy * s) * speed;
     this.jumpCd -= dt;
@@ -108,7 +110,7 @@ class Player {
       const k = this.onGround ? 1 - Math.exp(-14 * dt) : 1 - Math.exp(-2.4 * dt);
       if (this.onGround || l > 0.05) { this.vx += (wx - this.vx) * k; this.vz += (wz - this.vz) * k; }
       this.vy = Math.max(this.vy - 30 * dt, -60);
-      if (jump && this.onGround && this.jumpCd <= 0) { this.vy = 8.7; this.jumpCd = 0.08; this.exh += this.sprinting ? 0.2 : 0.05; this.onGround = false; }
+      if (jump && this.onGround && this.jumpCd <= 0) { this.vy = this.webT > 0 ? 5.6 : 8.7; this.jumpCd = 0.08; this.exh += this.sprinting ? 0.2 : 0.05; this.onGround = false; }
     }
     let dx = this.vx * dt, dz = this.vz * dt; const dy = this.vy * dt;
     if (this.sneaking && this.onGround && dy <= 0) {
@@ -156,7 +158,7 @@ class Player {
       const dl = Math.hypot(dx, dy, dz) || 1; dx /= dl; dy /= dl; dz /= dl;
     } else { const cp = Math.cos(this.pitch); dx = -Math.sin(this.yaw) * cp; dy = Math.sin(this.pitch); dz = -Math.cos(this.yaw) * cp; }
     this.ray[0] = dx; this.ray[1] = dy; this.ray[2] = dz;
-    if (ui.screen) { this.target = null; this.targetMob = null; this.brk = null; this.eating = 0; return; }
+    if (ui.screen) { this.target = null; this.targetMob = null; this.brk = null; this.eating = 0; this.drawT = 0; this.autoBow = 0; this.blocking = false; return; }
     const reach = this.mode === 1 ? 6 : 5;
     this.target = world.raycast(ex, ey, ez, dx, dy, dz, reach);
     const mh = pickMob(ex, ey, ez, dx, dy, dz, Math.min(3.7, this.target ? this.target.t : 99));
@@ -174,14 +176,25 @@ class Player {
     const plant = !!def && !!def.place && !!this.target && this.target.id === B.farmland;   // 食べられる作物（ニンジンなど）を 畑に植えようとしている
     const canEat = !!def && !!def.food && !tInteract && !mobAct && !plant && (this.food < 20 || !!def.heal || !!def.drink || this.mode === 1);
     this.autoEat = Math.max(0, (this.autoEat || 0) - dt);
+    const bowOk = !!def && !!def.tool && def.tool.type === 'bow' && !tInteract && !mobAct;   // 弓を持っている
+    const hasArrow = bowOk && (this.mode === 1 || this.countSpec(I.arrow) > 0);
+    this.autoBow = Math.max(0, this.autoBow - dt); this.noArrowT = Math.max(0, this.noArrowT - dt); this.noBlockT = Math.max(0, this.noBlockT - dt);
     if (input.tapPending) {   // 画面を軽くタップ：生き物なら攻撃、食べ物なら食べる、それ以外は置く・使う
       input.tapPending = false;
       if (this.targetMob && mobAct) { this.use(world); this.useCool = 0.24; }   // えさ・ハサミなどを持っていれば、たたかずに使う
       else if (this.targetMob) { if (this.cool <= 0) this.attack(this.targetMob); }
       else if (this.targetPeer) { if (this.cool <= 0) this.attackPeer(this.targetPeer); }
       else if (canEat) this.autoEat = 1.7;
+      else if (bowOk) { if (hasArrow) this.autoBow = 1.05; else if (this.noArrowT <= 0) { this.noArrowT = 2; ui.toast('矢がない（火打ち石＋棒＋羽根で作れる）'); } }   // 軽くタップ：自動で いっぱいまで引いて はなつ
       else { this.use(world); this.useCool = 0.24; }
     }
+    const pulling = bowOk && hasArrow && (input.useHeld || this.autoBow > 0);
+    if (bowOk && !hasArrow && input.usePressed && this.noArrowT <= 0) { this.noArrowT = 2; ui.toast('矢がない（火打ち石＋棒＋羽根で作れる）'); }
+    if (pulling) {   // 弓を引く：長く引くほど 遠くへ強く飛ぶ。はなすと うつ
+      if (this.drawT === 0) sfx('bowdraw', 0.6);
+      this.drawT += dt; this.eating = 0; this.blocking = false;
+    } else {
+    if (this.drawT > 0) { if (bowOk && hasArrow && this.drawT >= 0.18) this.shootBow(this.drawT); this.drawT = 0; }
     if (canEat && (input.useHeld || this.autoEat > 0)) {
       this.eating += dt; this.eatSnd -= dt;
       if (this.eatSnd <= 0) { this.eatSnd = 0.22; sfx('eat', 0.5); }
@@ -196,8 +209,20 @@ class Player {
       }
     } else {
       this.eating = 0;
-      if (input.usePressed || (input.useHeld && this.useCool <= 0)) { this.use(world); this.useCool = 0.24; }
+      if (input.usePressed || (input.useHeld && this.useCool <= 0)) { if (this.use(world)) this.noBlockT = 0.35; this.useCool = 0.24; }
     }
+    // 盾：左手のマスに入れておき、使うボタンを おしている間 かまえる（置く・食べるなど ほかのことをした時は かまえない）
+    this.blocking = !!this.armor[4] && input.useHeld && !canEat && !bowOk && this.noBlockT <= 0;
+    }
+    this.blockK += ((this.blocking ? 1 : 0) - this.blockK) * Math.min(1, dt * 14);
+  }
+  // 矢をはなつ。t＝引いた秒数（1秒でいっぱい）
+  shootBow(t) {
+    const pw = Math.min(1, t), k = pw * pw * 0.6 + pw * 0.4, sp = 14 + 36 * k, dmg = Math.max(1, Math.round(2 + 7 * k)), r = this.ray;
+    const s = spawnShot(this.x + r[0] * 0.4, this.eyeY() - 0.1 + r[1] * 0.4, this.z + r[2] * 0.4, r[0] * sp, r[1] * sp + 1.2, r[2] * sp, dmg, 6);
+    s.ox = this.x; s.oz = this.z; s.noPick = this.mode === 1; netShot(s);
+    if (this.mode !== 1) this.consumeSpec(I.arrow, 1);
+    this.wearHeld(1); this.swing(); sfx('bowshot'); this.exh += 0.05; this.stat('shoot', dmg);
   }
   breakTime(id) {
     const b = BLOCKS[id];
@@ -251,7 +276,7 @@ class Player {
     if (hurtMob(e, dmg, this.x, this.z, this.sprinting ? 8 : 5.5)) {
       sfx('hit');
       if (crit) fxPuff(e.x, e.y + e.h * 0.7, e.z, 10, 1, 0.9, 0.3, { glow: true, speed: 3, life: 0.4, size: 0.06 });
-      if (tool && tool.type !== 'lighter' && tool.type !== 'shears') this.wearHeld(tool.type === 'sword' ? 1 : 2);
+      if (tool && tool.type !== 'lighter' && tool.type !== 'shears' && tool.type !== 'bow') this.wearHeld(tool.type === 'sword' ? 1 : 2);
       this.exh += 0.1;
     }
   }
@@ -374,6 +399,7 @@ class Player {
   useLighter(world, t) {
     const x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
     this.swing(); sfxAt('spark', t.x, t.y, t.z); this.wearHeld(1);
+    if (t.id === B.hajike_box) { world.setBlock(t.x, t.y, t.z, 0, 0); spawnPrimed(t.x + 0.5, t.y, t.z + 0.5, 80); this.stat('prime', 0); return true; }   // はじけ箱に火をつける（4秒後に はじける）
     fxPuff(t.x + 0.5 + t.nx * 0.55, t.y + 0.5 + t.ny * 0.55, t.z + 0.5 + t.nz * 0.55, 7, 1, 0.75, 0.25, { glow: true, speed: 1.6, life: 0.3, size: 0.05, grav: 6 });
     if (world.dim === 2) { if (t.id === B.obsidian) ui.toast('ここでは ホムラの門は ひらかない'); return true; }
     const g = tryLightGate(world, x, y, z);
@@ -462,6 +488,7 @@ class Player {
       if (this.headIn === 1) { this.air--; if (this.air <= -20) { this.air = 0; this.damage(2, this.x, this.z, 0, '水', true); } }
       else this.air = Math.min(300, this.air + 6);
       if (this.inLava && world.tick % 10 === 0) { this.damage(4, this.x, this.z, 0, '溶岩', true); this.burnT = Math.max(this.burnT, 60); }
+      if (this.webT > 0) { this.webT--; if (world.tick % 3 === 0) fxPuff(this.x + (Math.random() - 0.5) * 0.6, this.y + 0.2 + Math.random() * 1.3, this.z + (Math.random() - 0.5) * 0.6, 1, 0.95, 0.97, 0.92, { speed: 0.2, life: 0.5, size: 0.06, up: 0, grav: 0 }); }
       if (this.burnT > 0) {   // 火がついている：水に入ると消える
         if (this.inWater) { this.burnT = 0; sfx('fizz', 0.5); }
         else { this.burnT--; if (this.burnT % 20 === 10 && !this.inLava) this.damage(1, this.x, this.z, 0, '火', true); if (world.tick % 2 === 0) fxPuff(this.x + (Math.random() - 0.5) * 0.5, this.y + 0.3 + Math.random() * 1.2, this.z + (Math.random() - 0.5) * 0.5, 1, 1, 0.55 + Math.random() * 0.3, 0.15, { glow: true, speed: 0.3, life: 0.5, size: 0.07, up: 1, grav: 0 }); }
@@ -491,6 +518,17 @@ class Player {
   damage(amount, fromX, fromZ, kb, source, raw) {
     if (this.dead || this.mode === 1 || amount <= 0) return;
     if (this.hurtT > 0 && !raw) return;
+    if (!raw && this.blocking && this.armor[4]) {   // 盾：前から来たものは ふせぐ（盾が すりへる）
+      const dx = fromX - this.x, dz = fromZ - this.z, dl = Math.hypot(dx, dz);
+      if (dl > 0.05 && (dx * -Math.sin(this.yaw) + dz * -Math.cos(this.yaw)) / dl > 0.1) {
+        const a = this.armor[4]; a.d = (a.d || 0) + 1 + Math.floor(amount); this.invDirty = true;
+        if (a.d >= ITEMS[a.id].armor.dur) { this.armor[4] = null; this.blocking = false; sfx('toolbreak'); ui.toast('盾 がこわれた'); }
+        if (kb) { this.vx -= dx / dl * kb * 0.25; this.vz -= dz / dl * kb * 0.25; }
+        this.hurtT = 5; sfx('shieldhit'); game.camKick = 0.4; this.stat('block', 0);
+        fxPuff(this.x - Math.sin(this.yaw) * 0.6, this.eyeY() - 0.35, this.z - Math.cos(this.yaw) * 0.6, 7, 1, 0.9, 0.6, { glow: true, speed: 2.4, life: 0.25, size: 0.05, grav: 8 });
+        return 'block';
+      }
+    }
     if (!raw) {
       amount *= 1 - Math.min(20, this.armorPoints()) * 0.04;
       for (let i = 0; i < 4; i++) { const a = this.armor[i]; if (a) { a.d = (a.d || 0) + 1; if (a.d >= ITEMS[a.id].armor.dur) { this.armor[i] = null; sfx('toolbreak'); ui.toast(itemName(a.id) + ' がこわれた'); } } }
@@ -502,13 +540,13 @@ class Player {
     if (this.hp <= 0) { this.hp = 0; this.die(source); }
   }
   die(source) {
-    this.dead = true; this.stats.deaths++; this.burnT = 0; this.gateT = 0;
+    this.dead = true; this.stats.deaths++; this.burnT = 0; this.gateT = 0; this.drawT = 0; this.autoBow = 0; this.blocking = false; this.webT = 0;
     this.deathPos = { x: Math.floor(this.x), y: Math.floor(this.y), z: Math.floor(this.z) };
     let dropped = false;
     if (!game.rules.keep) {
       const all = this.inv.concat(this.armor);
       for (const s of all) if (s) { const e = spawnDrop(this.x, this.y + 0.6, this.z, s.id, s.n, s.d || 0, (Math.random() - 0.5) * 4, 3 + Math.random() * 2, (Math.random() - 0.5) * 4, 40); if (e) e.life = 12000; dropped = true; }
-      this.inv.fill(null); this.armor = [null, null, null, null];
+      this.inv.fill(null); this.armor = [null, null, null, null, null];
     }
     this.invDirty = true; this.brk = null;
     if (ui.screen) ui.close(true);   // 持ち物や地図を開いたままにしない
@@ -530,7 +568,7 @@ class Player {
   load(o) {
     for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'hp', 'food', 'sat', 'air', 'sel', 'spawn', 'flying', 'deathPos']) if (o[k] !== undefined) this[k] = o[k];
     if (o.inv) this.inv = o.inv.map(s => s ? { id: s.id, n: s.n, d: s.d || 0 } : null); while (this.inv.length < 36) this.inv.push(null);
-    if (o.armor) this.armor = o.armor.map(s => s ? { id: s.id, n: s.n, d: s.d || 0 } : null);
+    if (o.armor) this.armor = o.armor.map(s => s ? { id: s.id, n: s.n, d: s.d || 0 } : null); while (this.armor.length < 5) this.armor.push(null);   // 昔のセーブには 盾のマスがない
     if (o.stats) Object.assign(this.stats, o.stats);
     if (o.dead) { this.hp = 20; this.food = 20; }
     this.invDirty = true;
@@ -543,7 +581,7 @@ class Player {
     cam.yaw = this.yaw; cam.pitch = this.pitch;
     cam.roll = Math.sin(this.bob * 1.9) * 0.006 * b + game.camKick * 0.09 * Math.sin(game.camKick * 9) + (game.shake > 0 ? (Math.random() - 0.5) * game.shake * 0.08 : 0);
     if (game.shake > 0) { cam.x += (Math.random() - 0.5) * game.shake * 0.2; cam.y += (Math.random() - 0.5) * game.shake * 0.2; }
-    cam.fov = settings.fov * (this.sprinting ? 1.08 : 1) * (this.flying && this.sprinting ? 1.05 : 1);
+    cam.fov = settings.fov * (this.sprinting ? 1.08 : 1) * (this.flying && this.sprinting ? 1.05 : 1) * (this.drawT > 0 ? 1 - 0.15 * Math.min(1, this.drawT) : 1);   // 弓を引くと 少し ねらいやすく
     if (this.dead) { cam.roll = 0.5; cam.y = this.y + 0.4; }
     else if (settings.view) {   // うしろから／前から見る：かべにめりこまないよう、ぶつかる手前で止める
       const back = settings.view === 1 ? 1 : -1, cp = Math.cos(this.pitch);
@@ -565,6 +603,24 @@ class Player {
     const bx = Math.sin(this.bob * 1.9) * 0.018 * ba, by = -Math.abs(Math.cos(this.bob * 1.9)) * 0.02 * ba - this.equipT * 0.45;
     const eat = this.eating > 0 ? Math.min(1, this.eating * 5) : 0, ew = eat ? Math.sin(this.eating * 26) * 0.02 : 0;
     const asp = R.w / R.h, hx = 0.7 * asp, sc = clamp(asp / 1.4, 0.55, 1);
+    if (this.armor[4]) {   // 左手の盾：ふだんは下に少しだけ見え、かまえると 前に出る
+      const k = this.blockK, W = [0.65 * r, 0.48 * g, 0.27 * b], Wd = [0.5 * r, 0.36 * g, 0.2 * b], Fe = [0.72 * r, 0.74 * g, 0.78 * b];
+      m4Translate(_mm, -hx * (0.66 - k * 0.3) + bx, -0.74 + k * 0.3 + by, -0.95 + k * 0.08);
+      m4RotY(_mr, -0.55 + k * 0.4); m4Mul(_mm, _mm, _mr); m4RotX(_mr, -0.1 - k * 0.08); m4Mul(_mm, _mm, _mr); m4RotZ(_mr, -0.1 + k * 0.08); m4Mul(_mm, _mm, _mr); m4Scale(_mr, sc, sc, sc); m4Mul(_mm, _mm, _mr);
+      addColorBox(handCol, _mm, -0.27, -0.36, -0.02, 0.27, 0.36, 0.02, W[0], W[1], W[2], 1);
+      addColorBox(handCol, _mm, -0.095, -0.36, 0.02, -0.075, 0.36, 0.026, Wd[0], Wd[1], Wd[2], 1); addColorBox(handCol, _mm, 0.075, -0.36, 0.02, 0.095, 0.36, 0.026, Wd[0], Wd[1], Wd[2], 1);
+      addColorBox(handCol, _mm, -0.29, 0.34, -0.03, 0.29, 0.38, 0.03, Fe[0], Fe[1], Fe[2], 1); addColorBox(handCol, _mm, -0.29, -0.38, -0.03, 0.29, -0.34, 0.03, Fe[0], Fe[1], Fe[2], 1);
+      addColorBox(handCol, _mm, -0.29, -0.34, -0.03, -0.25, 0.34, 0.03, Fe[0], Fe[1], Fe[2], 1); addColorBox(handCol, _mm, 0.25, -0.34, -0.03, 0.29, 0.34, 0.03, Fe[0], Fe[1], Fe[2], 1);
+      addColorBox(handCol, _mm, -0.07, -0.07, 0.02, 0.07, 0.07, 0.05, Fe[0] * 1.15, Fe[1] * 1.15, Fe[2] * 1.15, 1);
+    }
+    if (it && ITEMS[it.id].tool && ITEMS[it.id].tool.type === 'bow' && this.drawT > 0.02) {   // 弓を引いている：つるを たてにして、矢が画面のおくを向くように持つ。いっぱいまで引くと 小さく ふるえる
+      const d = Math.min(1, this.drawT), full = this.drawT >= 1 ? Math.sin(this.drawT * 55) * 0.004 : 0, id = this.drawT > 0.55 ? I.bow_p2 : I.bow_p1;
+      m4Translate(_mm, hx * (0.42 - d * 0.12) + bx + full, -0.3 + d * 0.04 + by + full, -0.85 + d * 0.07);
+      m4RotZ(_mr, -0.16); m4Mul(_mm, _mm, _mr); m4RotY(_mr, -1.08); m4Mul(_mm, _mm, _mr); m4RotZ(_mr, Math.PI / 4); m4Mul(_mm, _mm, _mr);
+      m4Scale(_mr, 0.62 * sc, 0.62 * sc, 0.62 * sc); m4Mul(_mm, _mm, _mr);
+      addItemMesh(handCol, _mm, id, r, g, b, 1);
+      return;
+    }
     if (!it) {
       m4Translate(_mm, hx * 0.62 - s1 * 0.3 * sc + bx, -0.78 + s2 * 0.2 + by, -0.7 - s2 * 0.25);
       m4RotX(_mr, -1.05 - s2 * 0.9); m4Mul(_mm, _mm, _mr); m4RotZ(_mr, 0.22 + s1 * 0.3); m4Mul(_mm, _mm, _mr); m4Scale(_mr, sc, sc, sc); m4Mul(_mm, _mm, _mr);
@@ -578,9 +634,11 @@ class Player {
       m4RotX(_mr, 0.12 - s2 * 0.8); m4Mul(_mm, _mm, _mr); m4RotY(_mr, 0.78 + s1 * 0.5); m4Mul(_mm, _mm, _mr); m4Scale(_mr, 0.34 * sc, 0.34 * sc, 0.34 * sc); m4Mul(_mm, _mm, _mr);
       addBlockCube(handTex, _mm, it.id, r, g, b, 1);
     } else {
-      m4Translate(_mm, hx * 0.56 - s1 * 0.36 * sc + bx - eat * hx * 0.5, -0.4 + s2 * 0.1 + by + ew - eat * 0.05, -1.0 - s2 * 0.22);
-      m4RotY(_mr, Math.PI + 0.62 + s1 * 0.7); m4Mul(_mm, _mm, _mr); m4RotX(_mr, s2 * 1.0); m4Mul(_mm, _mm, _mr); m4RotZ(_mr, -0.12 + s2 * 0.5); m4Mul(_mm, _mm, _mr);
-      m4Scale(_mr, 0.46 * sc, 0.46 * sc, 0.46 * sc); m4Mul(_mm, _mm, _mr);
+      // 平たい物：板を 見ている向きに そわせて、右下から前へ つき出すように持つ（柄は 画面の下に かくれる＝にぎっているように見える）。ふると 前へ ふりおろす
+      const tool = holdKind(it.id) === 2, S = (tool ? 0.66 : 0.5) * sc;
+      m4Translate(_mm, hx * (tool ? 0.62 : 0.6) - s1 * 0.3 * sc + bx - eat * hx * 0.48, (tool ? -0.5 : -0.52) + s2 * 0.04 - s1 * 0.12 + by + ew, (tool ? -0.95 : -0.98) - s2 * 0.12);
+      m4RotX(_mr, -s2 * 1.0); m4Mul(_mm, _mm, _mr); m4RotY(_mr, 1.8 + s1 * 0.25 + eat * 0.8); m4Mul(_mm, _mm, _mr); m4RotZ(_mr, tool ? -0.2 : -0.1); m4Mul(_mm, _mm, _mr);
+      m4Scale(_mr, S, S, S); m4Mul(_mm, _mm, _mr);
       addItemMesh(handCol, _mm, it.id, r, g, b, 1);
     }
   }

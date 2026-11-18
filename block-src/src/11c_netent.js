@@ -81,11 +81,17 @@ function netTake(m) {
 // ボスが自分の画面に現れた（体力バーを出す。暗くするのは カゲの王だけ）
 function bossSeen(e) { game.boss = e; game.bossLost = 0; ui.dark(e.type === 'king'); }
 
+// 矢をうったことを、同じ世界の近くの人に知らせる
+function netShot(s) {
+  if (!net.on) return;
+  for (const p of net.peers.values()) if (p.dim === game.world.dim && net.fresh(p) && Math.hypot(p.x - s.x, p.z - s.z) < 96) net.dm(p.pid, { t: 'shot', k: s.dark, p: [r2(s.x), r2(s.y), r2(s.z), r2(s.vx), r2(s.vy), r2(s.vz)], d: s.dmg });
+}
 // ---- 送る側：自分が動かしているものの一覧 ----
 function entRec(e) {
-  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0) | (e.baby > 0 ? 64 : 0) | (e.sheared ? 128 : 0) | (e.sit ? 256 : 0) | (e.love > 0 ? 512 : 0), e.type === 'sheep' ? e.color | 0 : e.type === 'dog' ? (e.tamer || 0) : 0];
+  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 || e.fuse > 0 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0) | (e.baby > 0 ? 64 : 0) | (e.sheared ? 128 : 0) | (e.sit ? 256 : 0) | (e.love > 0 ? 512 : 0), e.type === 'sheep' ? e.color | 0 : e.type === 'dog' ? (e.tamer || 0) : 0];
   if (e.kind === 'item') return [e.nid, 1, e.id, e.n, e.d, r2(e.x), r2(e.y), r2(e.z)];
   if (e.kind === 'falling') return [e.nid, 2, e.id, r2(e.x), r2(e.y), r2(e.z)];
+  if (e.kind === 'primed') return [e.nid, 4, e.fuse | 0, r2(e.x), r2(e.y), r2(e.z)];
   return [e.nid, 3, e.dark | 0, r2(e.x), r2(e.y), r2(e.z), r2(e.vx), r2(e.vy), r2(e.vz), e.dmg];
 }
 function netCollect(full) {
@@ -95,7 +101,7 @@ function netCollect(full) {
     net.nearPeer(e.x, e.z); let dn = net._npd;
     if (e.type === 'hoshikui' && dn < 1e8) dn = 0;   // ソラのはてのボスは、同じ世界にいる人には 遠くても いつも送る
     if (dn > 64) { if (e._ns) { e._ns = ''; net.rmQ.push(e.nid); } continue; }
-    if (e.kind === 'shot') { if (e._ns) continue; e._ns = '1'; out.push(entRec(e)); continue; }
+    if (e.kind === 'shot') { if (e._ns || e.dark === 5 || e.dark === 6) continue; e._ns = '1'; out.push(entRec(e)); continue; }   // 矢は 速いので、うった瞬間に 連絡で知らせる（netShot）
     if (!full && e.kind === 'mob' && dn > 28 && net.entTick) continue;   // 遠い生き物は ゆっくり送る
     const r = entRec(e), s = r.join(',');
     if (!full && s === e._ns) continue;
@@ -125,6 +131,8 @@ function mkPuppet(p, r) {
     if (MOBS[r[2]].boss && r[7] > 0) bossSeen(e);
   } else if (k === 1) { e = spawnDrop(r[5], r[6], r[7], r[2], r[3], r[4], 0, 0, 0, 0); if (!e) return null; }
   else if (k === 2) { e = addEnt({ kind: 'falling', x: r[3], y: r[4], z: r[5], px: r[3], py: r[4], pz: r[5], vx: 0, vy: 0, vz: 0, hw: 0.49, h: 0.98, id: r[2], age: 0, dead: false, onGround: false }); }
+  else if (k === 4) { e = addEnt({ kind: 'primed', x: r[3], y: r[4], z: r[5], px: r[3], py: r[4], pz: r[5], vx: 0, vy: 0, vz: 0, hw: 0.49, h: 0.98, fuse: r[2] | 0, age: 0, dead: false, onGround: false }); }
+  else if (k !== 3) return null;
   else { const s = spawnShot(r[3] + r[6] * 0.15, r[4] + r[7] * 0.15, r[5] + r[8] * 0.15, r[6], r[7], r[8], r[9], r[2]); s.foreign = true; return true; }   // 弾は、見えた人それぞれの画面で飛ばす（よけやすいように）
   e.remote = true; e.owner = p.pid; e.rnid = r[0]; e.tx = e.x; e.ty = e.y; e.tz = e.z; e.tyaw = e.yaw || 0;
   return e;
@@ -142,11 +150,12 @@ function updPuppet(e, r) {
     const hp = r[7], b = r[8], d = MOBS[e.type];
     if (hp < e.hp) { e.hurt = 10; sfxAt((hp <= 0 ? 'die_' : 'hurt_') + d.voice, e.x, e.y, e.z); if (hp <= 0 && !e.death) e.death = 1; }
     e.hp = hp; e.awake = !!(b & 1); e.onGround = !!(b & 8);
-    if ((b & 2) && !e._sw) e.swing = d.boss ? 20 : 8; e._sw = !!(b & 2);
+    if ((b & 2) && !e._sw) e.swing = d.boss ? 20 : e.type === 'yumikage' ? 16 : 8; e._sw = !!(b & 2);
+    e.fuseOn = e.type === 'bakudake' && !!(b & 4);
     if ((b & 4) && !e._sl) e.slam = 20; e._sl = !!(b & 4);
     e.breath = !!(b & 16); e.land = (b & 32) ? 1 : 0; puppetLook(e, r);
   } else if (e.kind === 'item') { e.n = r[3]; e.tx = r[5]; e.ty = r[6]; e.tz = r[7]; }
-  else { e.tx = r[3]; e.ty = r[4]; e.tz = r[5]; }
+  else { e.tx = r[3]; e.ty = r[4]; e.tz = r[5]; if (e.kind === 'primed') e.fuse = r[2] | 0; }
 }
 function dropPuppet(p, nid) {
   const e = p.ents.get(nid); if (e === undefined) return;
@@ -161,14 +170,16 @@ function puppetTick(world, e) {
   e.x += (e.tx - e.x) * 0.45; e.y += (e.ty - e.y) * 0.45; e.z += (e.tz - e.z) * 0.45;
   if (e.kind === 'mob') {
     if (e.swing > 0) e.swing--;
-    if (e.slam > 0) { e.slam--; if (e.slam === 6) kingSlamFx(e); }
+    if (e.slam > 0) { e.slam--; if (e.slam === 6 && MOBS[e.type].boss) kingSlamFx(e); }
+    if (e.type === 'bakudake') e.fuse = e.fuseOn ? Math.min(30, (e.fuse || 0) + 1) : Math.max(0, (e.fuse || 0) - 1);
     if (e.hp <= 0) { e.death++; if (e.type === 'hoshikui' && e.segs && e.death % 2 === 0) { const s = e.segs[rnd(e.segs.length)]; fxPuff(s.x, s.y + 0.8, s.z, 8, 1, 0.9, 1, { glow: true, speed: 6, life: 1.1, size: 0.16, spread: 1 }); } }
     e.yaw = lerpAngle(e.yaw, e.tyaw, 0.45);
     const moved = Math.hypot(e.x - ox, e.z - oz);
     e.walk += moved * 2.6; e.walkAmp += (Math.min(1, moved * 14) - e.walkAmp) * 0.3;
     if (e.type === 'hoshikui') hoshiBody(world, e, false);
     if (e.type === 'wisp' && e.age % 3 === 0) fxPuff(e.x, e.y + 0.3, e.z, 1, 0.45, 0.8, 1, { glow: true, speed: 0.3, life: 0.5, size: 0.06, up: -0.2, grav: 0 });
-  } else if (e.kind === 'item') {
+  } else if (e.kind === 'primed') { if (e.fuse > 0) e.fuse--; if (e.age % 3 === 0) fxPuff(e.x, e.y + 1.05, e.z, 1, 0.75, 0.75, 0.75, { speed: 0.3, life: 0.7, size: 0.08, up: 1.2, grav: 0 }); }
+else if (e.kind === 'item') {
     if (!player.dead && (e.pickCd = (e.pickCd || 0) - 1) <= 0) {
       const dx = player.x - e.x, dy = player.y + 0.8 - e.y, dz = player.z - e.z;
       if (dx * dx + dy * dy + dz * dz < 1.8 && player.canTake(e.id, e.d)) { e.pickCd = 14; net.dm(e.owner, { t: 'pick', n: e.rnid }); }
@@ -198,6 +209,12 @@ net.onDm = function (raw) {
       break;
     }
     case 'give': netTake(m); break;
+    case 'shot': {   // ほかの人（か、その人が動かす敵）が 矢をうった：自分の画面でも 同じ所から飛ばす
+      const a = m.p; if (!from || from.dim !== this.world.dim || !Array.isArray(a) || a.length < 6 || (m.k !== 5 && m.k !== 6) || !a.every(v => typeof v === 'number' && isFinite(v))) break;
+      const sh = spawnShot(a[0], a[1], a[2], clamp(a[3], -70, 70), clamp(a[4], -70, 70), clamp(a[5], -70, 70), clamp(+m.d || 0, 0, 12), m.k); sh.foreign = true; sh.by = from.name; sfxAt('bowshot', a[0], a[1], a[2]);
+      break;
+    }
+    case 'boom': if (from && from.dim === this.world.dim) blast(this.world, +m.x || 0, +m.y || 0, +m.z || 0, clamp(+m.a || 0, 0, 40), clamp(+m.r || 0, 0, 8), String(m.s || '').slice(0, 20), false); break;   // ほかの人の端末が受け持つ はじけ（自分へのダメージは ここで決める）
     case 'use': { const e = ownEnt(m.n); if (e && e.kind === 'mob' && typeof m.a === 'string') applyMobUse(e, m.a, m.f, m.c | 0); break; }   // ほかの人が、自分の動かしている動物に えさ・ハサミなどを使った
     case 'adopted': if (Array.isArray(m.ids)) for (const nid of m.ids) { const e = ownEnt(nid); if (e) { e.dead = true; e._ns = ''; } } break;   // 通信が切れている間に、ほかの人が引き取った分
     case 'kill': player.onKill({ type: m.ty }); break;
@@ -287,7 +304,7 @@ function drawLookPreview(cv, look) {
   };
   put('head', 4, 0, 8, 8); put('body', 4, 8, 8, 12); put('arm0', 0, 8, 4, 12); put('arm1', 12, 8, 4, 12); put('leg0', 4, 20, 4, 12); put('leg1', 8, 20, 4, 12);
 }
-const _hm = m4(), _hp = m4(), _ht = m4(), _hi = m4();
+const _hm = m4(), _hp = m4(), _ht = m4(), _hi = m4(), _hs = m4();
 function drawPeers(world, cam) {
   for (const p of net.peers.values()) {
     if (p.dead || p.y < -900 || p.dim !== world.dim || !net.fresh(p)) continue;
@@ -297,11 +314,11 @@ function drawPeers(world, cam) {
   }
 }
 // 自分の姿（うしろから／前から見るとき）
-const _self = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, walk: 0, walkAmp: 0, swingT: 0, sneaking: false, sleeping: false, held: 0, hurtT: 0, eating: false };
+const _self = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, walk: 0, walkAmp: 0, swingT: 0, sneaking: false, sleeping: false, held: 0, hurtT: 0, eating: false, blocking: false, shield: false };
 function drawSelf(world, cam) {
   const p = player, s = _self, h = p.held();
-  s.x = p.x; s.y = p.y; s.z = p.z; s.yaw = p.yaw; s.pitch = p.pitch; s.walk = p.bob * 1.9; s.walkAmp = p.bobAmp; s.swingT = p.swingT; s.sneaking = p.sneaking; s.sleeping = game.inBed;
-  s.held = h ? h.id : 0; s.hurtT = p.hurtT > 0 ? 1 : 0; s.eating = p.eating > 0;
+  s.x = p.x; s.y = p.y; s.z = p.z; s.yaw = p.yaw + (R.dbgYaw || 0); s.pitch = p.pitch;   // dbgYaw＝試験で 横から見るため s.walk = p.bob * 1.9; s.walkAmp = p.bobAmp; s.swingT = p.swingT; s.sneaking = p.sneaking; s.sleeping = game.inBed;
+  s.held = h ? (p.drawT > 0.55 ? I.bow_p2 : p.drawT > 0.02 ? I.bow_p1 : h.id) : 0; s.hurtT = p.hurtT > 0 ? 1 : 0; s.eating = p.eating > 0; s.blocking = p.blocking; s.shield = !!p.armor[4];
   drawHuman(world, MODELS.pl0, s, p.x - cam.x, p.y - cam.y, p.z - cam.z);
 }
 // 人の形を描く。p: {x,y,z,yaw,pitch,walk,walkAmp,swingT,sneaking,sleeping,held,hurtT,eating}
@@ -314,13 +331,14 @@ function drawHuman(world, model, p, x, y, z) {
   if (p.sleeping) { m4Translate(_mr, 0, 0.22, -0.9); m4Mul(_hm, _hm, _mr); m4RotX(_mr, Math.PI / 2); m4Mul(_hm, _hm, _mr); }
   m4Scale(_mr, sc, sc, sc); m4Mul(_hm, _hm, _mr);
   const sw = p.sleeping ? 0 : Math.sin(p.walk) * p.walkAmp, sn = p.sneaking && !p.sleeping, sp = p.swingT > 0 ? Math.sin((1 - p.swingT) * Math.PI) : 0;
-  let handM = null;
+  let handM = null, shM = null;
+  const aim = p.held === I.bow_p1 || p.held === I.bow_p2;   // 弓を引いている
   for (const pt of model) {
     let rx = 0, rz = 0, oy = sn ? -2 : 0, oz = 0; const id = pt.id;
     if (id === 'head') { rx = p.sleeping ? 0 : clamp(p.pitch, -1.2, 1.2); if (sn) { oy -= 1; oz = -4.5; } }
     else if (id === 'body') { if (sn) rx = -0.4; }
-    else if (id === 'arm0') { rx = -sw * 0.8; rz = -0.04; if (sn) { oy -= 1; oz = -4; rx += 0.25; } }
-    else if (id === 'arm1') { rx = sw * 0.8 + (p.held ? 0.32 : 0) + sp * 1.5 + (p.eating ? 1.2 + Math.sin(R.time * 22) * 0.12 : 0); rz = 0.04; if (sn) { oy -= 1; oz = -4; rx += 0.25; } }
+    else if (id === 'arm0') { rx = -sw * 0.8; rz = -0.04; if (aim) { rx = 1.3 + p.pitch * 0.8; rz = -0.35; } else if (p.blocking) { rx = 1.0; rz = -0.5; } if (sn) { oy -= 1; oz = -4; rx += 0.25; } }
+    else if (id === 'arm1') { rx = sw * 0.8 + (p.held ? 0.32 : 0) + sp * 1.5 + (p.eating ? 1.2 + Math.sin(R.time * 22) * 0.12 : 0); rz = 0.04; if (aim) { rx = 1.45 + p.pitch * 0.8; rz = 0.1; } if (sn) { oy -= 1; oz = -4; rx += 0.25; } }
     else if (id === 'leg0') rx = sw * 0.9;
     else if (id === 'leg1') rx = -sw * 0.9;
     let M = _hm;
@@ -331,7 +349,8 @@ function drawHuman(world, model, p, x, y, z) {
       m4Translate(_ht, -pt.pv[0], -pt.pv[1], -pt.pv[2]); m4Mul(_hp, _hp, _ht);
       m4Mul(_hp, _hm, _hp); M = _hp;
     }
-    if (id === 'arm1' && p.held && ITEMS[p.held]) { handM = _hi; m4Translate(_ht, 6, 12.5, -1.5); m4Mul(handM, M, _ht); }
+    if (id === 'arm1' && p.held && ITEMS[p.held]) { handM = _hi; m4Translate(_ht, 6, 12.8, -0.8); m4Mul(handM, M, _ht); }
+    if (id === 'arm0' && p.shield && !p.sleeping) { shM = _hs; shM.set(p.blocking ? _hm : M); }
     const bb = pt.b;
     for (let f = 0; f < 6; f++) {
       const uv = pt.uv[f], sh = FACE_SHADE[f] * 0.9 + 0.1;
@@ -342,11 +361,29 @@ function drawHuman(world, model, p, x, y, z) {
       }
     }
   }
+  if (shM) {   // 盾（板・鉄のふち・まん中の鉄）。ふだんは左うでの外がわ、かまえている時は 体の前
+    const W = [0.65 * r, 0.48 * g, 0.27 * b], Fe = [0.72 * r, 0.74 * g, 0.78 * b];
+    if (p.blocking) {
+      const y0 = sn ? 8 : 10;
+      addColorBox(dynCol, shM, -9.5, y0, -12, 0.5, y0 + 12, -11.2, W[0], W[1], W[2], 1);
+      addColorBox(dynCol, shM, -10, y0 + 12, -12.2, 1, y0 + 12.8, -11, Fe[0], Fe[1], Fe[2], 1); addColorBox(dynCol, shM, -10, y0 - 0.8, -12.2, 1, y0, -11, Fe[0], Fe[1], Fe[2], 1);
+      addColorBox(dynCol, shM, -6, y0 + 4.5, -12.6, -3, y0 + 7.5, -12, Fe[0], Fe[1], Fe[2], 1);
+    } else {
+      addColorBox(dynCol, shM, -9.3, 10.5, -4.5, -8.5, 21.5, 4.5, W[0], W[1], W[2], 1);
+      addColorBox(dynCol, shM, -9.5, 21.5, -5, -8.3, 22.3, 5, Fe[0], Fe[1], Fe[2], 1); addColorBox(dynCol, shM, -9.5, 9.7, -5, -8.3, 10.5, 5, Fe[0], Fe[1], Fe[2], 1);
+      addColorBox(dynCol, shM, -9.9, 14.5, -1.5, -9.3, 17.5, 1.5, Fe[0], Fe[1], Fe[2], 1);
+    }
+  }
   if (handM) {   // 手に持っている物
-    const cube = isBlk(p.held) && !ICON[p.held], s = cube ? 4.6 : 8.5;
-    if (cube) { m4RotY(_ht, 0.6); m4Mul(handM, handM, _ht); }
-    else { m4RotY(_ht, Math.PI / 2); m4Mul(handM, handM, _ht); m4RotZ(_ht, -0.9); m4Mul(handM, handM, _ht); m4Translate(_ht, 2.5, 2.5, 0); m4Mul(handM, handM, _ht); }
-    m4Scale(_ht, s, s, s); m4Mul(handM, handM, _ht);
+    const kind = holdKind(p.held), s = kind === 0 ? 4.6 : kind === 2 ? 13 : 7.5;
+    if (kind === 0) { m4RotY(_ht, 0.6); m4Mul(handM, handM, _ht); m4Scale(_ht, s, s, s); m4Mul(handM, handM, _ht); }
+    else if (aim) {   // 弓を引いている：つるを たてに、矢を前に向ける（うでは前へ のびている）
+      m4RotZ(_ht, Math.PI / 2); m4Mul(handM, handM, _ht); m4RotX(_ht, -Math.PI / 2); m4Mul(handM, handM, _ht); m4RotZ(_ht, Math.PI / 4); m4Mul(handM, handM, _ht);
+      m4Scale(_ht, s, s, s); m4Mul(handM, handM, _ht); m4Translate(_ht, 0.19, -0.19, 0); m4Mul(handM, handM, _ht);
+    } else {   // 平たい物：板を 体の前後の向きに立てる。道具は 柄を にぎって ななめ前に つき出す。そのほかは 下を持って たてる
+      m4RotY(_ht, Math.PI / 2); m4Mul(handM, handM, _ht); m4RotZ(_ht, kind === 2 ? -0.25 : -0.75); m4Mul(handM, handM, _ht);
+      m4Scale(_ht, s, s, s); m4Mul(handM, handM, _ht); m4Translate(_ht, kind === 2 ? 0.3 : 0, kind === 2 ? 0.3 : 0.4, 0); m4Mul(handM, handM, _ht);
+    }
     addItemModel(dynTex, dynCol, handM, p.held, r, g, b);
   }
 }
