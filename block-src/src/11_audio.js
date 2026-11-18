@@ -76,6 +76,11 @@ const audio = {
         case 'shade': T(0.55 * L, 'sawtooth', 85 * p, 58 * p, 0.3 * v, 0.1, [5, 6]); N(0.5 * L, 'bandpass', 320, 220, 3, 0.25 * v, 0.12); break;
         case 'rock': N(0.3 * L, 'lowpass', 240 * p, 90, 1, 0.8 * v, 0.02); T(0.2 * L, 'sine', 80 * p, 50, 0.4 * v); break;
         case 'wisp': T(0.3 * L, 'sine', 1400 * p, 1900 * p, 0.14 * v, 0.03, [12, 60]); break;
+        case 'homurabi': N(0.35 * L, 'bandpass', 900 * p, 2400, 1.2, 0.3 * v, 0.02); T(0.3 * L, 'sawtooth', 240 * p, 420 * p, 0.12 * v, 0.03, [22, 30]); break;
+        case 'kurage': T(0.7 * L, 'sine', 620 * p, 380 * p, 0.2 * v, 0.1, [7, 40]); T(0.6 * L, 'sine', 930 * p, 560 * p, 0.08 * v, 0.1, [7, 40]); break;
+        case 'bone': for (let i = 0; i < 3; i++) T(0.05, 'square', (260 + i * 70) * p, 180 * p, 0.14 * v, 0.003, null, i * 0.07 * L); N(0.2 * L, 'bandpass', 1500, 900, 2, 0.12 * v); break;
+        case 'magma': T(0.22 * L, 'sine', 150 * p, 70, 0.4 * v); N(0.25 * L, 'lowpass', 600 * p, 200, 1, 0.4 * v, 0.01); break;
+        case 'hoshi': T(1.3 * L, 'sawtooth', 110 * p, 52 * p, 0.42 * v, 0.2, [3, 7]); T(1.1 * L, 'sine', 330 * p, 160 * p, 0.2 * v, 0.2, [5, 20]); N(1.0 * L, 'bandpass', 500, 180, 1.5, 0.35 * v, 0.25); break;
         case 'king': T(1.0 * L, 'sawtooth', 62 * p, 44 * p, 0.45 * v, 0.15, [4, 4]); N(0.9 * L, 'lowpass', 260, 120, 1, 0.5 * v, 0.2); break;
       }
       return;
@@ -107,6 +112,14 @@ const audio = {
       case 'slam': T(0.6, 'sine', 95, 38, 0.9, 0.005); N(0.5, 'lowpass', 320, 80, 1, 0.9, 0.005); break;
       case 'summon': T(0.9, 'sawtooth', 70, 300, 0.25, 0.2, [9, 20]); N(0.9, 'bandpass', 300, 1800, 2, 0.3, 0.3); T(1.4, 'sine', 55, 40, 0.5, 0.05, null, 0.7); break;
       case 'shoot': T(0.22, 'sine', 950 * r, 300, 0.22); N(0.15, 'highpass', 3000, 2000, 1, 0.1); break;
+      case 'ignite': N(0.12, 'highpass', 2500, 5000, 1, 0.4); T(0.5, 'sawtooth', 90, 240, 0.2, 0.1, [11, 30], 0.08); N(0.6, 'bandpass', 500, 1500, 1.5, 0.25, 0.15, 0.08); break;
+      case 'spark': N(0.06, 'highpass', 3500, 6000, 1, 0.35); T(0.04, 'square', 1800 * r, 900, 0.1); break;
+      case 'gatehum': T(3.4, 'sine', 62, 96, 0.3, 1.2, [5, 9]); T(3.4, 'triangle', 124, 190, 0.1, 1.5, [7, 14]); N(3.2, 'bandpass', 300, 1400, 3, 0.12, 1.6); break;
+      case 'warp': T(1.1, 'sine', 180, 1300, 0.22, 0.4); T(1.3, 'triangle', 90, 660, 0.16, 0.5); N(1.2, 'bandpass', 400, 4200, 2, 0.3, 0.6); T(0.9, 'sine', 1568, 0, 0.12, 0.01, null, 1.0); break;
+      case 'boom': T(0.5, 'sine', 120, 34, 0.9, 0.004); N(0.7, 'lowpass', 900, 90, 0.8, 0.9, 0.004); N(0.25, 'highpass', 2200, 800, 0.7, 0.25, 0.003); break;
+      case 'crystal': [2093, 1568, 2637, 1319, 3136].forEach((f, i) => T(0.5, 'sine', f * r, 0, 0.16, 0.003, null, i * 0.045)); N(0.4, 'highpass', 4000, 7000, 1, 0.3); break;
+      case 'breath': N(2.4, 'bandpass', 500, 1700, 1.2, 0.5, 0.5); T(2.4, 'sawtooth', 70, 110, 0.2, 0.6, [6, 10]); break;
+      case 'roar': T(1.6, 'sawtooth', 130, 48, 0.5, 0.15, [4, 9]); T(1.5, 'sine', 390, 140, 0.22, 0.2, [6, 25]); N(1.4, 'bandpass', 700, 200, 1.2, 0.5, 0.2); break;
       case 'victory': [392, 523, 659, 784, 1047, 1319, 1568].forEach((f, i) => { T(0.8, 'triangle', f, 0, 0.26, 0.005, null, i * 0.13); T(1.0, 'sine', f * 2, 0, 0.09, 0.005, null, i * 0.13); }); break;
     }
   },

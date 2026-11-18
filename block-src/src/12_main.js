@@ -21,13 +21,23 @@ const ACHS = [
   { id: 'dpick', title: 'ダイヤのツルハシ', hint: 'ダイヤ3こと棒2本。黒曜石がほれる', icon: I.diamond_pick },
   { id: 'obsidian', title: '黒曜石を手に入れる', hint: '溶岩のみなもとに水をかけるとできる。バケツが役に立つ', icon: B.obsidian },
   { id: 'altar', title: 'めざめの祭壇をつくる', hint: '黒曜石4・カゲのかけら4・ダイヤ1。置いて使うと…', icon: B.altar },
-  { id: 'king', title: 'カゲの王をたおす', hint: '祭壇を使うと現れる。よろいと食べ物の準備を忘れずに', icon: B.crown_block }
+  { id: 'king', title: 'カゲの王をたおす', hint: '祭壇を使うと現れる。よろいと食べ物の準備を忘れずに', icon: B.crown_block },
+  { id: 'flint', title: '火打ち金をつくる', hint: '砂利をほると ときどき出る「火打ち石」と、鉄インゴットで作る', icon: I.flint_steel },
+  { id: 'gate', title: 'ホムラの門をひらく', hint: '黒曜石で四角いわく（内がわが よこ2×たて3以上）を作り、内がわに火打ち金を使う', icon: B.obsidian },
+  { id: 'homura', title: 'ホムラの底に立つ', hint: '門の中にしばらく立つと、溶岩の海が広がる べつの世界へ行ける', icon: B.yakeishi },
+  { id: 'fort', title: 'とりでを見つける', hint: 'ホムラの底にある、やけレンガの橋と広場', icon: B.yake_bricks },
+  { id: 'rod', title: 'ホムラの芯を手に入れる', hint: 'とりでにいる火の生き物「ホムラビ」が落とす', icon: I.homura_rod },
+  { id: 'eye', title: 'ほしの目をつくる', hint: 'ホムラの粉（芯1本から2つ）と カゲのかけらで作る。12こ必要', icon: I.hoshi_eye },
+  { id: 'ring', title: 'ソラの門をひらく', hint: '「ソラの門のわく」12こを、地面に 5×5 の輪（かどの4つはなし）にならべる', icon: B.sora_frame },
+  { id: 'crystal', title: 'ほしの結晶をこわす', hint: 'ソラのはての柱の上にある。残っていると、ボスの体力がもどってしまう', icon: B.hoshi_crystal },
+  { id: 'hoshikui', title: 'ホシクイをたおす', hint: 'とびかかってきた時と、まんなかの台にとまった時が たたくチャンス', icon: B.hoshi_egg }
 ];
 const ACH_ITEM = {}; for (const id of TAGS['#log']) ACH_ITEM[id] = 'wood';
 for (const id of TAGS['#planks']) ACH_ITEM[id] = 'planks';
 ACH_ITEM[B.cobble] = 'stone'; ACH_ITEM[I.iron_ingot] = 'iron'; ACH_ITEM[I.diamond] = 'diamond'; ACH_ITEM[B.obsidian] = 'obsidian';
+ACH_ITEM[I.flint_steel] = 'flint'; ACH_ITEM[I.homura_rod] = 'rod'; ACH_ITEM[I.hoshi_eye] = 'eye';
 const ACH_CRAFT = {}; ACH_CRAFT[B.crafting_table] = 'table'; ACH_CRAFT[I.wood_pick] = 'wpick'; ACH_CRAFT[I.stone_pick] = 'spick'; ACH_CRAFT[B.furnace] = 'furnace'; ACH_CRAFT[B.torch] = 'torch';
-ACH_CRAFT[I.iron_pick] = 'ipick'; ACH_CRAFT[I.diamond_pick] = 'dpick'; ACH_CRAFT[I.bread] = 'bread'; ACH_CRAFT[B.altar] = 'altar';
+ACH_CRAFT[I.iron_pick] = 'ipick'; ACH_CRAFT[I.diamond_pick] = 'dpick'; ACH_CRAFT[I.bread] = 'bread'; ACH_CRAFT[B.altar] = 'altar'; ACH_CRAFT[I.flint_steel] = 'flint'; ACH_CRAFT[I.hoshi_eye] = 'eye';
 
 function b64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
 function unb64(str) { const s = atob(str), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
@@ -88,6 +98,7 @@ const storage = {
 const RULES = [{ k: 'keep', name: '力尽きても持ち物を落とさない' }, { k: 'mobs', name: '敵が出る' }, { k: 'day', name: 'ずっと昼' }, { k: 'grief', name: 'ボスがブロックをこわす' }, { k: 'pvp', name: '友だちへの攻撃' }];
 const game = {
   state: 'boot', world: null, isDemo: false, worldId: null, name: '', diff: 2, ach: {}, ended: false, boss: null,
+  gates: new Map(), limbo: [[], [], []], arrive: null, soraDone: false, soraT: 0,   // 門の一覧／べつの世界に置いてきた落とし物とボス／移動のとちゅう／ソラのはてのボスをたおしたか
   rules: { keep: false, mobs: true, day: false, grief: true, pvp: false }, online: false, inBed: false, sessionT: 0, bossLost: 0, dynScale: 1, dynDist: 99,
   defaultRules(diff) { return { keep: diff < 2, mobs: true, day: false, grief: true, pvp: false }; },
   // ルールやむずかしさを変える。みんなの世界では全員に伝える
@@ -98,7 +109,7 @@ const game = {
   },
   applyMeta(m) {
     if (!this.online || !m) return;
-    this.name = m.name; this.diff = m.diff; this.rules = Object.assign(this.defaultRules(m.diff), m.rules || {});
+    this.name = m.name; this.diff = m.diff; this.rules = Object.assign(this.defaultRules(m.diff), m.rules || {}); this.soraDone = !!m.sora;
     if (ui.menu === 'mRules') ui.paintRules();
   },
   camKick: 0, shake: 0, fps: 0, debug: false, acc: 0, last: 0, frames: 0, fpsT: 0, saveT: 0, pausedAt: 0, saveChain: Promise.resolve(),
@@ -152,7 +163,7 @@ const game = {
   },
   disposeWorld() {
     if (this.world) { this.world.dispose(); this.world = null; }
-    stopGenWorkers(); _activeWorld = null; ents = []; PT.n = 0; this.boss = null;
+    stopGenWorkers(); _activeWorld = null; ents = []; PT.n = 0; this.boss = null; this.limbo = [[], [], []]; this.arrive = null; ui.gateFx(0);
     ui.dark(false); ui.fade(false);
   },
   showTitle() {
@@ -188,7 +199,7 @@ const game = {
       const r = await net.join(code), m = r.meta, pd = net.loadPlayer(r.code) || {};
       net.enter(r.code, m, r.time);
       this.isFreshOnline = !!fresh;
-      this.beginWorld({ id: m.id || ('o' + r.code), name: m.name, seed: m.seed, mode: m.mode, diff: m.diff, day: 1, time: 600, tick: 0, player: pd.player || null, ach: pd.ach || {}, ended: !!pd.ended, rules: m.rules, gv0: m.gv0 || 1, online: true, map: pd.map }, new Map());
+      this.beginWorld({ id: m.id || ('o' + r.code), name: m.name, seed: m.seed, mode: m.mode, diff: m.diff, day: 1, time: 600, tick: 0, dim: pd.dim | 0, sora: m.sora, player: pd.player || null, ach: pd.ach || {}, ended: !!pd.ended, rules: m.rules, gv0: m.gv0 || 1, online: true, map: pd.map }, new Map());
     } catch (e) { console.error(e); net.leave(true); ui.netError(e); }
   },
   async loadWorld(id) {
@@ -206,24 +217,30 @@ const game = {
     if (this.online) { w.net = net; net.world = w; net.own = !!(net.known().find(o => o.code === net.code) || {}).own; }
     this.rules = Object.assign(this.defaultRules(meta.diff), meta.rules || {});
     if (this.online) net.applyTime();
+    if (!this.online) { this.gates = new Map(); if (Array.isArray(meta.gates)) for (const g of meta.gates) this.gateIn(g && g.id, g); }
+    this.soraDone = !!meta.sora; this.soraT = 0;
     restoreMobs(w, meta.mobs);
+    if ((meta.dim | 0) && !(meta.player && meta.player.dead)) w.switchDim(meta.dim | 0);   // べつの世界でやめたときは、そこから（力つきていたら もとの世界から）
     map.load(meta.map);
     startGenWorkers(w.seed);
     this.worldId = meta.id; this.name = meta.name; this.diff = meta.diff; this.ach = meta.ach || {}; this.ended = !!meta.ended; this.isDemo = false;
     player.reset(); player.mode = meta.mode;
-    this.worldSpawn = this.findSpawn(w.gen);
+    this.worldSpawn = this.findSpawn(w.genOf(w.gv0, 0));
     this.isNew = !meta.player;
     if (meta.player) { player.load(meta.player); if (meta.player.dead) { player.respawn(); } else this.needSafeSpot = 0; }
     else { player.x = this.worldSpawn.x; player.y = this.worldSpawn.y; player.z = this.worldSpawn.z; this.needSafeSpot = 1; }
+    player.gateWait = true;   // 門の中でやめていたら、一度出るまで移らない
     this.state = 'loading'; this.loadT = 0; this.acc = 0; this.saveT = 0; this.camKick = 0; this.shake = 0;
     $('loadTitle').textContent = this.online ? '世界に入っています' : this.isNew ? '世界をつくっています' : '世界を読みこんでいます'; $('loadFill').style.width = '0%';
     $('loadNote').textContent = 'はじめての場所は少し時間がかかります';
     ui.showMenu('mLoading', true); $('hud').classList.add('off');
   },
   enterPlay() {
+    const tr = this.arrive; this.arrive = null;   // べつの世界へ移ってきたところか
     this.state = 'playing'; ui.hideMenu(); $('hud').classList.remove('off'); $('app').classList.add('playing');
     player.invDirty = true; ui.hp = ui.food = ui.air = ui.armor = ui.sel = -99; this.last = performance.now();
-    ui.dayBanner(this.world.day + '日目');
+    ui.dayBanner(tr || this.world.dim ? DIM_NAMES[this.world.dim] : this.world.day + '日目');
+    if (tr) this.onArrive(tr);
     if (this.isNew) {
       const tips = player.mode === 0 ? ['ようこそ！ まずは木をなぐって原木を集めよう', '次の目標は「開拓ノート」で見られます'] : ['クリエイティブへようこそ。持ち物を開くと全部のブロックを選べます'];
       tips.push(touchSt.touchUsed ? '左下で歩く・画面をなぞって見回す・長押しでこわす・タップで置く' : '操作に迷ったら Esc を押して「遊び方」を見てください');
@@ -233,7 +250,8 @@ const game = {
     if (this.online) {   // ゲーム一覧の「みんなの部屋」から来た人には、この世界のコードを知らせる
       try { if (window.NetDB && NetDB.hub && NetDB.hub.isHost) NetDB.hub.report('block', net.code); } catch (e) { }
     }
-    if (this.online) { ui.netHud(); setTimeout(() => { if (this.state === 'playing' && net.on) ui.toast(this.isFreshOnline ? '世界のコードは「' + net.code + '」。メニューから招待リンクを送れます' : '「' + this.name + '」に入りました（コード ' + net.code + '）', 7); }, 800); }
+    if (this.online) ui.netHud();
+    if (this.online && !tr) { setTimeout(() => { if (this.state === 'playing' && net.on) ui.toast(this.isFreshOnline ? '世界のコードは「' + net.code + '」。メニューから招待リンクを送れます' : '「' + this.name + '」に入りました（コード ' + net.code + '）', 7); }, 800); }
     this.save();
   },
   // 安全に立てる場所へ。mode 1: 地面の上（木の上は避ける） 2: 今の場所で、埋まっていたら上へ
@@ -278,13 +296,19 @@ const game = {
     if (!noLock) requestLock(true);
   },
   async quitToTitle() { await this.save(); this.showTitle(); },
-  respawn() { player.respawn(); this.state = 'playing'; ui.hideMenu(); $('app').classList.add('playing'); ui.hp = ui.food = ui.air = -99; requestLock(true); },
+  respawn() {
+    if (this.world.dim !== 0) {   // べつの世界で力つきた → もとの世界の復活地点へ
+      this.state = 'playing'; ui.hideMenu(); $('app').classList.add('playing'); ui.hp = ui.food = ui.air = -99; requestLock(true);
+      this.travel(0, 'home'); return;
+    }
+    player.respawn(); this.state = 'playing'; ui.hideMenu(); $('app').classList.add('playing'); ui.hp = ui.food = ui.air = -99; requestLock(true);
+  },
   save() {
     if (!this.world || this.isDemo || this.state === 'loading') return Promise.resolve();
     if (this.online) { net.savePlayer(); return Promise.resolve(); }
     const w = this.world; w.flushAll();
     const meta = { id: this.worldId, name: this.name, seed: w.seed, mode: player.mode, diff: this.diff, day: w.day, time: w.time, tick: w.tick, player: JSON.parse(JSON.stringify(player.serialize())), ach: Object.assign({}, this.ach), ended: this.ended, savedAt: Date.now(), ver: 2,
-      rules: Object.assign({}, this.rules), gv0: w.gv0, mobs: collectMobs(w), map: map.save(true) };
+      rules: Object.assign({}, this.rules), gv0: w.gv0, mobs: collectMobs(w), map: map.save(true), dim: w.dim, gates: [...this.gates.values()], sora: this.soraDone ? 1 : 0 };
     if (w.rgv) meta.rgv = Object.fromEntries(w.rgv);
     const entries = []; for (const k of w.savedDirty) entries.push([k, w.saved.get(k)]); w.savedDirty.clear();
     this.saveChain = this.saveChain.then(() => storage.save(meta, entries)).catch((e) => { for (const [k] of entries) w.savedDirty.add(k); if (!this.saveWarned) { this.saveWarned = true; ui.toast('セーブに失敗しました。ブラウザの空き容量が足りないのかもしれません', 6); } });
@@ -296,7 +320,7 @@ const game = {
     const data = await storage.load(id);
     if (!data) { ui.toast('書き出す世界が見つかりませんでした'); return; }
     const out = { format: 'kakukaku-save', ver: 1, meta: data.meta, chunks: [] };
-    for (const [k, v] of data.chunks) out.chunks.push([k, b64(v.b), b64(v.m), v.e || []]);
+    for (const [k, v] of data.chunks) out.chunks.push(v.b2 ? [k, b64(v.b2), b64(v.m), v.e || [], 2] : [k, b64(v.b), b64(v.m), v.e || []]);   // 5つ目の 2 ＝ ブロックの番号が16ビット
     const text = JSON.stringify(out), fname = 'block_' + String(data.meta.name || 'world').replace(/[\\/:*?"<>|\s]/g, '_') + '.json';
     try {
       if (window.claude && typeof window.claude.use === 'function') {
@@ -316,7 +340,7 @@ const game = {
         const o = JSON.parse(fr.result);
         if (!o || o.format !== 'kakukaku-save' || !o.meta || !Array.isArray(o.chunks)) throw new Error('形式がちがいます');
         const meta = Object.assign({}, o.meta, { id: 'w' + Date.now().toString(36), savedAt: Date.now() });
-        const entries = o.chunks.map(([k, b, m, e]) => [k, { b: unb64(b), m: unb64(m), e: e || [] }]);
+        const entries = o.chunks.map(([k, b, m, e, f]) => [k, f === 2 ? { b2: unb64(b), m: unb64(m), e: e || [] } : { b: unb64(b), m: unb64(m), e: e || [] }]);
         await storage.save(meta, entries);
         ui.toast('「' + meta.name + '」を読みこみました'); this.openWorldListRefresh();
       } catch (e) { ui.toast('このファイルは読みこめませんでした'); }
@@ -338,7 +362,7 @@ const game = {
     else if (kind === 'sleep') this.unlock('bed');
     else if (kind === 'till') this.unlock('farm');
     else if (kind === 'armor') { if (player.armor.some(a => a)) this.unlock('armor'); }
-    else if (kind === 'kill') { if (id === 'shade') this.unlock('shade'); else if (id === 'king') this.unlock('king'); }
+    else if (kind === 'kill') { if (id === 'shade') this.unlock('shade'); else if (id === 'king') this.unlock('king'); else if (id === 'hoshikui') this.unlock('hoshikui'); }
     else if (kind === 'loot') this.unlock('loot');
     else if (kind === 'place' && id === B.torch) this.unlock('torch');
   },
@@ -380,10 +404,141 @@ const game = {
     ui.toast('カゲの王が 目を覚ました…', 4);
     if (player.mode === 1) ui.toast('クリエイティブでは、カゲの王はおそってきません', 5);
   },
-  bossDefeated() {
+  bossDefeated(type) {
     this.boss = null; ui.dark(false); ui.flash(); sfx('victory'); this.shake = 0.4;
-    if (!this.ended) { this.ended = true; this.endT = 4.5; }
+    if (type === 'hoshikui') {   // さいごのボス。ここで「おわりの画面」
+      this.unlock('hoshikui');
+      if (!this.soraDone) { this.soraDone = true; if (this.online) net.setMeta({ sora: 1 }); }
+      this.ended = true; this.endT = 7;
+      ui.toast('ホシクイを たおした！ まんなかの台に かえりの門が ひらいた', 8);
+    } else ui.toast('カゲの王を たおした！ 王冠を落としていった', 6);
     this.save();
+  },
+  // ---------- べつの世界（ホムラの底・ソラのはて） ----------
+  gateIn(id, v) {   // 門の一覧に入れる（保存されていた物・ほかの人から届いた物。形を確かめる）
+    if (typeof id !== 'string' || id.length > 48 || !v) return;
+    const d = v.d | 0, x = Math.round(+v.x), y = Math.round(+v.y), z = Math.round(+v.z);
+    if (!(d === 0 || d === 1) || !(Math.abs(x) < 3e7) || !(Math.abs(z) < 3e7) || !(y >= 1 && y < CH)) return;
+    this.gates.set(id, { id, d, x, y, z });
+  },
+  gateAdd(d, x, y, z) {
+    const id = d + '_' + x + '_' + y + '_' + z; if (this.gates.has(id)) return;
+    const rec = { id, d, x, y, z }; this.gates.set(id, rec);
+    if (this.gates.size > 80) this.gateDel(this.gates.keys().next().value);
+    if (this.online) net.gateSet(rec);
+  },
+  gateDel(id) { if (this.gates.delete(id) && this.online) net.gateDel(id); },
+  findGate(d, x, z, r) { let best = null, bd = r * r; for (const g of this.gates.values()) { if (g.d !== d) continue; const dd = (g.x - x) * (g.x - x) + (g.z - z) * (g.z - z); if (dd <= bd) { bd = dd; best = g; } } return best; },
+  // いまの世界を出る前に、自分が動かしている物を片づける（動物はしまう・落とし物とボスは その世界に置いておく・敵は消す）
+  leaveDim() {
+    const w = this.world, keep = [];
+    if (net.on) net.flush();
+    for (const e of ents) {
+      if (e.dead || e.remote) continue;
+      if (net.on && e._ns) net.rmQ.push(e.nid);
+      if (e.kind === 'mob') {
+        if (net.on) { const p = net.nearPeer(e.x, e.z); if (p && (net._npd < 72 || e.type === 'hoshikui')) { netGive(e, p.pid); continue; } }   // ソラのはてのボスは、同じ世界に人がいれば 遠くてもまかせる
+        if (MOBS[e.type].boss) { if (e.hp > 0) keep.push(e); }
+        else if (keepsMob(e)) stashMob(w, e);
+      } else if (e.kind === 'item') keep.push(e);
+    }
+    if (net.on) for (const p of net.peers.values()) p.ents.clear();
+    for (const e of keep) e._ns = '';
+    this.limbo[w.dim] = keep; ents = []; PT.n = 0; this.boss = null; this.bossLost = 0; ui.dark(false);
+  },
+  // べつの世界へ移る。how：'gate'＝ホムラの門をくぐる、'sora'＝ソラの門にとびこむ、'home'＝もとの世界の復活地点へ（かえりの門・力つきたとき）
+  travel(dim, how) {
+    const w = this.world; if (!w || this.isDemo || (this.state !== 'playing' && this.state !== 'paused') || this.arrive) return;
+    if (this.state === 'paused') this.resume(true);
+    if (ui.screen) ui.close(true);
+    if (this.inBed) this.wake();
+    const from = w.dim, arr = { kind: how, from, done: false };
+    let px = player.x, py = player.y, pz = player.z;
+    if (how === 'gate') {
+      const fx = Math.floor(player.x), fz = Math.floor(player.z);
+      const o = gateOrigin(w, fx, Math.floor(player.y + 0.1), fz) || gateOrigin(w, fx, Math.floor(player.y + 1), fz);
+      if (o) this.gateAdd(from, o.x, o.y, o.z);   // 帰りに ここへ出てこられるように
+      const s = dim === 1 ? 1 / HOMURA_SCALE : HOMURA_SCALE, tx = Math.floor(player.x * s), tz = Math.floor(player.z * s);
+      const g = this.findGate(dim, tx, tz, dim === 1 ? 26 : 150);
+      arr.g = g; arr.tx = g ? g.x : tx; arr.tz = g ? g.z : tz; arr.ty = g ? g.y : clamp(Math.floor(player.y), 40, 100);
+      px = arr.tx + 0.5; py = arr.ty; pz = arr.tz + 0.5;
+    }
+    sfx('warp'); ui.flash(); this.isNew = false;
+    if (!player.dead) this.save();   // 読みこみ中にやめても、ここまでの変更が残るように
+    this.leaveDim();
+    w.switchDim(dim);
+    ents = this.limbo[dim]; this.limbo[dim] = [];
+    for (const e of ents) if (e.kind === 'mob' && MOBS[e.type].boss) bossSeen(e);
+    this.needSafeSpot = 0;
+    if (how === 'sora') { px = SORA_ARRIVE[0] + 0.5; pz = SORA_ARRIVE[1] + 0.5; py = 72; player.yaw = Math.PI / 2; player.pitch = 0; this.needSafeSpot = 1; }
+    else if (how === 'home') {
+      if (player.dead) player.respawn();
+      else { const sp = player.spawn || this.worldSpawn; player.x = sp.x; player.y = sp.y; player.z = sp.z; this.needSafeSpot = player.spawn ? 2 : 1; }
+      px = player.x; py = player.y; pz = player.z; arr.bed = !!player.spawn;
+    }
+    player.x = px; player.y = py; player.z = pz; player.vx = player.vy = player.vz = 0; player.fallDist = 0; player.gateT = 0; player.gateWait = true; player.brk = null; player.burnT = 0; player.flying = player.mode === 1;
+    this.arrive = arr; this.soraT = 0;
+    this.state = 'loading'; this.loadT = 0; this.acc = 0;
+    $('loadTitle').textContent = DIM_NAMES[dim] + ' へ…'; $('loadFill').style.width = '0%'; $('loadNote').textContent = 'はじめての場所は少し時間がかかります';
+    ui.showMenu('mLoading', true); $('hud').classList.add('off'); ui.gateFx(0);
+  },
+  // 着いた先の読みこみが終わった。false を返すと、もう少し読みこみを続ける
+  finishArrive() {
+    const a = this.arrive, w = this.world; a.done = true;
+    if (a.kind === 'gate') {
+      let g = a.g;
+      if (g && w.getBlock(g.x, g.y, g.z) !== B.homura_gate) { this.gateDel(g.id); g = null; }   // 前にあった門が こわされていた
+      if (!g) { g = buildGate(w, a.tx, a.ty, a.tz); this.gateAdd(w.dim, g.x, g.y, g.z); }
+      const ax = w.getMeta(g.x, g.y, g.z) & 1;
+      player.x = g.x + 0.5; player.z = g.z + 0.5; player.y = g.y + 0.01;   // マスのまんなかに立つ（マスのさかい目ちょうどに立つと、面のすき間が線に見える） player.yaw = ax ? Math.PI / 2 : 0; player.pitch = 0;
+      player.vx = player.vy = player.vz = 0; player.gateWait = true;
+    } else if (a.kind === 'home' && a.bed && player.spawn) {
+      const sp = player.spawn;
+      if (w.isLoaded(Math.floor(sp.x), Math.floor(sp.z)) && w.getBlock(Math.floor(sp.x), Math.floor(sp.y - 0.6), Math.floor(sp.z)) !== B.bed) {
+        player.spawn = null; a.bed = false; a.done = false; ui.toast('ベッドがなくなったので最初の場所にもどります');
+        player.x = this.worldSpawn.x; player.y = this.worldSpawn.y; player.z = this.worldSpawn.z; this.needSafeSpot = 1; this.loadT = 0;
+        return false;
+      }
+    }
+    return true;
+  },
+  onArrive(a) {
+    const d = this.world.dim;
+    if (d === 1) { this.unlock('homura'); if (!this.ach.rod && player.mode === 0) setTimeout(() => { if (this.state === 'playing' && this.world.dim === 1) ui.toast('ここは ホムラの底。溶岩に気をつけて。やけレンガの「とりで」を探そう（方向は 開拓ノートに出ます）', 8); }, 2500); }
+    else if (d === 2 && !this.soraDone && this.diff > 0) setTimeout(() => { if (this.state === 'playing' && this.world.dim === 2) ui.toast('ここは ソラのはて。柱の上の結晶をこわしてから、ホシクイに いどもう', 8); }, 2500);
+  },
+  // ソラの門のわくを置いたとき：輪ができていたら 門をひらく
+  checkSoraRing(x, y, z) {
+    const w = this.world;
+    if (w.dim !== 0) { ui.toast('ソラの門は、もとの世界でしか ひらかない', 5); return; }
+    const c = soraRingAt(w, x, y, z); if (!c) return;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) w.setBlock(c[0] + dx, y, c[1] + dz, B.sora_gate, 2, 1);
+    sfx('ignite'); sfx('treasure'); ui.flash(); this.shake = Math.max(this.shake, 0.4);
+    for (let i = 0; i < 70; i++) { const a = Math.random() * 6.283, r = Math.random() * 2.4; fxPuff(c[0] + 0.5 + Math.cos(a) * r, y + 0.8 + Math.random() * 3, c[1] + 0.5 + Math.sin(a) * r, 1, 0.6, 0.85, 1, { glow: true, speed: 1.5, life: 1.3, size: 0.1, up: 1.6, grav: 0 }); }
+    this.unlock('ring');
+    ui.toast('ソラの門が ひらいた！ とびこむと「ソラのはて」へ。帰り道は、ボスをたおすと ひらく', 9);
+  },
+  // べつの世界にいる間、1秒ごとに
+  dimTick() {
+    const w = this.world;
+    if (w.dim === 1) { if (!this.ach.fort && w.getBlock(Math.floor(player.x), Math.floor(player.y - 0.5), Math.floor(player.z)) === B.yake_bricks) this.unlock('fort'); return; }
+    if (w.dim !== 2 || player.dead || ++this.soraT < 4) return;
+    const first = !net.on || net.isFirstInDim();
+    if (this.soraDone || this.diff === 0) {   // ボスがいない（たおした後・「のんびり」）ときは、かえりの門を出しておく
+      if (first && w.isLoaded(0, 0) && w.isLoaded(-3, -3) && w.getBlock(1, SORA_PED_Y + 1, 0) !== B.sora_gate) {   // たおした人が遠くにいて 置けなかったときも、だれかが近づけば ここで置かれる
+        for (const [dx, dz] of soraGateCells()) w.setBlock(dx, SORA_PED_Y + 1, dz, B.sora_gate, 2, 1);
+        if (this.soraDone && !w.getBlock(0, SORA_PED_Y + 5, 0)) w.setBlock(0, SORA_PED_Y + 5, 0, B.hoshi_egg, 0);
+      }
+      return;
+    }
+    let mine = null, other = null;
+    for (const e of ents) if (e.kind === 'mob' && e.type === 'hoshikui' && !e.dead) { if (e.remote) other = e; else mine = e; }
+    if (mine && other && other.owner < net.pid) { mine.dead = true; mine.noCredit = true; mine = null; }   // 2体になってしまったら ゆずる
+    const b = mine || other;
+    if (b) { if (this.boss !== b && b.hp > 0) bossSeen(b); return; }
+    if (!first) return;
+    const e = spawnMob('hoshikui', 0.5, 90, 34.5); bossSeen(e);
+    sfx('roar'); ui.toast('ソラのヌシ「ホシクイ」が あらわれた！', 6);
   },
   showEnding() {
     if (this.state !== 'playing') return;
@@ -409,10 +564,10 @@ const game = {
     w.randomTicks(Math.floor(player.x / 16), Math.floor(player.z / 16));
     w.tickFurnaces();
     tickEntities(w);
-    if (w.tick % 20 === 0) spawnCycle(w);
+    if (w.tick % 20 === 0) { spawnCycle(w); if (w.dim) this.dimTick(); }
     if (w.tick % 10 === 0) map.mark();
     player.tick(); net.tick();
-    if (this.boss && this.boss.dead) { if (this.boss.hp <= 0) this.bossDefeated(); else { this.boss = null; this.bossLost = 120; } }   // 倒した以外で消えた＝ほかの人の端末に移った
+    if (this.boss && this.boss.dead) { if (this.boss.hp <= 0) this.bossDefeated(this.boss.type); else { this.boss = null; this.bossLost = 120; } }   // 倒した以外で消えた＝ほかの人の端末に移った
     if (this.bossLost > 0 && --this.bossLost === 0 && !this.boss) ui.dark(false);
     if (this.inBed && !w.isNight()) this.wake();
     if (++this.saveT >= 400) { this.saveT = 0; this.save(); }
@@ -439,7 +594,7 @@ const game = {
     if (this.fpsT >= 0.5) { this.fps = Math.round(this.frames / this.fpsT); this.frames = 0; this.fpsT = 0; }
     R.time += dt;
     const w = this.world; if (!w || R.lost) return;
-    const cam = this.cam, vd = Math.min(settings.viewDist, this.dynDist);
+    const cam = this.cam, vd = Math.min(settings.viewDist, this.dynDist, w.dim === 1 ? 6 : 99);   // ホムラの底は もやで遠くが見えないので、読みこむ広さもしぼる（洞くつだらけで面が多いため）
     if (this.state === 'title') {
       this.titleAng += dt * 0.045; w.time = (w.time + dt * 30) % 24000; if (w.time > 10500) w.time = 500;
       const tp = this.titlePos, tvd = Math.min(vd, 6);
@@ -454,10 +609,12 @@ const game = {
       const pcx = Math.floor(player.x / 16), pcz = Math.floor(player.z / 16);
       let ok = 0; for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const c = w.getChunk(pcx + dx, pcz + dz); if (c && c.meshed) ok++; }
       $('loadFill').style.width = Math.round(ok / 25 * 100) + '%';
+      let ready = ok >= 25;
+      if ((ready || this.loadT > 25) && this.arrive && !this.arrive.done) ready = this.finishArrive() && ready;   // 門をさがす・つくる
       if (this.needSafeSpot && this.placeSafe(this.needSafeSpot)) this.needSafeSpot = 0;
       cam.x = player.x; cam.y = player.eyeY(); cam.z = player.z; cam.yaw = player.yaw; cam.pitch = player.pitch; cam.fov = settings.fov; cam.roll = 0;
       renderFrame(w, cam, vd, 0, false);
-      if ((ok >= 25 && !this.needSafeSpot) || this.loadT > 25) this.enterPlay();
+      if ((ready && !this.needSafeSpot) || this.loadT > 25) this.enterPlay();
       return;
     }
     // みんなの世界では、メニューを開いていても世界は止まらない
@@ -476,13 +633,14 @@ const game = {
       if (this.acc > 0.25) this.acc = 0;
       updateParticles(w, dt);
       this.camKick = Math.max(0, this.camKick - dt * 3); this.shake = Math.max(0, this.shake - dt * 0.8);
-      if (this.endT > 0) { this.endT -= dt; if (this.endT <= 0) this.showEnding(); }
-      audio.tickMusic(w.isNight());
+      if (this.endT > 0) { this.endT -= dt; if (this.endT <= 0) { if (player.dead || this.state !== 'playing' || ui.screen) this.endT = 1; else this.showEnding(); } }   // 力つきている間・画面を開いている間は待つ
+      audio.tickMusic(w.dim ? true : w.isNight());
     }
     net.frame(dt);
     w.stream(player.x, player.z, vd, 4);
     updateMeshes(w, player.x, player.y, player.z, vd, 5);
     player.camera(cam);
+    { const gk = clamp(player.gateT / 70, 0, 1); if (gk > 0) { cam.fov += gk * 12 + Math.sin(R.time * 11) * 6 * gk; cam.roll = Math.sin(R.time * 7) * 0.07 * gk; } ui.gateFx(gk); }   // 門の中：けしきが ゆらぐ
     const alpha = sim ? this.acc / 0.05 : 1;
     drawEntities(w, cam, alpha);
     if (net.on) drawPeers(w, cam);
@@ -490,7 +648,7 @@ const game = {
     drawParticles(w, cam);
     const t = player.target;
     if (t && this.state === 'playing' && !ui.screen && !player.dead) {
-      const bs = selectionBoxes(t.id, t.meta), b = bs[0] || BOX_FULL[0], e = 0.004;
+      const b = t.box || selectionBoxes(t.id, t.meta)[0] || BOX_FULL[0], e = 0.004;
       const x0 = t.x + b[0] - e - cam.x, y0 = t.y + b[1] - e - cam.y, z0 = t.z + b[2] - e - cam.z, x1 = t.x + b[3] + e - cam.x, y1 = t.y + b[4] + e - cam.y, z1 = t.z + b[5] + e - cam.z;
       addBoxLines(dynLine, x0, y0, z0, x1, y1, z1, 0, 0, 0, 0.55);
       if (player.brk && player.brk.p > 0) addLayerBox(dynCrack, x0, y0, z0, x1, y1, z1, TEX['crack_' + clamp(Math.floor(player.brk.p * 8), 0, 7)], 1, 1, 1, 1);
@@ -501,6 +659,7 @@ const game = {
     R.skip = skip;
     ui.updateHud(dt);
     if (net.on) updTags(cam);
+    signs.draw(cam);
     map.work(map.open ? 7 : 1.5);
     if (map.open) map.drawFull(); else if (map.frame % 3 === 0) map.drawMini();
   }
@@ -513,5 +672,5 @@ function startApp(data) {
   game.boot();
 }
 try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => { if (game.world && !game.isDemo) { game.save(); return { resume: game.online ? '@' + net.code : game.worldId }; } return {}; }); } catch (e) { }
-window.__kk = { game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
+window.__kk = { DIM_NAMES, tryLightGate, buildGate, soraPillars, fortInfo, nearestFort, NET_VER, H_LAVA, SORA_PED_Y, game, get world() { return game.world; }, player, settings, ui, R, storage, get ents() { return ents; }, spawnMob, spawnDrop, BLOCKS, ITEMS, B, I, RECIPES, TEX, audio, input, matchGrid, MOBS, meshSection, touchSt, hurtMob, selectionBoxes, genWorkers, updateMeshes, net, spawnCycle, MODELS, keepsMob, map, ICON_URL, blockDrops, GENS, GEN_CUR, BIOME, BIOME_NAMES, collisionBoxes };
 if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(startApp); else startApp((window.claude && window.claude.hot && window.claude.hot.data) || {});

@@ -14,7 +14,7 @@ const R = {
 const VS_TERRAIN = `#version 300 es
 layout(location=0) in vec3 a_pos; layout(location=1) in float a_layer; layout(location=2) in vec2 a_uv;
 layout(location=3) in vec2 a_light; layout(location=4) in vec4 a_misc;
-uniform mat4 u_vp; uniform vec3 u_off; uniform float u_time; uniform vec3 u_skyL; uniform vec3 u_camMod; uniform float u_minL;
+uniform mat4 u_vp; uniform vec3 u_off; uniform float u_time; uniform vec3 u_skyL; uniform vec3 u_camMod; uniform float u_minL; uniform vec3 u_tint[32];
 out vec3 v_uvl; out vec3 v_light; out float v_dist;
 void main(){
   vec3 p = a_pos / 16.0 + u_off;
@@ -29,7 +29,7 @@ void main(){
   float s = a_light.x / 16.0, b = a_light.y / 16.0;
   vec3 skyC = u_skyL * pow(0.8, 15.0 - s);
   vec3 blkC = vec3(1.0, 0.87, 0.7) * pow(0.8, 15.0 - b);
-  v_light = max(max(skyC, blkC), vec3(u_minL)) * (a_misc.x / 255.0);
+  v_light = max(max(skyC, blkC), vec3(u_minL)) * (a_misc.x / 255.0) * u_tint[int(a_misc.w + 0.5)];
   v_uvl = vec3(a_uv / 16.0, layer);
   v_dist = length(p);
   gl_Position = u_vp * vec4(p, 1.0);
@@ -161,7 +161,7 @@ function initRenderer(canvas) {
   gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
   if (!gl) return false;
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); R.lost = true; if (typeof onContextLost === 'function') onContextLost(); });
-  const tU = ['u_vp', 'u_off', 'u_time', 'u_skyL', 'u_camMod', 'u_minL', 'u_tex', 'u_fogColor', 'u_fog'];
+  const tU = ['u_vp', 'u_off', 'u_time', 'u_skyL', 'u_camMod', 'u_minL', 'u_tex', 'u_fogColor', 'u_fog', 'u_tint'];
   R.prog.opaque = compileProg(VS_TERRAIN, FS_TERRAIN(0), tU);
   R.prog.cutout = compileProg(VS_TERRAIN, FS_TERRAIN(1), tU);
   R.prog.trans = compileProg(VS_TERRAIN, FS_TERRAIN(2), tU);
@@ -300,6 +300,13 @@ function boxVisible(pl, x0, y0, z0, x1, y1, z1) {
 
 function lerp3(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
 function updateSky(world) {
+  const sk0 = R.sky, mb = R.minBase === undefined ? 0.045 : R.minBase; R.minLight = mb; R.dim = world.dim | 0;
+  if (world.dim === 1) {   // ホムラの底：空はなく、赤黒いもや
+    sk0.day = 0; sk0.night = 0; sk0.zen = sk0.hor = sk0.fog = [0.27, 0.065, 0.04]; sk0.light = [0.3, 0.3, 0.3]; sk0.sun = [0, -1, 0]; sk0.glow = [0, 0, 0]; R.minLight = mb + 0.27; return;
+  }
+  if (world.dim === 2) {   // ソラのはて：ずっと夜の空。うすむらさきの明かり
+    sk0.day = 0; sk0.night = 1; sk0.zen = [0.025, 0.012, 0.06]; sk0.hor = sk0.fog = [0.085, 0.05, 0.15]; sk0.light = [0.6, 0.55, 0.78]; sk0.sun = [0.35, -0.8, 0.48]; sk0.glow = [0, 0, 0]; R.minLight = mb + 0.07; return;
+  }
   const ang = world.time / 24000 * Math.PI * 2, s = Math.sin(ang), day = world.dayFactor();
   const dusk = Math.max(0, 1 - Math.abs(s) / 0.32);
   const sk = R.sky;
@@ -341,6 +348,8 @@ function terrainUniforms(pr, cam) {
   gl.uniform3fv(pr.u.u_skyL, R.sky.light);
   gl.uniform3f(pr.u.u_camMod, ((cam.x % 64) + 64) % 64, 0, ((cam.z % 64) + 64) % 64);
   gl.uniform1f(pr.u.u_minL, R.minLight);
+  if (!R.tintArr) { R.tintArr = new Float32Array(96).fill(1); TINT_RGB.forEach((c, i) => { R.tintArr[i * 3] = c[0]; R.tintArr[i * 3 + 1] = c[1]; R.tintArr[i * 3 + 2] = c[2]; }); }
+  gl.uniform3fv(pr.u.u_tint, R.tintArr);
   gl.uniform3fv(pr.u.u_fogColor, R.fogColor);
   gl.uniform2f(pr.u.u_fog, R.fogStart, R.fogEnd);
   gl.uniform1i(pr.u.u_tex, 0);
@@ -370,6 +379,7 @@ function renderFrame(world, cam, viewR, under, drawHand) {
   R.fogColor = under === 1 ? [0.08, 0.2, 0.45].map((v, i) => v * (0.3 + 0.7 * sk.day)) : under === 2 ? [0.9, 0.35, 0.05] : sk.fog;
   const far = viewR * 16;
   R.fogStart = under === 1 ? 2 : under === 2 ? 0.2 : far * 0.62; R.fogEnd = under === 1 ? 30 : under === 2 ? 2.5 : far - 6;
+  if (R.dim === 1 && !under) { R.fogStart = Math.min(R.fogStart, 14); R.fogEnd = Math.min(R.fogEnd, 86); }
   gl.clearColor(R.fogColor[0], R.fogColor[1], R.fogColor[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, R.texMob);
@@ -382,7 +392,7 @@ function renderFrame(world, cam, viewR, under, drawHand) {
   gl.uniform3fv(ps.u.u_zen, sk.zen); gl.uniform3fv(ps.u.u_hor, sk.hor); gl.uniform3fv(ps.u.u_sun, sk.sun);
   gl.uniform1f(ps.u.u_night, sk.night); gl.uniform1f(ps.u.u_time, R.time); gl.uniform1i(ps.u.u_tex, 0);
   gl.uniform1f(ps.u.u_sunL, TEX.sun); gl.uniform1f(ps.u.u_moonL, TEX.moon); gl.uniform3fv(ps.u.u_glow, sk.glow);
-  gl.uniform1f(ps.u.u_under, under ? 1 : 0);
+  gl.uniform1f(ps.u.u_under, under || R.dim === 1 ? 1 : 0);
   if (under) gl.uniform3fv(ps.u.u_hor, R.fogColor);
   gl.bindVertexArray(R.fsVao); gl.drawArrays(gl.TRIANGLES, 0, 3);
   // 見える区画を集める
@@ -428,7 +438,7 @@ function renderFrame(world, cam, viewR, under, drawHand) {
   if (dynCrack.n) { gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1, -2); dynUniforms(R.vp, 1, true); dynCrack.drawQuads(); gl.disable(gl.POLYGON_OFFSET_FILL); }
   if (dynLine.n) { dynUniforms(R.vp, 0, false); dynLine.drawLines(); }
   // 雲
-  if (R.clouds && !under) {
+  if (R.clouds && !under && !R.dim) {
     const pc = R.prog.cloud;
     gl.useProgram(pc.p); gl.depthMask(false);
     gl.uniformMatrix4fv(pc.u.u_vp, false, R.vp); gl.uniform1f(pc.u.u_y, 132.5 - cam.y);
@@ -465,9 +475,35 @@ function renderFrame(world, cam, viewR, under, drawHand) {
 // ---- 形を追加する道具 ----
 const _v3 = new Float32Array(3);
 // 行列 m で変換した立方体ブロック（層つきの絵）。size=1 で中心が原点
+const _bp = new Float32Array(12), _buv = new Float32Array(8);
+// 行列 m で変換した箱（1/16マス単位の q=[x0,y0,z0,x1,y1,z1]）。絵は場所に合わせて切り出す（地形と同じ貼り方）
+function addBoxPart(buf, m, q, tl, r, g, b, a) {
+  const x0 = q[0], y0 = q[1], z0 = q[2], x1 = q[3], y1 = q[4], z1 = q[5], p = _bp, uv = _buv;
+  for (let f = 0; f < 6; f++) {
+    switch (f) {
+      case 0: p[0] = x1; p[1] = y0; p[2] = z1; p[3] = x1; p[4] = y0; p[5] = z0; p[6] = x1; p[7] = y1; p[8] = z0; p[9] = x1; p[10] = y1; p[11] = z1;
+        uv[0] = 16 - z1; uv[1] = 16 - y0; uv[2] = 16 - z0; uv[3] = 16 - y0; uv[4] = 16 - z0; uv[5] = 16 - y1; uv[6] = 16 - z1; uv[7] = 16 - y1; break;
+      case 1: p[0] = x0; p[1] = y0; p[2] = z0; p[3] = x0; p[4] = y0; p[5] = z1; p[6] = x0; p[7] = y1; p[8] = z1; p[9] = x0; p[10] = y1; p[11] = z0;
+        uv[0] = z0; uv[1] = 16 - y0; uv[2] = z1; uv[3] = 16 - y0; uv[4] = z1; uv[5] = 16 - y1; uv[6] = z0; uv[7] = 16 - y1; break;
+      case 2: p[0] = x0; p[1] = y1; p[2] = z1; p[3] = x1; p[4] = y1; p[5] = z1; p[6] = x1; p[7] = y1; p[8] = z0; p[9] = x0; p[10] = y1; p[11] = z0;
+        for (let k = 0; k < 4; k++) { uv[k * 2] = p[k * 3]; uv[k * 2 + 1] = p[k * 3 + 2]; } break;
+      case 3: p[0] = x0; p[1] = y0; p[2] = z0; p[3] = x1; p[4] = y0; p[5] = z0; p[6] = x1; p[7] = y0; p[8] = z1; p[9] = x0; p[10] = y0; p[11] = z1;
+        uv[0] = x0; uv[1] = 16 - z0; uv[2] = x1; uv[3] = 16 - z0; uv[4] = x1; uv[5] = 16 - z1; uv[6] = x0; uv[7] = 16 - z1; break;
+      case 4: p[0] = x0; p[1] = y0; p[2] = z1; p[3] = x1; p[4] = y0; p[5] = z1; p[6] = x1; p[7] = y1; p[8] = z1; p[9] = x0; p[10] = y1; p[11] = z1;
+        uv[0] = x0; uv[1] = 16 - y0; uv[2] = x1; uv[3] = 16 - y0; uv[4] = x1; uv[5] = 16 - y1; uv[6] = x0; uv[7] = 16 - y1; break;
+      default: p[0] = x1; p[1] = y0; p[2] = z0; p[3] = x0; p[4] = y0; p[5] = z0; p[6] = x0; p[7] = y1; p[8] = z0; p[9] = x1; p[10] = y1; p[11] = z0;
+        uv[0] = 16 - x1; uv[1] = 16 - y0; uv[2] = 16 - x0; uv[3] = 16 - y0; uv[4] = 16 - x0; uv[5] = 16 - y1; uv[6] = 16 - x1; uv[7] = 16 - y1;
+    }
+    const sh = FACE_SHADE[f];
+    for (let k = 0; k < 4; k++) { m4Point(_v3, m, p[k * 3] / 16 - 0.5, p[k * 3 + 1] / 16 - 0.5, p[k * 3 + 2] / 16 - 0.5); buf.v(_v3[0], _v3[1], _v3[2], uv[k * 2] / 16, uv[k * 2 + 1] / 16, tl[f], r * sh, g * sh, b * sh, a); }
+  }
+}
 function addBlockCube(buf, m, id, r, g, b, a, meta) {
   const bl = BLOCKS[id]; if (!bl || !bl.tl) return;
   const tl = bl.tl;
+  if (TINT[id]) { const c = TINT_RGB[TINT[id]]; r *= c[0]; g *= c[1]; b *= c[2]; }
+  const parts = itemParts(id);
+  if (parts) { for (const q of parts) addBoxPart(buf, m, q, tl, r, g, b, a); return; }
   for (let f = 0; f < 6; f++) {
     const sh = FACE_SHADE[f];
     for (let k = 0; k < 4; k++) {
@@ -534,7 +570,7 @@ function addItemMesh(buf, m, id, r, g, b, a) {
 }
 // アイテム（ブロックなら立方体、それ以外は板）を行列つきで追加
 function addItemModel(texBuf, colBuf, m, id, r, g, b) {
-  if (id < 256 && !ICON[id]) addBlockCube(texBuf, m, id, r, g, b, 1);
+  if (isBlk(id) && !ICON[id]) addBlockCube(texBuf, m, id, r, g, b, 1);
   else addItemMesh(colBuf, m, id, r, g, b, 1);
 }
 
@@ -552,12 +588,13 @@ function addParticle(kind, x, y, z, vx, vy, vz, life, size, grav, layer, u, v, r
 function fxAmount(n) { const k = settings.particles === 2 ? 1 : settings.particles === 1 ? 0.6 : 0.3; return k === 1 ? n : Math.max(1, Math.round(n * k)); }
 function fxBlockBits(x, y, z, id, n, spread) {
   const bl = BLOCKS[id]; if (!bl || !bl.tl) return;
+  const tc = TINT_RGB[TINT[id]];   // 色つきのブロックは かけらにも色をかける
   n = fxAmount(n);
   for (let i = 0; i < n; i++) {
     const layer = id === 2 ? (Math.random() < 0.4 ? TEX.grass_top_0 : TEX.dirt) : bl.tl[(Math.random() * 6) | 0];
     addParticle(0, x + (Math.random() - 0.5) * spread, y + (Math.random() - 0.5) * spread, z + (Math.random() - 0.5) * spread,
       (Math.random() - 0.5) * 3, Math.random() * 3.5 + 0.5, (Math.random() - 0.5) * 3, 0.5 + Math.random() * 0.6, 0.07 + Math.random() * 0.06, 16,
-      layer, Math.floor(Math.random() * 13) / 16, Math.floor(Math.random() * 13) / 16, 1, 1, 1);
+      layer, Math.floor(Math.random() * 13) / 16, Math.floor(Math.random() * 13) / 16, tc[0], tc[1], tc[2]);
   }
 }
 function fxPuff(x, y, z, n, r, g, b, opts) {

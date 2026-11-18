@@ -365,15 +365,113 @@ function buildTextures() {
   newTex('bed_top_head', p => { p.rect(0, 0, 16, 16, C('#c9413a')); p.rect(0, 0, 16, 2, C('#8a6238')); p.rect(2, 3, 12, 6, C('#f2f2f0')); for (let x = 2; x < 14; x++) p.px(x, 8, C('#cfcfcc')); p.px(2, 3, C('#cfcfcc')); p.px(13, 3, C('#cfcfcc')); for (let x = 0; x < 16; x++) p.px(x, 10, C('#f2f2f0')); p.rect(0, 11, 16, 5, C('#c9413a')); for (let x = 0; x < 16; x++) if (x % 3 === 0) p.px(x, 13, C('#a8322c')); });
   newTex('bed_top_foot', p => { p.rect(0, 0, 16, 16, C('#c9413a')); for (let y = 1; y < 16; y += 3) for (let x = 0; x < 16; x++) if ((x + y) % 3 === 0) p.px(x, y, C('#a8322c')); p.rect(0, 14, 16, 2, C('#8a6238')); for (let i = 0; i < 16; i++) { p.px(0, i, C('#b33830')); p.px(15, i, C('#b33830')); } });
   newTex('bed_side', p => { p.rect(0, 7, 16, 3, C('#c9413a')); p.rect(0, 10, 16, 2, C('#e6e6e2')); p.rect(0, 12, 16, 4, C('#6e4c29')); p.rect(0, 12, 3, 4, C('#8a6238')); p.rect(13, 12, 3, 4, C('#8a6238')); p.rect(3, 13, 10, 3, C('#3d2a16')); for (let x = 0; x < 16; x++) p.px(x, 7, C('#de5a52')); });
+  // ドアとトラップドアは 白っぽく描いておき、木の色をかけ算する（TINT）。こうすると木の種類ごとに絵を持たなくてすむ
   const door = (p, top) => {
-    const m = C('#b08a55'), dk = C('#7a5a32'), lt = C('#c9a46b');
+    const m = C('#ffffff'), dk = C('#b2b2b2'), lt = C('#f0f0f0');
     for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) p.px(x, y, p.rng() < 0.15 ? lt : m);
     for (let i = 0; i < 16; i++) { p.px(0, i, dk); p.px(15, i, dk); } for (let x = 0; x < 16; x++) p.px(x, top ? 0 : 15, dk);
     if (top) { for (const x0 of [3, 9]) { p.rect(x0 - 1, 2, 6, 7, dk); for (let y = 3; y < 8; y++) for (let x = x0; x < x0 + 4; x++) p.clr(x, y); } p.rect(2, 11, 12, 1, dk); p.rect(2, 12, 12, 1, lt); }
-    else { p.rect(3, 3, 10, 9, dk); p.rect(4, 4, 8, 7, shadeC(m, 0.92)); p.rect(4, 4, 8, 1, lt); p.rect(12, 0, 2, 2, C('#e8c84a')); p.px(12, 0, C('#fff3a0')); }
+    else { p.rect(3, 3, 10, 9, dk); p.rect(4, 4, 8, 7, shadeC(m, 0.9)); p.rect(4, 4, 8, 1, lt); p.rect(12, 0, 2, 2, C('#4a4a4a')); p.px(12, 0, C('#8a8a8a')); }
   };
+  newTex('trapdoor', p => {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) p.px(x, y, p.rng() < 0.15 ? C('#f0f0f0') : C('#ffffff'));
+    for (let i = 0; i < 16; i++) { p.px(i, 0, C('#b2b2b2')); p.px(0, i, C('#b2b2b2')); p.px(i, 15, C('#9a9a9a')); p.px(15, i, C('#9a9a9a')); p.px(i, 7, C('#c4c4c4')); p.px(i, 8, C('#c4c4c4')); p.px(7, i, C('#c4c4c4')); p.px(8, i, C('#c4c4c4')); }
+    for (const [x0, y0] of [[3, 3], [10, 3], [3, 10], [10, 10]]) { p.rect(x0 - 1, y0 - 1, 5, 5, C('#a6a6a6')); for (let y = y0; y < y0 + 3; y++) for (let x = x0; x < x0 + 3; x++) p.clr(x, y); }
+  });
   newTex('door_top', p => door(p, true)); newTex('door_bottom', p => door(p, false));
   newTex('ladder', p => { const a = C('#9a7040'), b2 = C('#6e4c29'); for (let y = 0; y < 16; y++) { p.px(2, y, a); p.px(3, y, b2); p.px(12, y, a); p.px(13, y, b2); } for (const y of [1, 5, 9, 13]) for (let x = 2; x < 14; x++) { p.px(x, y, a); p.px(x, y + 1, b2); } });
+  // ---- 色をかけて使う もとの絵 ----
+  newTex('concrete', p => { p.speckle(CP(['#fbfbfb', '#f4f4f4', '#ffffff', '#f7f7f7'])); p.dots(5, C('#e8e8e8')); });
+  newTex('glass_tint', p => {
+    p.rect(0, 0, 16, 16, C('#ffffff'), 118);
+    for (let i = 0; i < 16; i++) { p.px(i, 0, C('#ffffff'), 205); p.px(0, i, C('#ffffff'), 205); p.px(i, 15, C('#d8d8d8'), 205); p.px(15, i, C('#d8d8d8'), 205); }
+    for (const [x, y] of [[2, 5], [3, 4], [4, 3], [5, 2], [11, 13], [12, 12], [13, 11]]) p.px(x, y, C('#ffffff'), 225);
+  });
+  // ---- 明かり ----
+  newTex('lantern_side', p => {
+    const ir = C('#3d4148'), ir2 = C('#5a5f68'), hot = CP(['#fff3a8', '#ffd84a', '#ffb02e', '#f08a1a']);
+    p.rect(0, 0, 16, 16, ir);
+    for (let y = 0; y < 7; y++) { p.px(7, y, y & 1 ? ir : ir2); p.px(8, y, y & 1 ? ir2 : ir); }      // くさり
+    p.rect(6, 6, 4, 3, ir); p.px(6, 6, ir2); p.px(9, 6, ir2);                                           // ふた
+    p.rect(5, 8, 6, 8, ir);                                                                              // わく
+    for (let y = 10; y < 14; y++) for (let x = 6; x < 10; x++) p.px(x, y, hot[clamp(Math.abs(x - 7.5) > 1 ? 2 : (y < 12 ? 0 : 1), 0, 3)]);
+    p.px(5, 8, ir2); p.px(10, 8, ir2);
+  });
+  newTex('lantern_top', p => { p.rect(0, 0, 16, 16, C('#3d4148')); p.rect(6, 6, 4, 4, C('#5a5f68')); p.rect(7, 7, 2, 2, C('#2a2d33')); });
+  newTex('chochin_side', p => {
+    const bk = C('#26221f'), red = CP(['#d6453a', '#c23a30', '#e2584c']);
+    p.rect(0, 0, 16, 16, red[1]); p.rect(0, 0, 16, 3, bk); p.rect(0, 14, 16, 2, bk);
+    p.rect(5, 1, 6, 2, bk); p.rect(5, 14, 6, 2, bk);
+    for (let y = 3; y < 14; y++) for (let x = 4; x < 12; x++) {
+      const rib = y % 2 === 0, mid = Math.abs(y - 8) <= 2 && x >= 6 && x <= 9;
+      p.px(x, y, mid ? (rib ? C('#f6c05a') : C('#ffe08a')) : rib ? red[1] : (x === 5 || x === 6 ? red[2] : red[0]));
+    }
+    for (let y = 3; y < 14; y++) { p.px(4, y, C('#a8322c')); p.px(11, y, C('#a8322c')); }
+  });
+  newTex('chochin_top', p => { p.rect(0, 0, 16, 16, C('#26221f')); p.rect(6, 6, 4, 4, C('#3a3531')); });
+  newTex('campfire_log', p => {
+    const bark = CP(['#5c4327', '#4f3920', '#6b4f2f', '#3d2c18']);
+    for (let y = 0; y < 16; y++) { let c = bark[Math.floor(p.rng() * 3)]; for (let x = 0; x < 16; x++) { if (p.rng() < 0.2) c = bark[Math.floor(p.rng() * 4)]; p.px(x, y, c); } }
+    for (let i = 0; i < 9; i++) p.px(Math.floor(p.rng() * 16), Math.floor(p.rng() * 16), C('#1c1612'));
+    for (let i = 0; i < 6; i++) p.px(Math.floor(p.rng() * 16), Math.floor(p.rng() * 16), C(i & 1 ? '#ff8a2b' : '#ffd23d'));
+  });
+  for (let f = 0; f < 2; f++) newTex('fire_' + f, p => {
+    const pal = CP(['#fff3a8', '#ffd23d', '#ff8a2b', '#d9421f']);
+    for (let x = 2; x < 14; x++) {
+      const hgt = 5 + Math.floor(p.rng() * 8) + (Math.abs(x - 7.5) < 3 ? 2 : 0);
+      for (let k = 0; k < hgt; k++) { const t = k / hgt; p.px(x, 15 - k, pal[t < 0.25 ? 0 : t < 0.5 ? 1 : t < 0.8 ? 2 : 3]); }
+    }
+  });
+  newTex('crystal_lamp', p => {
+    p.blot(CP(['#d8f6ff', '#bfeefc', '#eafcff', '#a9e4f6', '#d8f6ff']), 4);
+    for (let i = 0; i < 16; i++) { p.px(i, 0, C('#f6feff')); p.px(0, i, C('#f6feff')); p.px(i, 15, C('#7fc6dc')); p.px(15, i, C('#7fc6dc')); }
+    for (let i = 3; i < 13; i++) { p.px(i, i, C('#ffffff')); p.px(15 - i, i, C('#9adbee')); }
+  });
+  // ---- かざり ----
+  newTex('hay_side', p => {
+    const st = CP(['#d9b13c', '#c99f30', '#e6c24e', '#b88d25']);
+    for (let x = 0; x < 16; x++) { let c = st[Math.floor(p.rng() * 4)]; for (let y = 0; y < 16; y++) { if (p.rng() < 0.25) c = st[Math.floor(p.rng() * 4)]; p.px(x, y, c); } }
+    for (const y of [3, 12]) for (let x = 0; x < 16; x++) { p.px(x, y, C('#a8322c')); p.px(x, y + 1, C('#7a211c')); }
+  });
+  newTex('hay_top', p => {
+    const st = CP(['#d9b13c', '#c99f30', '#e6c24e', '#b88d25']);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)); p.px(x, y, st[(Math.floor(r) + (p.rng() < 0.2 ? 1 : 0)) & 3]); }
+  });
+  const smooth = (name, pal, lt, dk) => newTex(name, p => {
+    p.blot(CP(pal), 4);
+    for (let i = 0; i < 16; i++) { p.px(i, 0, C(lt)); p.px(0, i, C(lt)); p.px(i, 15, C(dk)); p.px(15, i, C(dk)); }
+  });
+  smooth('granite_smooth', ['#9a6b5c', '#a07363', '#a87d6e', '#96685a', '#a07363'], '#bf9486', '#74503f');
+  smooth('diorite_smooth', ['#cfcfd1', '#c4c4c7', '#dcdcde', '#c9c9cc', '#d4d4d6'], '#efeff0', '#9a9a9f');
+  smooth('andesite_smooth', ['#8a8d8a', '#868986', '#939693', '#8a8d8a', '#8f928f'], '#a9aca9', '#666966');
+  smooth('smooth_stone', ['#9c9ea3', '#98999e', '#a2a4a8', '#9c9ea3', '#9fa1a5'], '#b4b6ba', '#6e7075');
+  newTex('chiseled_bricks', p => {
+    p.speckle(CP(['#909296', '#888a8e', '#96989c']));
+    for (let i = 0; i < 16; i++) { p.px(i, 0, C('#a6a8ad')); p.px(0, i, C('#a6a8ad')); p.px(i, 15, C('#5f6166')); p.px(15, i, C('#5f6166')); }
+    for (let i = 3; i < 13; i++) { p.px(i, 3, C('#5f6166')); p.px(3, i, C('#5f6166')); p.px(i, 12, C('#a6a8ad')); p.px(12, i, C('#a6a8ad')); }
+    p.rect(6, 6, 4, 4, C('#6e7075')); p.rect(7, 7, 2, 2, C('#a6a8ad'));
+  });
+  newTex('mossy_bricks', p => {
+    sbrick(p, false);
+    const g = CP(['#5d8a3a', '#4d7a30', '#6a9a44']);
+    for (let i = 0; i < 8; i++) { const x = Math.floor(p.rng() * 16), y = Math.floor(p.rng() * 16); for (let k = 0; k < 6; k++) p.px(x + Math.floor(p.rng() * 4) - 1, y + Math.floor(p.rng() * 3) - 1, g[Math.floor(p.rng() * 3)]); }
+  });
+  newTex('chiseled_sandstone', p => {
+    p.speckle(CP(['#dccf98', '#d5c78f', '#e3d6a1']));
+    for (let x = 0; x < 16; x++) { p.px(x, 0, C('#ece1b4')); p.px(x, 15, C('#b9aa73')); p.px(x, 3, C('#c4b57d')); p.px(x, 12, C('#c4b57d')); }
+    for (const x0 of [2, 9]) { p.rect(x0, 5, 5, 6, C('#c4b57d')); p.rect(x0 + 1, 6, 3, 4, C('#ece1b4')); p.px(x0 + 2, 7, C('#b9aa73')); p.px(x0 + 2, 8, C('#b9aa73')); }
+  });
+  newTex('red_sandstone', p => {
+    p.speckle(CP(['#c0672e', '#b85f29', '#c96f33']));
+    for (let x = 0; x < 16; x++) { p.px(x, 0, C('#d98a52')); p.px(x, 15, C('#8f4a1c')); }
+    for (const y of [4, 9, 13]) for (let x = 0; x < 16; x++) if (p.rng() < 0.85) p.px(x, y, C('#a2531f'));
+  });
+  newTex('red_sandstone_top', p => { p.speckle(CP(['#c96f33', '#c0672e', '#d2783a'])); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#d98a52')); p.px(0, i, C('#d98a52')); p.px(i, 15, C('#a2531f')); p.px(15, i, C('#a2531f')); } });
+  newTex('iron_bars', p => {
+    const a = C('#8c9096'), b2 = C('#5f6368');
+    for (const x of [1, 5, 9, 13]) for (let y = 0; y < 16; y++) { p.px(x, y, a); p.px(x + 1, y, b2); }
+    for (const y of [0, 15]) for (let x = 0; x < 16; x++) p.px(x, y, y ? b2 : a);
+  });
   // 水・溶岩（動く）
   for (let f = 0; f < 8; f++) newTex('water_' + f, p => {
     const pal = CP(['#2f62cf', '#3b72e0', '#4a82ea', '#6a9cf5']);
@@ -390,6 +488,77 @@ function buildTextures() {
       p.px(x, y, pal[clamp(Math.floor((v + 2) * 1.25), 0, 4)]);
     }
   });
+  // ---- べつの世界のブロック ----
+  newTex('yakeishi', p => { p.blot(CP(['#8f3b34', '#80332d', '#9c463e', '#742d28', '#893832']), 2); p.dots(14, C('#b25a4e')); p.dots(12, C('#5a221e')); });
+  newTex('ore_quartz', p => { p.copy('yakeishi'); for (const [x, y] of ORE_SH) p.px(x, y, C('#5a221e')); for (const [x, y] of ORE_SPOTS) p.px(x, y, C('#e9e2d8')); for (const [x, y] of ORE_HL) p.px(x, y, C('#ffffff')); });
+  newTex('nageki_sand', p => {
+    p.blot(CP(['#4f3d30', '#463529', '#594638', '#3e2f24', '#4f3d30']), 4); p.dots(10, C('#6a5646'));
+    for (const [x, y] of [[3, 4], [4, 4], [9, 3], [10, 3], [5, 8], [6, 9], [7, 9], [8, 8], [12, 11], [13, 11], [2, 12], [3, 13]]) p.px(x, y, C('#2c2019'));   // くぼみ（なげく顔のように見える）
+  });
+  newTex('magma', p => {
+    p.blot(CP(['#3a1c14', '#2e1510', '#472318', '#33180f']), 4);
+    let x = 2, y = 0; for (let k = 0; k < 44; k++) { p.px(x, y, C(k % 5 === 0 ? '#ffd75a' : k % 2 ? '#ff8a1c' : '#e8591a')); if (p.rng() < 0.55) x += p.rng() < 0.5 ? 1 : -1; else y++; if (k === 20) { x = 11; y = 2; } }
+    for (const [a, b] of [[6, 6], [7, 6], [13, 9], [1, 10], [9, 13], [10, 13]]) p.px(a, b, C('#ffb02e'));
+  });
+  const brickPat = (p, pal, mortar, hi) => {
+    p.rect(0, 0, 16, 16, mortar);
+    for (let r = 0; r < 4; r++) for (let x = 0; x < 16; x++) {
+      const off = r % 2 ? 4 : 0, bx = (x + off) % 8; if (bx === 7) continue;
+      const tone = pal[(((x + off) >> 3) + r) & 3];
+      for (let y = r * 4; y < r * 4 + 3; y++) p.px(x, y, y === r * 4 && hi ? shadeC(tone, 1.14) : p.rng() < 0.15 ? shadeC(tone, 0.88) : tone);
+    }
+  };
+  newTex('yake_bricks', p => brickPat(p, CP(['#70303a', '#662b34', '#7b3640', '#5c262e']), C('#34161b'), true));
+  newTex('kurohashira', p => { for (let x = 0; x < 16; x++) { const c = C(['#3b3d44', '#33353b', '#44464e', '#2d2f35'][(x * 5 + (x >> 2)) & 3]); for (let y = 0; y < 16; y++) p.px(x, y, p.rng() < 0.1 ? shadeC(c, 0.8) : c); } for (const x of [3, 8, 12]) for (let y = 0; y < 16; y++) if (p.rng() < 0.8) p.px(x, y, C('#1f2025')); });
+  newTex('kurohashira_top', p => { p.speckle(CP(['#3b3d44', '#33353b', '#44464e'])); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#55575f')); p.px(0, i, C('#55575f')); p.px(i, 15, C('#1f2025')); p.px(15, i, C('#1f2025')); } for (let i = 4; i < 12; i++) { p.px(i, 4, C('#1f2025')); p.px(i, 11, C('#1f2025')); p.px(4, i, C('#1f2025')); p.px(11, i, C('#1f2025')); } });
+  const aobi = CP(['#1f8f8a', '#1a807c', '#27a19b', '#16706c']);
+  newTex('aobi_soil_top', p => { p.speckle(aobi); p.dots(10, C('#3fc7bd')); p.dots(8, C('#0f5552')); });
+  newTex('aobi_soil_side', p => { p.copy('yakeishi'); for (let x = 0; x < 16; x++) { const dep = 2 + Math.floor(p.rng() * 3); for (let y = 0; y < dep; y++) p.px(x, y, aobi[Math.floor(p.rng() * 4)]); p.px(x, dep, C('#0f5552')); } });
+  newTex('aobi_stem', p => { for (let x = 0; x < 16; x++) { const c = C(['#3a4a7a', '#33426e', '#425488', '#2d3a62'][(x * 3 + (x >> 1)) & 3]); for (let y = 0; y < 16; y++) p.px(x, y, p.rng() < 0.12 ? shadeC(c, 0.82) : c); } let x = 5; for (let y = 0; y < 16; y++) { p.px(x, y, C('#43d6c8')); if (p.rng() < 0.3) x += p.rng() < 0.5 ? 1 : -1; } x = 12; for (let y = 0; y < 16; y++) { if (y % 5 !== 4) p.px(x, y, C('#2fb3a8')); if (p.rng() < 0.3) x += p.rng() < 0.5 ? 1 : -1; } });
+  newTex('aobi_stem_top', p => { p.rect(0, 0, 16, 16, C('#2d3a62')); for (const [r, c] of [[6, '#3a4a7a'], [4, '#43d6c8'], [3, '#425488'], [1, '#2fb3a8']]) for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)) < r + 0.6) p.px(x, y, C(c)); });
+  newTex('aobi_cap', p => { p.blot(CP(['#1c9c96', '#17898a', '#24aea6', '#127a7c', '#1c9c96']), 4); for (const [x, y] of [[2, 3], [9, 2], [13, 6], [5, 9], [11, 11], [3, 13], [8, 6]]) { p.px(x, y, C('#0c5b60')); p.px(x + 1, y, C('#0c5b60')); p.px(x, y + 1, C('#0e6468')); } p.dots(8, C('#4fd8cc')); });
+  newTex('aobi_lamp', p => { p.blot(CP(['#9ff6ea', '#c8fff6', '#7fe9dc', '#eafffb', '#9ff6ea']), 4); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#43d6c8')); p.px(0, i, C('#43d6c8')); p.px(i, 15, C('#1f9c94')); p.px(15, i, C('#1f9c94')); } });
+  newTex('aobi_sprout', p => {
+    for (const [bx, h, c] of [[3, 6, '#27a19b'], [7, 9, '#3fc7bd'], [11, 5, '#1f8f8a'], [13, 7, '#27a19b']]) { let x = bx; for (let k = 0; k < h; k++) { p.px(x, 15 - k, C(k > h - 2 ? '#9ff6ea' : c)); if (k > 2 && p.rng() < 0.3) x += p.rng() < 0.5 ? 1 : -1; } p.px(x + 1, 15 - h + 1, C('#9ff6ea')); }
+  });
+  newTex('planks_aobi', p => {
+    const m = C('#2f8f8c'), dk = C('#1c6462'), lt = C('#3aa5a0');
+    for (let b = 0; b < 4; b++) {
+      const tone = [1, 0.96, 1.03, 0.98][b];
+      for (let y = b * 4; y < b * 4 + 4; y++) for (let x = 0; x < 16; x++) p.px(x, y, shadeC(p.rng() < 0.2 ? lt : m, tone));
+      for (let x = 0; x < 16; x++) p.px(x, b * 4 + 3, dk);
+      const jx = (b * 5 + 3) % 16; for (let y = b * 4; y < b * 4 + 3; y++) p.px(jx, y, dk);
+    }
+  });
+  newTex('quartz_side', p => { p.speckle(CP(['#ece6dc', '#e6dfd4', '#f2ede4'])); for (const y of [5, 10]) for (let x = 0; x < 16; x++) if (p.rng() < 0.7) p.px(x, y, C('#d4cabb')); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#fbf8f2')); p.px(i, 15, C('#c9bfae')); } });
+  newTex('quartz_top', p => { p.speckle(CP(['#ece6dc', '#e6dfd4', '#f2ede4'])); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#fbf8f2')); p.px(0, i, C('#fbf8f2')); p.px(i, 15, C('#c9bfae')); p.px(15, i, C('#c9bfae')); } });
+  newTex('soraishi', p => { p.blot(CP(['#d6d3e6', '#cbc7df', '#e1deee', '#c0bcd6', '#d6d3e6']), 2); p.dots(12, C('#f0eef8')); p.dots(12, C('#a9a4c4')); });
+  newTex('sora_bricks', p => brickPat(p, CP(['#d6d3e6', '#cbc7df', '#dedbec', '#c4c0da']), C('#9f9abb'), true));
+  newTex('sora_frame_top', p => {
+    p.copy('obsidian'); for (let i = 0; i < 16; i++) { p.px(i, 0, C('#cbc7df')); p.px(0, i, C('#cbc7df')); p.px(i, 15, C('#8f8aae')); p.px(15, i, C('#8f8aae')); }
+    for (let y = 4; y < 12; y++) for (let x = 4; x < 12; x++) { const d = Math.hypot(x - 7.5, y - 7.5); if (d < 4.2) p.px(x, y, C(d < 1.3 ? '#0e2b33' : d < 2.6 ? '#43d6c8' : '#f6cf3e')); }
+    p.px(6, 6, C('#eafffb'));
+  });
+  newTex('sora_frame_side', p => { p.copy('obsidian'); for (let x = 0; x < 16; x++) { p.px(x, 0, C('#cbc7df')); p.px(x, 1, C('#b7b2d2')); p.px(x, 2, C('#8f8aae')); } for (const [x, y] of [[3, 7], [8, 10], [12, 6]]) { p.px(x, y, C('#f6cf3e')); p.px(x - 1, y, C('#a8862a')); p.px(x + 1, y, C('#a8862a')); p.px(x, y - 1, C('#a8862a')); p.px(x, y + 1, C('#a8862a')); } });
+  // 門のゆらめき（4こま）
+  for (let f = 0; f < 4; f++) newTex('gate_h_' + f, p => {
+    const pal = CP(['#7a1fb8', '#b02fd0', '#e0509a', '#ff8a3a', '#ffd75a']);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const v = Math.sin((x + f * 4) * Math.PI / 8 + Math.sin((y + f * 2) * Math.PI / 4) * 1.6) + Math.sin((y - f * 4) * Math.PI / 8 + Math.cos(x * Math.PI / 4) * 1.3);
+      const i = clamp(Math.floor((v + 2) * 1.25), 0, 4); p.px(x, y, pal[i], i >= 3 ? 215 : 170);
+    }
+  });
+  for (let f = 0; f < 4; f++) newTex('gate_s_' + f, p => {
+    p.rect(0, 0, 16, 16, C('#070a1e'), 242);
+    const r = mulberry32(777);
+    for (let k = 0; k < 16; k++) { const x = Math.floor(r() * 16), y = Math.floor(r() * 16), ph = Math.floor(r() * 4), c = ['#ffffff', '#9ff6ea', '#f6cf3e', '#c8b6ff'][k & 3]; if (((ph + f) & 3) < 2) p.px(x, y, C(c), 255); else p.px(x, y, shadeC(C(c), 0.4), 250); }
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (((x * 3 + y * 5 + f * 4) & 15) === 0) p.px(x, y, C('#1b2a5e'), 245);
+  });
+  newTex('hoshi_crystal', p => {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.abs(x - 7.5) + Math.abs(y - 7.5); if (d < 7.6) p.px(x, y, C(d < 2.2 ? '#ffffff' : d < 4.5 ? '#ffd9f2' : d < 6.4 ? '#f39ad6' : '#b0509a')); }
+    for (let i = 3; i < 13; i++) { p.px(i, 7, C('#ffffff')); p.px(7, i, C('#ffffff')); }
+  });
+  newTex('hoshi_egg', p => { p.blot(CP(['#1a1038', '#231648', '#120a2a', '#2c1c58', '#1a1038']), 4); const r = mulberry32(99); for (let k = 0; k < 9; k++) p.px(Math.floor(r() * 16), Math.floor(r() * 16), C(k % 3 ? '#c8b6ff' : '#fff3a0')); });
   // ひび割れ（8段階）
   const crackSeq = []; { const r = mulberry32(4242); for (let l = 0; l < 7; l++) { let x = 7 + Math.floor(r() * 2), y = 7 + Math.floor(r() * 2); const ang = l * 0.9 + r(); for (let k = 0; k < 9; k++) { crackSeq.push([l, k, Math.round(x), Math.round(y)]); x += Math.cos(ang + (r() - 0.5) * 1.6); y += Math.sin(ang + (r() - 0.5) * 1.6); } } }
   for (let s = 0; s < 8; s++) newTex('crack_' + s, p => { for (const [l, k, x, y] of crackSeq) if (k <= s + 1 && l <= s + 2 && x >= 0 && x < 16 && y >= 0 && y < 16) p.px(x, y, [20, 20, 22], 175); });
@@ -398,7 +567,7 @@ function buildTextures() {
   newTex('moon', p => { p.rect(3, 3, 10, 10, C('#e6ebf2')); p.rect(3, 3, 10, 1, C('#f6f8fb')); for (const [x, y] of [[5, 5], [6, 5], [5, 6], [10, 7], [10, 8], [11, 8], [7, 10], [6, 11], [7, 11]]) p.px(x, y, C('#c2c9d6')); p.rect(11, 4, 2, 9, C('#d3d9e3')); });
 
   // ブロックの各面の層番号を決める（向きのあるブロックは正面が南側）
-  for (let id = 1; id < 256; id++) {
+  for (let id = 1; id < NB; id++) {
     const b = BLOCKS[id]; if (!b || !b.tex) continue;
     const t = b.tex, nm = (n) => { if (TEX[n] === undefined && TEX[n + '_0'] !== undefined) return TEX[n + '_0']; if (TEX[n] === undefined) throw new Error('絵がありません: ' + n); return TEX[n]; };
     if (typeof t === 'string') b.tl = [nm(t), nm(t), nm(t), nm(t), nm(t), nm(t)];
@@ -468,6 +637,8 @@ function buildIcons() {
   S(I.glow_dust, R_PILE, { m: '#ffd45c', l: '#fff6cf', d: '#c98a22' });
   const dyeC = { red: ['#d63a2f', '#f0705f', '#8a1f18'], yellow: ['#f0cc3a', '#fff0a0', '#a8851a'], blue: ['#3f66c9', '#7f9df0', '#22408a'], green: ['#5a8f3a', '#8cc060', '#355a20'], black: ['#2e2e33', '#5a5a62', '#101012'], pink: ['#f0a0bd', '#fbd3e0', '#b8607f'] };
   _dyes.forEach(([k], i) => S(286 + i, R_PILE, { m: dyeC[k][0], l: dyeC[k][1], d: dyeC[k][2] }));
+  const hexOf = (c) => '#' + c.map(v => ('0' + clamp(Math.round(v), 0, 255).toString(16)).slice(-2)).join('');
+  COLORS.forEach(([k, , , hex], c) => { if (!ICON[DYE[c]]) S(DYE[c], R_PILE, { m: hex, l: hexOf(shadeC(C(hex), 1.3).map(v => Math.min(255, v + 30))), d: hexOf(shadeC(C(hex), 0.6)) }); });
   S(I.clay_ball, R_BALL, { l: '#c0c8d2', m: '#9aa3b0', s: '#7a8390', d: '#4f5661' });
   S(I.snowball, R_BALL, { l: '#ffffff', m: '#eaf1f6', s: '#c5d6e2', d: '#8fa6b8' });
   S(I.wheat_seeds, ['', '', '', '', '', '....a....a......', '...aba..aba.....', '....a....a..a...', '.......a...aba..', '..a...aba...a...', '.aba...a........', '..a.......a.....', '.........aba....', '..........a.....', '', ''], { a: '#6f8f2f', b: '#b7cf6a' });
@@ -491,10 +662,20 @@ function buildIcons() {
   S(I.water_bucket, R_BUCKET, { l: '#f6f6f6', m: '#d0d0d0', s: '#a2a2a2', d: '#5f5f5f', f: '#3f76e4' });
   S(I.lava_bucket, R_BUCKET, { l: '#f6f6f6', m: '#d0d0d0', s: '#a2a2a2', d: '#5f5f5f', f: '#ff8a1c' });
   S(I.shadow_shard, ['', '', '.......dd.......', '......dmmd......', '......dmld..d...', '.....dmmld.dmd..', '.....dmlmd.dld..', '....dmmlmmddmd..', '....dmllmmmdd...', '...dmmlmmmmd....', '...dmlmmmmd.....', '....dmmmmd......', '.....dmmd.......', '......dd........', '', ''], { m: '#3b2a6b', l: '#8f6fe0', d: '#150d2e' });
+  S(I.flint, R_LUMP, { m: '#3a3d44', l: '#6d727c', d: '#17181c' });
+  S(I.flint_steel, ['', '', '..dddd..........', '.dllmmd.........', '.dlmd...........', '.dmd.....dd.....', '.dmd....dmmd....', '.dmmd..dmlmd....', '..dmmddmlmmd....', '...ddddmmmmd....', '......dmmmd.....', '.......ddd......'], { l: '#f6f6f6', m: '#b9bcc2', d: '#4a4d55' });
+  { const fr = ICON[I.flint_steel]; const fl = C('#3a3d44'), fh = C('#6d727c'); for (const [x, y, c] of [[9, 5, fl], [10, 5, fl], [8, 6, fl], [9, 6, fh], [10, 6, fl], [11, 6, fl], [8, 7, fl], [9, 7, fl], [10, 7, fh], [11, 7, fl], [9, 8, fl], [10, 8, fl], [11, 8, fl], [10, 9, fl]]) { const i = (y * 16 + x) * 4; fr[i] = c[0]; fr[i + 1] = c[1]; fr[i + 2] = c[2]; fr[i + 3] = 255; } }
+  S(I.quartz, R_GEM, { l: '#ffffff', m: '#ece6dc', s: '#cfc5b4', d: '#8a8172', w: '#ffffff' });
+  S(I.homura_rod, stick, { h: '#ffc23a', H: '#e8591a' });
+  S(I.homura_powder, R_PILE, { m: '#ff9a2e', l: '#ffe08a', d: '#c9521a' });
+  { const eye = R_BALL.slice(); eye[7] = '....dlmkkmmd....'; eye[8] = '....dmmkkmsd....'; S(I.hoshi_eye, eye, { l: '#c8fff6', m: '#43d6c8', s: '#1f9c94', d: '#0e4a50', k: '#0b1a22' }); }
   // 立方体でないブロックのアイコン
   ICON.icon_bed = sprite(['', '', '', '', '', '.dd.............', '.dwwd...........', '.dwwwdrrrrrrrrd.', '.dwwwdrrRrrRrrd.', '.ddddddddddddddd', '.dmmmmmmmmmmmmmd', '.ddddddddddddddd', '.dm..........dm.', '.dm..........dm.', '', ''], P({ d: '#4a321a', w: '#f2f2f0', r: '#c9413a', R: '#e2685f', m: '#8a6238' }));
   ICON.icon_door = sprite(['...dddddddddd...', '...dmmmmmmmmd...', '...dmddmmddmd...', '...dmdwmmdwmd...', '...dmdwmmdwmd...', '...dmddmmddmd...', '...dmmmmmmmmd...', '...dmmmmmmmyd...', '...dmmmmmmmmd...', '...dmddddddmd...', '...dmdllllldd...', '...dmdlllllmd...', '...dmdlllllmd...', '...dmddddddmd...', '...dmmmmmmmmd...', '...dddddddddd...'], P({ d: '#5b3d18', m: '#b08a55', l: '#c9a46b', w: '#9fd4e8', y: '#f6cf3e' }));
-  for (let id = 1; id < 256; id++) {
+  const DOOR_ROWS = ['...dddddddddd...', '...dmmmmmmmmd...', '...dmddmmddmd...', '...dmdwmmdwmd...', '...dmdwmmdwmd...', '...dmddmmddmd...', '...dmmmmmmmmd...', '...dmmmmmmmyd...', '...dmmmmmmmmd...', '...dmddddddmd...', '...dmdllllldd...', '...dmdlllllmd...', '...dmdlllllmd...', '...dmddddddmd...', '...dmmmmmmmmd...', '...dddddddddd...'];
+  _woods.forEach(([k], w) => { if (!w) return; const wc = WOOD_COL[k]; ICON['icon_door_' + k] = sprite(DOOR_ROWS, P({ d: hexOf(shadeC(C(wc.d), 0.7)), m: wc.m, l: wc.l, w: '#9fd4e8', y: '#f6cf3e' })); BLOCKS[B['door_' + k]].sprite = 'icon_door_' + k; });
+  ICON.icon_sign = sprite(['', '.dddddddddddddd.', '.dllllllllllllld', '.dlmmmmmmmmmmmmd', '.dlmkkkmkkkkmmmd', '.dlmmmmmmmmmmmmd', '.dlmkkkkkmkkmmmd', '.dlmmmmmmmmmmmmd', '.dmmmmmmmmmmmmmd', '.dddddddddddddd.', '......dhhd......', '......dhhd......', '......dhhd......', '......dhhd......', '......dhhd......', '......dddd......'], P({ d: '#5b3d18', l: '#c9a46b', m: '#b08a55', k: '#3d2a16', h: '#8a6238' }));
+  for (let id = 1; id < NB; id++) {
     const b = BLOCKS[id]; if (!b || !ITEMS[id]) continue;
     if (b.sprite) ICON[id] = ICON[b.sprite] || TEX_DATA[TEX[b.sprite]];
   }
@@ -507,7 +688,19 @@ function dataToCanvas(d) {
   const ctx = c.getContext('2d'); const im = ctx.createImageData(16, 16); im.data.set(d); ctx.putImageData(im, 0, 0);
   return c;
 }
-function shadedCanvas(d, f) { const e = new Uint8ClampedArray(d); for (let i = 0; i < 1024; i += 4) { e[i] *= f; e[i + 1] *= f; e[i + 2] *= f; } return dataToCanvas(e); }
+function shadedCanvas(d, f, t) { const e = new Uint8ClampedArray(d), r = f * (t ? t[0] : 1), g = f * (t ? t[1] : 1), b = f * (t ? t[2] : 1); for (let i = 0; i < 1024; i += 4) { e[i] *= r; e[i + 1] *= g; e[i + 2] *= b; } return dataToCanvas(e); }
+// 持ち物の絵や 手に持ったときの形：そのブロックを作っている箱（1/16マス）。ふつうの立方体は null
+function itemParts(id) {
+  const b = BLOCKS[id]; if (!b) return null;
+  switch (b.shape) {
+    case S_SLAB: return shapeParts(S_SLAB, 0, 0, false);
+    case S_STAIR: return shapeParts(S_STAIR, 2, 0, false);
+    case S_FENCE: case S_WALL: case S_PANE: return shapeParts(b.shape, 0, 10, false);
+    case S_GATE: case S_TRAP: case S_LANTERN: case S_FIRE: return shapeParts(b.shape, 0, 0, b.big);
+    case S_LAYER: return [[0, 0, 0, 16, b.lh || 2, 16]];
+  }
+  return null;
+}
 function buildIconUrls() {
   for (const k in ITEMS) {
     const id = +k, it = ITEMS[id];
@@ -515,14 +708,19 @@ function buildIconUrls() {
     const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
     if (ICON[id]) ctx.drawImage(dataToCanvas(ICON[id]), 0, 0, 32, 32);
     else if (it.block) {
-      const b = BLOCKS[id], tl = b.tl;
-      const hgt = b.shape === S_LAYER ? 2 : 16;
-      ctx.setTransform(14 / 16, 7 / 16, -14 / 16, 7 / 16, 16, 1 + (16 - hgt));
-      ctx.drawImage(dataToCanvas(TEX_DATA[tl[2]]), 0, 0);
-      ctx.setTransform(14 / 16, 7 / 16, 0, 1, 2, 8 + (16 - hgt));
-      ctx.drawImage(shadedCanvas(TEX_DATA[tl[4]], 0.8), 0, 16 - hgt, 16, hgt, 0, 0, 16, hgt);
-      ctx.setTransform(14 / 16, -7 / 16, 0, 1, 16, 15 + (16 - hgt));
-      ctx.drawImage(shadedCanvas(TEX_DATA[tl[0]], 0.6), 0, 16 - hgt, 16, hgt, 0, 0, 16, hgt);
+      // ななめ上から見た絵。箱ごとに 上の面・手前左の面（南）・手前右の面（東）を描く。奥の箱から順に
+      const b = BLOCKS[id], tl = b.tl, tint = TINT[id] ? TINT_RGB[TINT[id]] : null;
+      const top = shadedCanvas(TEX_DATA[tl[2]], 1, tint), left = shadedCanvas(TEX_DATA[tl[4]], 0.8, tint), right = shadedCanvas(TEX_DATA[tl[0]], 0.6, tint);
+      const parts = (itemParts(id) || [[0, 0, 0, 16, 16, 16]]).slice().sort((p, q) => (p[1] - q[1]) || ((p[0] + p[2]) - (q[0] + q[2])));
+      for (const [x0, y0, z0, x1, y1, z1] of parts) {
+        const w = x1 - x0, h = y1 - y0, d = z1 - z0;
+        ctx.setTransform(14 / 16, 7 / 16, -14 / 16, 7 / 16, 16, 1 + (16 - y1));
+        ctx.drawImage(top, x0, z0, w, d, x0, z0, w, d);
+        ctx.setTransform(14 / 16, 7 / 16, 0, 1, 16 - 0.875 * z1, 1 + 0.4375 * z1);
+        ctx.drawImage(left, x0, 16 - y1, w, h, x0, 16 - y1, w, h);
+        ctx.setTransform(14 / 16, -7 / 16, 0, 1, 2 + 0.875 * x1, 8 + 0.4375 * x1);
+        ctx.drawImage(right, 16 - z1, 16 - y1, d, h, 16 - z1, 16 - y1, d, h);
+      }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
     ICON_URL[id] = c.toDataURL();

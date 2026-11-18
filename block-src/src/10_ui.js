@@ -16,7 +16,7 @@ function loadSettings() {
 function saveSettings() { try { localStorage.setItem('kk_settings', JSON.stringify(settings)); } catch (e) { } }
 function applySettings() {
   game.dynScale = 1; game.dynDist = 99;   // 「自動で軽くする」のやり直し
-  R.scale = settings.quality; R.clouds = settings.clouds; R.minLight = 0.02 + settings.bright * 0.012;
+  R.scale = settings.quality; R.clouds = settings.clouds; R.minBase = R.minLight = 0.02 + settings.bright * 0.012;
   if (meshOpts.fancyLeaves !== settings.fancyLeaves) { meshOpts.fancyLeaves = settings.fancyLeaves; if (game.world) for (const c of game.world.chunks.values()) c.dirty = 0xFF; }
   const st = document.documentElement.style; st.setProperty('--hud', settings.hudScale); st.setProperty('--tb', settings.touchSize);
   const nt = $('ntags'); if (nt) nt.style.display = settings.nameTags ? '' : 'none';
@@ -138,7 +138,7 @@ const ui = {
       }
       if (t !== this.lastInfo) { this.lastInfo = t; $('info').textContent = t; }
       const boss = game.boss && !game.boss.dead ? game.boss : null;
-      $('bossbar').hidden = !boss; if (boss) $('bossFill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
+      $('bossbar').hidden = !boss; if (boss) { $('bossFill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%'; const bn = MOBS[boss.type].name; if (this._bn !== bn) { this._bn = bn; $('bossName').textContent = bn; } }
     }
     $('fxWater').style.opacity = p.headIn === 1 ? 1 : 0; $('fxLava').style.opacity = p.headIn === 2 ? 1 : 0;
     const eb = $('eatbar'); if (p.eating > 0) { eb.style.display = 'block'; $('eatFill').style.width = Math.min(100, p.eating / 1.5 * 100) + '%'; } else if (eb.style.display !== 'none') eb.style.display = 'none';
@@ -168,6 +168,7 @@ const ui = {
   flash() { const el = $('fxFlash'); el.style.transition = 'none'; el.style.opacity = 0.9; requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = ''; el.style.opacity = 0; })); },
   fade(on) { $('fxFade').style.opacity = on ? 1 : 0; },
   dark(on) { $('fxDark').style.opacity = on ? 1 : 0; },
+  gateFx(k) { if (k === this._gk) return; this._gk = k; const el = $('fxGate'); if (el) el.style.opacity = k > 0 ? Math.min(0.9, 0.15 + k * 0.75) : 0; },
   dayBanner(text) { const el = $('daybanner'); el.textContent = text; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); },
   achievement(title, icon) { this.achQ.push({ title, icon }); },
   showDeath(msg, dropped) {
@@ -207,6 +208,8 @@ const ui = {
     on('bInvite', () => this.copyInvite());
     on('bRules', () => this.openRules());
     on('bMap', () => map.openMap());
+    on('signOk', () => this.closeSign(true)); on('signCancel', () => this.closeSign(false));
+    for (const id of ['signL1', 'signL2']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); if (id === 'signL1') $('signL2').focus(); else this.closeSign(true); } else if (e.key === 'Escape') { e.preventDefault(); this.closeSign(false); } });
     on('bMsgOk', () => { const f = this._msgOk; this._msgOk = null; if (f) f(); else this.back(); });
     $('inNick').addEventListener('change', () => { net.setName($('inNick').value); });
     $('segDiff2').addEventListener('click', (e) => { const b = e.target.closest('.btn'); if (!b || b.disabled) return; sfx('click'); game.setRule('diff', +b.dataset.v); this.paintRules(); });
@@ -272,7 +275,7 @@ const ui = {
       const el = document.createElement('div'); el.className = 'wslot';
       el.innerHTML = '<div><strong></strong><span class="dim"></span></div><div class="rowf"><button class="btn sm pri" type="button" data-a="play">入る</button><button class="btn sm" type="button" data-a="forget">一覧から外す</button>' + (w.own ? '<button class="btn sm bad" type="button" data-a="del">消す</button>' : '') + '</div>';
       el.querySelector('strong').textContent = w.name; const info = el.querySelector('span'); info.textContent = 'コード ' + w.code + '・しらべています…';
-      net.count(w.code).then(async (n) => {
+      net.countAt(w.code).then(async (n) => {
         if (n > 0) info.textContent = 'コード ' + w.code + '・いま ' + n + '人が遊んでいます';
         else { const ex = n === 0 ? await net.exists(w.code) : null; info.textContent = 'コード ' + w.code + (ex === false ? '・もうありません（消されたようです）' : n === 0 ? '・いまはだれもいません' : '・つながりませんでした'); }
       });
@@ -319,7 +322,7 @@ const ui = {
   paintNetBox() {
     const box = $('netBox'); box.hidden = !net.on; if (!net.on) return;
     $('netCode').textContent = 'コード ' + net.code;
-    const names = [(net.getName() || 'ななし') + '（自分）']; for (const p of net.peers.values()) if (net.here(p)) names.push(p.name);
+    const names = [(net.getName() || 'ななし') + '（自分）']; for (const p of net.peers.values()) if (net.here(p)) names.push(p.name + (p.dim ? '（' + DIM_NAMES[p.dim] + '）' : ''));
     $('netWho').textContent = 'いまいる人：' + names.join('、');
   },
   sleepHud(on) {
@@ -390,7 +393,12 @@ const ui = {
     for (const a of ACHS) {
       const ok = !!game.ach[a.id]; if (ok) done++;
       const el = document.createElement('div'); el.className = 'note' + (ok ? ' done' : '') + (!ok && next ? ' next' : '');
-      el.innerHTML = '<div><strong>' + esc(a.title) + '</strong><span class="dim">' + esc(a.hint) + '</span></div>'; box.appendChild(el);
+      let hint = a.hint;
+      if (a.id === 'fort' && !ok && game.world && game.world.dim === 1) {   // いちばん近い とりでの方向を教える
+        const f = nearestFort(game.world.seed, player.x, player.z);
+        if (f) { const dx = f.x - player.x, dz = f.z - player.z, dir = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'][((Math.round(Math.atan2(dx, -dz) / (Math.PI / 4)) % 8) + 8) % 8]; hint += '。いちばん近いのは ' + dir + 'へ 約' + Math.round(Math.hypot(dx, dz) / 10) * 10 + 'ブロック（高さ ' + FORT_Y + '）'; }
+      }
+      el.innerHTML = '<div><strong>' + esc(a.title) + '</strong><span class="dim">' + esc(hint) + '</span></div>'; box.appendChild(el);
       if (!ok) next = false;
     }
     $('notesHead').textContent = ACHS.length + 'こ中 ' + done + 'こ達成。金色のわくが次の目標です';
@@ -477,9 +485,34 @@ const ui = {
     if (kind === 'inv' || kind === 'table') this.paintRecipes();
     game.onStat('open', kind);
   },
+  // 看板に字を書く画面
+  editSign(x, y, z) {
+    const w = game.world, e = w.getEnt(x, y, z);
+    if (!e || e.t !== 'sign' || game.state !== 'playing') return;
+    if (this.screen) this.close(true);
+    if (document.pointerLockElement) { this.expectUnlock = true; document.exitPointerLock(); }
+    const ln = String(e.s || '').split('\n');
+    $('signL1').value = ln[0] || ''; $('signL2').value = ln[1] || '';
+    this.screen = 'sign'; this.signPos = { x, y, z };
+    $('signScr').classList.add('on'); $('app').classList.add('uiopen');
+    setTimeout(() => { try { $('signL1').focus(); } catch (er) { } }, 30);
+  },
+  closeSign(save, silent) {
+    if (this.screen !== 'sign') return;
+    const q = this.signPos, w = game.world;
+    if (save && q && w) {
+      const e = w.getEnt(q.x, q.y, q.z);
+      if (e && e.t === 'sign') { const a = $('signL1').value.trim().slice(0, 14), b = $('signL2').value.trim().slice(0, 14); e.s = b ? a + '\n' + b : a; w.touch(q.x, q.y, q.z); signs.at = 0; sfx('place_wood', 0.6); }
+    }
+    this.screen = null; this.signPos = null;
+    $('signScr').classList.remove('on'); $('app').classList.remove('uiopen');
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (!silent && game.state === 'playing') requestLock(true);
+  },
   close(silent) {
     if (!this.screen) return;
     if (this.screen === 'map') { map.closeMap(silent); return; }
+    if (this.screen === 'sign') { this.closeSign(false, silent); return; }
     for (let i = 0; i < this.craft.length; i++) { const s = this.craft[i]; if (s) { const left = player.give(s.id, s.n, s.d); if (left) spawnDrop(player.x, player.eyeY() - 0.3, player.z, s.id, left, s.d); this.craft[i] = null; } }
     this.craft = [];
     if (player.cursor) { const s = player.cursor; const left = player.give(s.id, s.n, s.d); if (left) this.dropStack({ id: s.id, n: left, d: s.d }); player.cursor = null; }
@@ -591,7 +624,7 @@ const ui = {
     const row = $('recList').querySelector('[data-rr="' + RECIPES.indexOf(r) + '"]'); if (row) { row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); }
   },
   paintRecipes() {
-    const tabs = [['ok', 'いま作れる'], ['tool', '道具・装備'], ['block', 'ブロック'], ['food', '食べ物'], ['misc', 'そのほか']];
+    const tabs = [['ok', 'いま作れる'], ['tool', '道具・装備'], ['block', 'ブロック'], ['build', 'かたち'], ['color', '色'], ['food', '食べ物'], ['misc', 'そのほか']];
     const tb = $('recTabs');
     if (!tb.children.length) for (const [k, n] of tabs) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm'; b.dataset.t = k; b.textContent = n; tb.appendChild(b); }
     for (const b of tb.children) b.classList.toggle('on', b.dataset.t === this.recTab);
@@ -767,6 +800,10 @@ function howtoHtml() {
 <dd>木をなぐって原木を集める → 持ち物を開いて「板」「作業台」を作る → 作業台を置いて道具を作る</dd>
 <dd>夜になると敵が出ます。たいまつで明るくした家にこもるか、ベッドで朝まで眠りましょう</dd>
 <dd>次に何をするか迷ったら「開拓ノート」に目標が順番に書いてあります</dd>
+<dt>べつの世界</dt>
+<dd>黒曜石で四角いわく（内がわが よこ2×たて3以上）を作り、内がわに「火打ち金」を使うと「ホムラの門」がひらきます。中にしばらく立つと「ホムラの底」へ</dd>
+<dd>ホムラの底の1ブロックは、もとの世界の8ブロックぶん。力つきると、もとの世界の復活地点にもどります</dd>
+<dd>その先のことは「開拓ノート」に順番に書いてあります</dd>
 <dt>クリエイティブ</dt>
 <dd>ジャンプをすばやく2回で空を飛べます（ジャンプで上がり、しゃがむで下がります）</dd>
 <dt>セーブについて</dt>

@@ -46,7 +46,7 @@ const map = {
   save(withPins) { const o = { seen: this.pack() }; if (withPins) o.pins = this.pins.map(p => ({ id: p.id, x: p.x, z: p.z, n: p.n, c: p.c, by: p.by })); return o; },
   // まわりの 読みこまれたチャンクを「歩いた所」にする
   mark() {
-    const w = game.world; if (!w || game.isDemo) return;
+    const w = game.world; if (!w || game.isDemo || w.dim) return;   // 地図は もとの世界だけ
     const pcx = Math.floor(player.x) >> 4, pcz = Math.floor(player.z) >> 4;
     for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) {
       if (dx * dx + dz * dz > 38) continue;
@@ -192,7 +192,7 @@ const map = {
   },
   // ---------- 小さな地図 ----------
   drawMini() {
-    const cv = $('mini'), on = !!settings.minimap && !game.isDemo && (game.state === 'playing' || game.state === 'paused') && !this.open;
+    const cv = $('mini'), on = !!settings.minimap && !game.isDemo && (game.state === 'playing' || game.state === 'paused') && !this.open && !game.world.dim;
     if (cv.hidden === on) cv.hidden = !on;
     if (!on) return;
     const ctx = this.mctx || (this.mctx = cv.getContext('2d')), S = cv.width, x0 = Math.floor(player.x) - S / 2, z0 = Math.floor(player.z) - S / 2;
@@ -205,6 +205,7 @@ const map = {
   toggle() { if (this.open) this.closeMap(); else this.openMap(); },
   openMap() {
     if (this.open || game.isDemo || player.dead || (game.state !== 'playing' && game.state !== 'paused')) return;
+    if (game.world.dim) { ui.toast('この世界では、地図は役に立たない'); sfx('deny', 0.4); return; }
     if (game.state === 'paused') game.resume(true);
     if (ui.screen) ui.close(true);
     if (document.pointerLockElement) { ui.expectUnlock = true; document.exitPointerLock(); }
@@ -316,3 +317,37 @@ const map = {
 };
 // 小さな地図のふち
 function box4(ctx, S) { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, 0, S, 1); ctx.fillRect(0, S - 1, S, 1); ctx.fillRect(0, 0, 1, S); ctx.fillRect(S - 1, 0, 1, S); }
+
+// ===== 看板の字 =====
+// 近く（12マス以内）の看板の字を、看板の上に札として出す。字を絵にして貼るより軽く、どの向きからでも読める
+const signs = {
+  list: [], at: 0, tags: [],
+  scan() {   // まわりのチャンクから 字の書いてある看板を集める（0.5秒ごと）
+    const w = game.world, pcx = Math.floor(player.x) >> 4, pcz = Math.floor(player.z) >> 4; this.list.length = 0;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const c = w.getChunk(pcx + dx, pcz + dz); if (!c || c.stage < 2 || !c.ents.size) continue;
+      for (const [i, e] of c.ents) if (e.t === 'sign' && e.s) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); const d = Math.hypot(x + 0.5 - player.x, y - player.y, z + 0.5 - player.z); if (d < 12) this.list.push({ x, y, z, s: e.s, d }); }
+    }
+    this.list.sort((a, b) => a.d - b.d); if (this.list.length > 10) this.list.length = 10;
+  },
+  draw(cam) {
+    const box = $('stags'); if (!box) return;
+    const show = game.state === 'playing' && !map.open && game.world;
+    if (show && performance.now() - this.at > 500) { this.at = performance.now(); this.scan(); }
+    const W = box.clientWidth || innerWidth, H = box.clientHeight || innerHeight, m = R.vp, n = show ? this.list.length : 0;
+    for (let k = 0; k < Math.max(n, this.tags.length); k++) {
+      let t = this.tags[k];
+      if (k >= n) { if (t) t.hidden = true; continue; }
+      if (!t) { t = this.tags[k] = document.createElement('div'); t.className = 'stag'; box.appendChild(t); }
+      const q = this.list[k], x = q.x + 0.5 - cam.x, y = q.y + 1.15 - cam.y, z = q.z + 0.5 - cam.z;
+      const cw = m[3] * x + m[7] * y + m[11] * z + m[15];
+      if (cw < 0.1) { t.hidden = true; continue; }
+      const nx = (m[0] * x + m[4] * y + m[8] * z + m[12]) / cw, ny = (m[1] * x + m[5] * y + m[9] * z + m[13]) / cw;
+      if (Math.abs(nx) > 1.1 || Math.abs(ny) > 1.1) { t.hidden = true; continue; }
+      t.hidden = false;
+      if (t._s !== q.s) { t._s = q.s; t.textContent = q.s; }
+      const sc = clamp(1.25 - q.d * 0.06, 0.6, 1.1);
+      t.style.transform = 'translate(' + Math.round((nx + 1) / 2 * W) + 'px,' + Math.round((1 - ny) / 2 * H) + 'px) translate(-50%,-100%) scale(' + sc.toFixed(2) + ')';
+    }
+  }
+};

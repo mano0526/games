@@ -22,6 +22,7 @@ const NOFF = new Int32Array(6), AOT = new Int32Array(72), CPOS = new Int8Array(7
   }
 })();
 
+let _mtint = 0;   // いま作っているブロックにかける色の番号（TINT）
 class MeshBuf {
   constructor(cap) { this.alloc(cap); this.n = 0; }
   alloc(cap) { this.cap = cap; this.buf = new ArrayBuffer(cap * 16); this.i16 = new Int16Array(this.buf); this.u16 = new Uint16Array(this.buf); this.u8 = new Uint8Array(this.buf); }
@@ -32,18 +33,18 @@ class MeshBuf {
   vert(x, y, z, layer, u, v, sky, blk, shade, flags, anim) {
     const o = this.n * 8, b = this.n * 16 + 8, u8 = this.u8;
     this.i16[o] = x; this.i16[o + 1] = y; this.i16[o + 2] = z; this.u16[o + 3] = layer;
-    u8[b] = u; u8[b + 1] = v; u8[b + 2] = sky; u8[b + 3] = blk; u8[b + 4] = shade; u8[b + 5] = flags; u8[b + 6] = anim; u8[b + 7] = 0;
+    u8[b] = u; u8[b + 1] = v; u8[b + 2] = sky; u8[b + 3] = blk; u8[b + 4] = shade; u8[b + 5] = flags; u8[b + 6] = anim; u8[b + 7] = _mtint;
     this.n++;
   }
 }
 const mbO = new MeshBuf(16384), mbC = new MeshBuf(8192), mbT = new MeshBuf(4096);
-const mB = new Uint8Array(5832), mM = new Uint8Array(5832), mL = new Uint8Array(5832);
-const CUBE_TL = new Uint16Array(256 * 6);
+const mB = new Uint16Array(5832), mM = new Uint8Array(5832), mL = new Uint8Array(5832);
+const CUBE_TL = new Uint16Array(NB * 6);
 let TL_GRASS_TOP = [], TL_GRASS_SIDE = [], TL_TALL = [], TL_SNOWSIDE = 0, TL_WHEAT = [], TL_LEAF_FAST = {};
 const meshOpts = { fancyLeaves: true };
 
 function initMesher() {
-  for (let id = 1; id < 256; id++) { const b = BLOCKS[id]; if (b && b.tl) for (let f = 0; f < 6; f++) CUBE_TL[id * 6 + f] = b.tl[f]; }
+  for (let id = 1; id < NB; id++) { const b = BLOCKS[id]; if (b && b.tl) for (let f = 0; f < 6; f++) CUBE_TL[id * 6 + f] = b.tl[f]; }
   TL_GRASS_TOP = GRASS_PALS.map((p, i) => TEX['grass_top_' + i]);
   TL_GRASS_SIDE = GRASS_PALS.map((p, i) => TEX['grass_side_' + i]);
   TL_TALL = GRASS_PALS.map((p, i) => TEX['tallgrass_' + i]);
@@ -60,12 +61,13 @@ function quadP(buf, p, layer, uv, sky, blk, shade, flags, anim, both) {
 }
 const _qp = new Float32Array(12), _quv = new Float32Array(8);
 // セルの中の箱（1/16 きざみ）。境界にある面はとなりで隠れるか調べる
-function emitBox(buf, bx, by, bz, x0, y0, z0, x1, y1, z1, tl, pi, topRot, noCull) {
-  const own = mL[pi];
+// ownL：箱の中の面に使う明るさ（省くと そのマスの明るさ）。same：となりが同じブロック・同じ向きなら その面を省く（ハーフブロックをしきつめたとき用）
+function emitBox(buf, bx, by, bz, x0, y0, z0, x1, y1, z1, tl, pi, topRot, noCull, ownL, same) {
+  const own = ownL === undefined ? mL[pi] : ownL;
   for (let f = 0; f < 6; f++) {
     const onB = f === 0 ? x1 === 16 : f === 1 ? x0 === 0 : f === 2 ? y1 === 16 : f === 3 ? y0 === 0 : f === 4 ? z1 === 16 : z0 === 0;
     let l = own;
-    if (onB) { const nb = mB[pi + NOFF[f]]; if (!noCull && OPAQUE[nb]) continue; l = mL[pi + NOFF[f]]; if ((l >> 4) < (own >> 4)) l = (own & 0xF0) | (l & 15); if ((l & 15) < (own & 15)) l = (l & 0xF0) | (own & 15); }
+    if (onB) { const nb = mB[pi + NOFF[f]]; if (!noCull && OPAQUE[nb]) continue; if (same && f !== 2 && f !== 3 && nb === mB[pi] && mM[pi + NOFF[f]] === mM[pi]) continue; l = mL[pi + NOFF[f]]; if ((l >> 4) < (own >> 4)) l = (own & 0xF0) | (l & 15); if ((l & 15) < (own & 15)) l = (l & 0xF0) | (own & 15); }
     const p = _qp, uv = _quv;
     switch (f) {
       case 0: p[0] = x1; p[1] = y0; p[2] = z1; p[3] = x1; p[4] = y0; p[5] = z0; p[6] = x1; p[7] = y1; p[8] = z0; p[9] = x1; p[10] = y1; p[11] = z1;
@@ -106,6 +108,21 @@ function fluidCorner(pi, id, dx, dz) {
   return cnt ? Math.round(sum / cnt) : 14;
 }
 const _tl6 = new Uint16Array(6);
+// まわり6マスのうち いちばん明るい値（階段やハーフブロックは 自分のマスには光が入らないので、となりの明るさで描く）
+function nbLight(pi) {
+  let s = 0, b = 0;
+  for (let f = 0; f < 6; f++) { const l = mL[pi + NOFF[f]]; if ((l >> 4) > s) s = l >> 4; if ((l & 15) > b) b = l & 15; }
+  return (s << 4) | b;
+}
+// フェンスなどが つながる向き（描くとき用。世界の linkMask と同じ決まり）
+function meshLinks(pi, sh) {
+  let m = 0;
+  if (shapeLinks(sh, mB[pi + 18], mM[pi + 18], 0)) m |= 1;
+  if (shapeLinks(sh, mB[pi - 1], mM[pi - 1], 1)) m |= 2;
+  if (shapeLinks(sh, mB[pi - 18], mM[pi - 18], 2)) m |= 4;
+  if (shapeLinks(sh, mB[pi + 1], mM[pi + 1], 3)) m |= 8;
+  return m;
+}
 
 // 1つの区画（16x16x16）を面データにする。何もなければ null
 function meshSection(world, c, sy) {
@@ -135,6 +152,7 @@ function meshSection(world, c, sy) {
       const id = mB[pi];
       if (!id) continue;
       const sh = SHAPE[id], bx = x * 16, by = y * 16, bz = z * 16;
+      _mtint = TINT[id];
       if (sh === S_CUBE) {
         const rc = RCLASS[id], leaf = ISLEAF[id];
         const buf = rc === 2 ? mbT : (rc === 1 && !(leaf && !fancy)) ? mbC : mbO;
@@ -240,8 +258,30 @@ function meshSection(world, c, sy) {
           side(4, h01, h11, 0, 16, 16, 16); side(5, h10, h00, 16, 0, 0, 0);
           break;
         }
-        case S_LAYER: _tl6.fill(tl[0]); emitBox(mbO, bx, by, bz, 0, 0, 0, 16, 2, 16, _tl6, pi, 2, false); break;
-        case S_FARM: _tl6.set(tl); _tl6[2] = meta ? TEX.farmland_wet : TEX.farmland_dry; emitBox(mbO, bx, by, bz, 0, 0, 0, 16, 15, 16, _tl6, pi, 2, false); break;
+        case S_LAYER: _tl6.fill(tl[0]); emitBox(mbO, bx, by, bz, 0, 0, 0, 16, BLOCKS[id].lh || 2, 16, _tl6, pi, 2, false); break;
+        case S_SLAB: case S_STAIR: {
+          const l = nbLight(pi);
+          for (const q of shapeParts(sh, meta, 0, false)) emitBox(mbO, bx, by, bz, q[0], q[1], q[2], q[3], q[4], q[5], tl, pi, 2, false, l, sh === S_SLAB);
+          break;
+        }
+        case S_FENCE: case S_WALL: case S_PANE: {
+          const buf = sh === S_PANE ? mbC : mbO;
+          for (const q of shapeParts(sh, 0, meshLinks(pi, sh), false)) emitBox(buf, bx, by, bz, q[0], q[1], q[2], q[3], q[4], q[5], tl, pi, 2, false);
+          break;
+        }
+        case S_GATE: case S_SIGN: case S_LANTERN: case S_TRAP: {
+          const buf = sh === S_TRAP ? mbC : mbO;
+          for (const q of shapeParts(sh, meta, 0, BLOCKS[id].big)) emitBox(buf, bx, by, bz, q[0], q[1], q[2], q[3], q[4], q[5], tl, pi, 2, false);
+          break;
+        }
+        case S_FIRE: {
+          for (const q of shapeParts(sh, 0, 0, false)) emitBox(mbO, bx, by, bz, q[0], q[1], q[2], q[3], q[4], q[5], tl, pi, 2, false);
+          const fl = TEX.fire_0, uv = [0, 16, 16, 16, 16, 0, 0, 0];   // ほのお（2こまで ゆれる。暗い所でも明るい）
+          quadP(mbC, [bx + 2, by + 2, bz + 2, bx + 14, by + 2, bz + 14, bx + 14, by + 16, bz + 14, bx + 2, by + 16, bz + 2], fl, uv, sky, 240, 255, 0, 2, true);
+          quadP(mbC, [bx + 2, by + 2, bz + 14, bx + 14, by + 2, bz + 2, bx + 14, by + 16, bz + 2, bx + 2, by + 16, bz + 14], fl, uv, sky, 240, 255, 0, 2, true);
+          break;
+        }
+        case S_FARM: _tl6.set(tl); if (id === 50) _tl6[2] = meta ? TEX.farmland_wet : TEX.farmland_dry; emitBox(mbO, bx, by, bz, 0, 0, 0, 16, 15, 16, _tl6, pi, 2, false); break;
         case S_CACTUS: emitBox(mbO, bx, by, bz, 1, 0, 1, 15, 16, 15, tl, pi, 2, false); break;
         case S_CHEST: {
           const front = F4_TO_FACE[meta & 3];
@@ -257,6 +297,13 @@ function meshSection(world, c, sy) {
           const b = doorBox(meta);
           _tl6.fill((meta & 8) ? TEX.door_top : TEX.door_bottom);
           emitBox(mbC, bx, by, bz, b[0] * 16, 0, b[2] * 16, b[3] * 16, 16, b[5] * 16, _tl6, pi, 2, true); break;
+        }
+        case S_PORTAL: {   // 門の面（うすい・すきとおる・ゆらめく）。meta 0＝X方向、1＝Z方向、2＝水平
+          const layer = tl[0], uv = [0, 16, 16, 16, 16, 0, 0, 0];
+          if (meta === 2) quadP(mbT, [bx, by + 12, bz + 16, bx + 16, by + 12, bz + 16, bx + 16, by + 12, bz, bx, by + 12, bz], layer, uv, sky, 240, 255, 2, 4, true);
+          else if (meta === 1) quadP(mbT, [bx + 8, by, bz, bx + 8, by, bz + 16, bx + 8, by + 16, bz + 16, bx + 8, by + 16, bz], layer, uv, sky, 240, 255, 2, 4, true);
+          else quadP(mbT, [bx, by, bz + 8, bx + 16, by, bz + 8, bx + 16, by + 16, bz + 8, bx, by + 16, bz + 8], layer, uv, sky, 240, 255, 2, 4, true);
+          break;
         }
         case S_FLAT: {   // 水面に浮かぶ葉。向きは場所ごとに変える
           const r = hash3(wx0 + x, wy0 + y, wz0 + z, 31) & 3, yy = by - 1;

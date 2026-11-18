@@ -1,6 +1,6 @@
 // ===== 05_world.js : 世界のデータ・明るさ・水の流れ・成長・セーブ用の圧縮 =====
 const DX6 = [1, -1, 0, 0, 0, 0], DY6 = [0, 0, 1, -1, 0, 0], DZ6 = [0, 0, 0, 0, 1, -1];
-const RTICK = new Uint8Array(256);
+const RTICK = new Uint8Array(NB);
 for (const k of ['grass', 'wheat_crop', 'farmland', 'cactus']) RTICK[B[k]] = 1;
 for (const w of _woods) { RTICK[w[3]] = 1; RTICK[w[5]] = 1; }
 
@@ -15,6 +15,22 @@ function unrle(src, n) {
   for (let i = 0; i + 2 < src.length; i += 3) { const v = src[i], len = src[i + 1] | (src[i + 2] << 8); if (v) out.fill(v, o, Math.min(n, o + len)); o += len; }
   return out;
 }
+// ブロックの番号（16ビット）用。値2バイト＋長さ2バイト
+function rle16(arr) {
+  const out = []; let i = 0; const n = arr.length;
+  while (i < n) { const v = arr[i]; let j = i + 1; while (j < n && arr[j] === v && j - i < 65535) j++; const len = j - i; out.push(v & 255, v >> 8, len & 255, len >> 8); i = j; }
+  return new Uint8Array(out);
+}
+function unrle16(src, n) {
+  const out = new Uint16Array(n); let o = 0;
+  for (let i = 0; i + 3 < src.length; i += 4) { const v = src[i] | (src[i + 1] << 8), len = src[i + 2] | (src[i + 3] << 8); if (v) out.fill(v, o, Math.min(n, o + len)); o += len; }
+  return out;
+}
+function to16(u8) { const o = new Uint16Array(u8.length); o.set(u8); return o; }
+// 中継サーバーに置く1マスの値。番号が255までなら 昔と同じ「番号＋メタ×256」。それより大きい番号は 上の位に印をつけた別の形
+function cellPack(id, meta) { return id < 256 ? id | (meta << 8) : 0x1000000 | id | (meta << 12); }
+function cellId(v) { return v >= 0x1000000 ? v & 0xFFF : v & 255; }
+function cellMeta(v) { return v >= 0x1000000 ? (v >> 12) & 255 : (v >> 8) & 255; }
 
 // ---- 当たり判定・選択用の箱 ----
 const BOX_FULL = [[0, 0, 0, 1, 1, 1]], BOX_NONE = [];
@@ -22,9 +38,92 @@ function doorBox(meta) {
   const side = (meta & 4) ? ((meta & 3) + 1) & 3 : meta & 3, t = 3 / 16;
   return side === 0 ? [0, 0, 1 - t, 1, 1, 1] : side === 1 ? [0, 0, 0, t, 1, 1] : side === 2 ? [0, 0, 0, 1, 1, t] : [1 - t, 0, 0, 1, 1, 1];
 }
-function collisionBoxes(id, meta) {
+// ---- 形のあるブロックの「部品の箱」（1/16マス単位）。描くのにも、当たり判定にも使う ----
+// mask＝となりとつながる向き（F4 の順：1=南(+Z) 2=西(-X) 4=北(-Z) 8=東(+X)）。フェンス・へい・ガラス板だけが使う
+const _partCache = new Map();
+function shapeParts(sh, meta, mask, big) {
+  const k = ((sh * 256 + meta) * 16 + mask) * 2 + (big ? 1 : 0); let r = _partCache.get(k);
+  if (r) return r;
+  r = [];
+  const arm = (d, a) => r.push(d === 0 ? [a[0], a[1], a[4], a[2], a[3], 16] : d === 1 ? [0, a[1], a[0], 16 - a[4], a[3], a[2]] : d === 2 ? [a[0], a[1], 0, a[2], a[3], 16 - a[4]] : [a[4], a[1], a[0], 16, a[3], a[2]]);   // a=[はば0, 高さ0, はば1, 高さ1, 柱のはし]
+  const f = meta & 3;
+  switch (sh) {
+    case S_SLAB: r.push(meta & 1 ? [0, 8, 0, 16, 16, 16] : [0, 0, 0, 16, 8, 16]); break;
+    case S_STAIR: {   // f＝高いほうの向き。4＝さかさま
+      const up = meta & 4, y0 = up ? 0 : 8, y1 = up ? 8 : 16;
+      r.push(up ? [0, 8, 0, 16, 16, 16] : [0, 0, 0, 16, 8, 16]);
+      r.push(f === 0 ? [0, y0, 8, 16, y1, 16] : f === 1 ? [0, y0, 0, 8, y1, 16] : f === 2 ? [0, y0, 0, 16, y1, 8] : [8, y0, 0, 16, y1, 16]);
+      break;
+    }
+    case S_FENCE: r.push([6, 0, 6, 10, 16, 10]); for (let d = 0; d < 4; d++) if ((mask >> d) & 1) { arm(d, [7, 6, 9, 9, 10]); arm(d, [7, 12, 9, 15, 10]); } break;
+    case S_WALL: r.push([4, 0, 4, 12, 16, 12]); for (let d = 0; d < 4; d++) if ((mask >> d) & 1) arm(d, [5, 0, 11, 13, 12]); break;
+    case S_PANE: { const m = mask || 15; r.push([7, 0, 7, 9, 16, 9]); for (let d = 0; d < 4; d++) if ((m >> d) & 1) arm(d, [7, 0, 9, 16, 9]); break; }
+    case S_GATE: {   // f＝開くほうの向き。4＝開いている
+      const ns = (f & 1) === 0;   // 南北を向いている＝東西にのびる
+      if (!(meta & 4)) {
+        for (const [a, b, y0, y1] of [[0, 2, 5, 16], [14, 16, 5, 16], [2, 14, 6, 9], [2, 14, 12, 15], [6, 10, 9, 12]]) r.push(ns ? [a, y0, 7, b, y1, 9] : [7, y0, a, 9, y1, b]);
+      } else {
+        for (const a of [0, 14]) {
+          r.push(ns ? [a, 5, 7, a + 2, 16, 9] : [7, 5, a, 9, 16, a + 2]);
+          for (const [y0, y1] of [[6, 9], [12, 15]]) r.push(f === 0 ? [a, y0, 9, a + 2, y1, 16] : f === 2 ? [a, y0, 0, a + 2, y1, 7] : f === 1 ? [0, y0, a, 7, y1, a + 2] : [9, y0, a, 16, y1, a + 2]);
+        }
+      }
+      break;
+    }
+    case S_TRAP:   // f＝ちょうつがいのある向き。4＝開いている。8＝上半分についている
+      if (meta & 4) r.push(f === 0 ? [0, 0, 13, 16, 16, 16] : f === 1 ? [0, 0, 0, 3, 16, 16] : f === 2 ? [0, 0, 0, 16, 16, 3] : [13, 0, 0, 16, 16, 16]);
+      else r.push(meta & 8 ? [0, 13, 0, 16, 16, 16] : [0, 0, 0, 16, 3, 16]);
+      break;
+    case S_SIGN: {   // f＝字の面が向いているほう
+      const ns = (f & 1) === 0;
+      r.push([7, 0, 7, 9, 8, 9]); r.push(ns ? [1, 8, 7, 15, 16, 9] : [7, 8, 1, 9, 16, 15]);
+      break;
+    }
+    case S_LANTERN:   // 1＝上からつるす
+      if (big) { r.push([4, 2, 4, 12, 13, 12]); r.push([5, 0, 5, 11, 2, 11]); r.push([5, 13, 5, 11, 15, 11]); if (meta & 1) r.push([7, 15, 7, 9, 16, 9]); }
+      else if (meta & 1) { r.push([5, 1, 5, 11, 8, 11]); r.push([6, 8, 6, 10, 10, 10]); r.push([7, 10, 7, 9, 16, 9]); }
+      else { r.push([5, 0, 5, 11, 7, 11]); r.push([6, 7, 6, 10, 9, 10]); }
+      break;
+    case S_FIRE: r.push([1, 0, 0, 5, 4, 16]); r.push([11, 0, 0, 15, 4, 16]); r.push([0, 3, 1, 16, 7, 5]); r.push([0, 3, 11, 16, 7, 15]); break;
+  }
+  _partCache.set(k, r);
+  return r;
+}
+// 当たり判定の箱（マス単位）。フェンスとへいは とびこえられないよう 1.5マスの高さ
+const _collCache = new Map();
+function shapeColl(sh, meta, mask, big) {
+  const k = ((sh * 256 + meta) * 16 + mask) * 2 + (big ? 1 : 0); let r = _collCache.get(k);
+  if (r) return r;
+  let parts = shapeParts(sh, meta, mask, big);
+  const f = meta & 3;
+  if (sh === S_FENCE || sh === S_WALL) { const a = sh === S_FENCE ? 6 : 4, b = 16 - a; parts = [[a, 0, a, b, 24, b]]; for (let d = 0; d < 4; d++) if ((mask >> d) & 1) parts.push(d === 0 ? [a, 0, b, b, 24, 16] : d === 1 ? [0, 0, a, a, 24, b] : d === 2 ? [a, 0, 0, b, 24, a] : [b, 0, a, 16, 24, b]); }
+  else if (sh === S_GATE) parts = (meta & 4) ? [] : [(f & 1) === 0 ? [0, 0, 6, 16, 24, 10] : [6, 0, 0, 10, 24, 16]];
+  else if (sh === S_FIRE) parts = [[0, 0, 0, 16, 7, 16]];
+  else if (sh === S_LANTERN) parts = [parts[0]];
+  r = parts.map(p => [p[0] / 16, p[1] / 16, p[2] / 16, p[3] / 16, p[4] / 16, p[5] / 16]);
+  _collCache.set(k, r);
+  return r;
+}
+// えらぶ枠・光線の当たり判定用：部品をそのまま使う
+const _selCache = new Map();
+function shapeSel(sh, meta, mask, big) {
+  const k = ((sh * 256 + meta) * 16 + mask) * 2 + (big ? 1 : 0); let r = _selCache.get(k);
+  if (!r) { r = shapeParts(sh, meta, mask, big).map(p => [p[0] / 16, p[1] / 16, p[2] / 16, p[3] / 16, p[4] / 16, p[5] / 16]); _selCache.set(k, r); }
+  return r;
+}
+// つながるかどうか。kind＝自分の形、nb＝となりのブロック、nm＝そのメタ、d＝となりのある向き
+function shapeLinks(sh, nb, nm, d) {
+  if (!nb) return false;
+  const ns = SHAPE[nb];
+  if (sh === S_PANE) return ns === S_PANE || OPAQUE[nb] === 1 || nb === B.glass || (nb >= 560 && nb <= 575);
+  if (ns === S_GATE) return (d & 1) !== (nm & 1);                  // フェンスゲートは 横にのびている向きにだけ
+  if (sh === S_FENCE) return ns === S_FENCE || (OPAQUE[nb] === 1 && !ISLEAF[nb]);
+  return ns === S_WALL || (OPAQUE[nb] === 1 && !ISLEAF[nb]);       // へい
+}
+function collisionBoxes(id, meta, mask) {
   switch (SHAPE[id]) {
     case S_CUBE: return BOX_FULL;
+    case S_SLAB: case S_STAIR: case S_FENCE: case S_WALL: case S_PANE: case S_GATE: case S_TRAP: case S_LANTERN: case S_FIRE: return shapeColl(SHAPE[id], meta, mask || 0, BLOCKS[id].big);
     case S_FARM: return [[0, 0, 0, 1, 0.9375, 1]];
     case S_CACTUS: return [[0.0625, 0, 0.0625, 0.9375, 1, 0.9375]];
     case S_CHEST: return [[0.0625, 0, 0.0625, 0.9375, 0.875, 0.9375]];
@@ -34,12 +133,13 @@ function collisionBoxes(id, meta) {
     default: return BOX_NONE;
   }
 }
-function selectionBoxes(id, meta) {
+function selectionBoxes(id, meta, mask) {
   switch (SHAPE[id]) {
     case S_NONE: case S_FLUID: return BOX_NONE;
+    case S_SLAB: case S_STAIR: case S_FENCE: case S_WALL: case S_PANE: case S_GATE: case S_TRAP: case S_SIGN: case S_LANTERN: case S_FIRE: return shapeSel(SHAPE[id], meta, mask || 0, BLOCKS[id].big);
     case S_CROSS: return [[0.15, 0, 0.15, 0.85, 0.8, 0.85]];
     case S_CROP: return [[0, 0, 0, 1, 0.3 + 0.2 * (meta & 3), 1]];
-    case S_LAYER: return [[0, 0, 0, 1, 0.125, 1]];
+    case S_LAYER: return [[0, 0, 0, 1, (BLOCKS[id].lh || 2) / 16, 1]];
     case S_FLAT: return [[0.06, 0, 0.06, 0.94, 0.08, 0.94]];
     case S_TORCH: {
       if (!meta) return [[0.4, 0, 0.4, 0.6, 0.65, 0.6]];
@@ -50,7 +150,7 @@ function selectionBoxes(id, meta) {
       const f = meta & 3, t = 0.125;
       return [f === 0 ? [0, 0, 1 - t, 1, 1, 1] : f === 1 ? [0, 0, 0, t, 1, 1] : f === 2 ? [0, 0, 0, 1, 1, t] : [1 - t, 0, 0, 1, 1, 1]];
     }
-    default: return collisionBoxes(id, meta);
+    default: return collisionBoxes(id, meta, mask);
   }
 }
 function blockDrops(id, meta, toolDef, rng) {
@@ -95,18 +195,26 @@ class World {
     this.rng = mulberry32((Math.random() * 4294967296) | 0);
     this.onUnload = null;
     // みんなで遊ぶとき：net につながる。remote は「ほかの人の変更をあてはめている最中」
-    this.net = null; this.dim = 0; this.remote = false;
+    this.net = null; this.dim = 0; this.pre = ''; this.remote = false;   // pre＝保存するときの名前のあたま（べつの世界は 'd1:' など）
     // 地形の版。gv0＝世界を作ったときの版。rgv＝区画（4×4チャンク）ごとに最初に作った版（null なら全部 gv0）
     this.gv0 = 1; this.rgv = null; this.gens = {}; this.gens[1] = this.gen;
-    this.stash = new Map();   // しまってある動物（チャンクごと）
+    this.stashes = [new Map(), new Map(), new Map()]; this.stash = this.stashes[0];   // しまってある動物（世界ごと・チャンクごと）
   }
   setGen(gv0, rgv) { this.gv0 = gv0 || 1; this.gen = this.genOf(this.gv0); this.rgv = rgv || null; }
-  genOf(gv) { let g = this.gens[gv]; if (!g) { g = this.gens[gv] = new (GENS[gv] || GENS[1])(this.seed); } return g; }
+  genOf(gv, dim) { if (dim === undefined) dim = this.dim; const k = dim ? dim + ':' + gv : gv; let g = this.gens[k]; if (!g) { g = this.gens[k] = new (dimGenClass(gv, dim))(this.seed); } return g; }
+  // べつの世界へ切りかえる（読みこんであるチャンクは保存して片づける。動く物の片づけは呼ぶ側で）
+  switchDim(dim) {
+    this.flushAll();
+    for (const c of this.chunks.values()) if (this.onUnload) this.onUnload(c);
+    this.chunks.clear(); this._lc = null;
+    this.dim = dim; this.pre = dim ? 'd' + dim + ':' : ''; this.gen = this.genOf(this.gv0); this.stash = this.stashes[dim];
+    this.token = ++_worldToken; this.inflight = 0; this.schedule.clear(); this.scheduled.clear(); this.qn = 0; this.rn = 0; this.center = null;
+  }
   // そのチャンクを作る地形の版。0 ならまだ決まっていない（オンラインで問い合わせ中）
   genVer(cx, cz) {
     if (this.net) return this.net.genVer(this.dim, cx >> 2, cz >> 2);
     if (!this.rgv) return this.gv0;
-    const k = (cx >> 2) + ',' + (cz >> 2); let v = this.rgv.get(k);
+    const k = this.pre + (cx >> 2) + ',' + (cz >> 2); let v = this.rgv.get(k);
     if (!v) { v = GEN_CUR; this.rgv.set(k, v); }
     return v;
   }
@@ -335,7 +443,8 @@ class World {
   remoteCell(x, y, z, v) {
     const c = this.getChunk(x >> 4, z >> 4);
     if (!c || c.stage < 1 || y < 0 || y >= CH) return false;
-    const id = v & 255, meta = (v >> 8) & 255, i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i];
+    const id = cellId(v), meta = cellMeta(v), i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i];
+    if (!BLOCKS[id] && id !== 0) return false;   // 知らない番号（もっと新しい版の人が置いたもの）は そのままにしておく
     if (old === id && c.meta[i] === meta) return false;
     const keep = !!BLOCKS[old] && !!BLOCKS[id] && !!BLOCKS[old].ent && BLOCKS[old].ent === BLOCKS[id].ent;
     if (c.stage === 1) { c.blocks[i] = id; c.meta[i] = meta; if (old !== id && !keep) c.ents.delete(i); if (id && y > c.maxY) c.maxY = y; c.modified = true; return true; }
@@ -351,6 +460,7 @@ class World {
     if (!e) { if (cur) c.ents.delete(i); return; }
     if (cur && cur.t === e.t) {   // 開いている画面が同じ物を見続けられるよう、中身だけ入れかえる
       if (e.t === 'chest') { for (let k = 0; k < 27; k++) cur.items[k] = e.items[k] || null; if (e.g) cur.g = 1; else delete cur.g; }
+      else if (e.t === 'sign') cur.s = e.s;
       else { cur.in = e.in; cur.fuel = e.fuel; cur.out = e.out; cur.burn = e.burn; cur.burnMax = e.burnMax; cur.cook = e.cook; }
     } else c.ents.set(i, e);
     c.modified = true;
@@ -362,7 +472,7 @@ class World {
   hasSupport(id, meta, x, y, z) {
     const b = BLOCKS[id], below = this.getBlock(x, y - 1, z);
     if (SHAPE[id] === S_TORCH) {
-      if (!meta) return OPAQUE[below] === 1 || below === B.glass || SHAPE[below] === S_FARM;
+      if (!meta) { const bs = SHAPE[below], bm = this.getMeta(x, y - 1, z); return OPAQUE[below] === 1 || below === B.glass || bs === S_FARM || bs === S_FENCE || bs === S_WALL || (bs === S_SLAB && (bm & 1) === 1) || (bs === S_STAIR && (bm & 4) === 4); }   // フェンスやへいの上、上半分のハーフブロックの上にも立てられる
       const d = F4[(meta - 1) & 3]; return OPAQUE[this.getBlock(x + d[0], y, z + d[1])] === 1;
     }
     if (SHAPE[id] === S_LADDER) {
@@ -370,12 +480,24 @@ class World {
       if (id === B.vine) return OPAQUE[bk] === 1 || ISLEAF[bk] === 1 || (this.getBlock(x, y + 1, z) === id && this.getMeta(x, y + 1, z) === meta);   // つたは葉にもつく。上のつたからぶら下がれる
       return OPAQUE[bk] === 1;
     }
+    if (SHAPE[id] === S_LANTERN) return (meta & 1) ? SOLID[this.getBlock(x, y + 1, z)] === 1 : SOLID[below] === 1;   // つるすか、置くか
     switch (b.support) {
+      case 'floor': return SOLID[below] === 1 && SHAPE[below] !== S_LANTERN;
       case 'soil': return SOIL[below] === 1;
       case 'sandy': return below === B.sand || below === B.red_sand || SOIL[below] === 1 || (below >= B.terracotta && below <= B.terracotta_brown);
       case 'water': return below === B.water && this.getMeta(x, y - 1, z) === 0;
       case 'solid': return OPAQUE[below] === 1 || ISLEAF[below] === 1;
       case 'farmland': return below === B.farmland;
+      case 'hgate': {   // ホムラの門：上下と、面の向きの両どなりが 黒曜石か門
+        if (!this.areaLoaded(x, z, 1)) return true;
+        const ok = (v) => v === B.obsidian || v === id, ax = meta & 1 ? 0 : 1, az = meta & 1 ? 1 : 0;
+        return ok(below) && ok(this.getBlock(x, y + 1, z)) && ok(this.getBlock(x + ax, y, z + az)) && ok(this.getBlock(x - ax, y, z - az));
+      }
+      case 'sgate': {   // ソラの門：まわり4つが 門か、わくか、岩盤
+        if (!this.areaLoaded(x, z, 1)) return true;
+        for (let d = 0; d < 4; d++) { const nb = this.getBlock(x + F4[d][0], y, z + F4[d][1]); if (nb !== id && nb !== B.sora_frame && nb !== B.bedrock) return false; }
+        return true;
+      }
       case 'cactus':
         if (below !== B.sand && below !== B.red_sand && below !== B.cactus) return false;
         for (let d = 0; d < 4; d++) if (SOLID[this.getBlock(x + F4[d][0], y, z + F4[d][1])]) return false;
@@ -389,7 +511,7 @@ class World {
     if (FLUID[id]) { this.sched(x, y, z, FLUID[id] === 1 ? 4 : 18); return; }
     if (GRAVITY[id]) { const bl = this.getBlock(x, y - 1, z); if (y > 0 && (bl === 0 || FLUID[bl] || (REPLACE[bl] && !SOLID[bl]))) this.sched(x, y, z, 2); return; }
     const b = BLOCKS[id], sh = SHAPE[id];
-    if (b.support || sh === S_TORCH || sh === S_LADDER) {
+    if (b.support || sh === S_TORCH || sh === S_LADDER || sh === S_LANTERN) {
       if (!this.hasSupport(id, this.getMeta(x, y, z), x, y, z)) this.breakNatural(x, y, z);
       return;
     }
@@ -416,7 +538,7 @@ class World {
   }
   spillEnt(x, y, z) {
     const e = this.getEnt(x, y, z);
-    if (!e) return;
+    if (!e || e.t === 'sign') return;
     const list = e.t === 'chest' ? e.items : [e.in, e.fuel, e.out];
     for (const s of list) if (s) spawnDrop(x + 0.5, y + 0.5, z + 0.5, s.id, s.n, s.d || 0);
   }
@@ -614,7 +736,7 @@ class World {
 
   // ---------- チャンクの読みこみ・片づけ ----------
   installChunk(c, r) {
-    c.blocks = r.blocks; c.meta = r.meta; c.biome = r.biome; c.maxY = r.maxY;
+    c.blocks = r.blocks instanceof Uint16Array ? r.blocks : to16(r.blocks); c.meta = r.meta; c.biome = r.biome; c.maxY = r.maxY;   // 地形づくりは8ビットで返す（版1・2は255までしか使わない）
     c.light = new Uint8Array(CVOL);
     c.ents.clear();
     if (r.ents) for (const e of r.ents) { const o = Object.assign({}, e); delete o.i; c.ents.set(e.i, o); }
@@ -622,7 +744,7 @@ class World {
     if (this.net) this.net.applyStore(c);
   }
   loadSaved(c, s) {
-    const blocks = unrle(s.b, CVOL), meta = unrle(s.m, CVOL), biome = new Uint8Array(256);
+    const blocks = s.b2 ? unrle16(s.b2, CVOL) : to16(unrle(s.b, CVOL)), meta = unrle(s.m, CVOL), biome = new Uint8Array(256);   // b2＝16ビットの番号（新しい保存の形）、b＝昔の8ビット
     const g = this.genOf(this.genVer(c.cx, c.cz) || this.gv0);
     for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) { g.column(c.cx * 16 + x, c.cz * 16 + z); biome[(z << 4) | x] = g.colB; }
     let maxY = CH - 1;
@@ -633,11 +755,11 @@ class World {
   serializeChunk(c) {
     const e = [];
     for (const [i, o] of c.ents) e.push(Object.assign({ i }, JSON.parse(JSON.stringify(o))));
-    return { b: rle(c.blocks), m: rle(c.meta), e };
+    return { b2: rle16(c.blocks), m: rle(c.meta), e };
   }
   flushChunk(c) {
     if (!c.modified || !c.saveDirty || c.stage < 1 || this.net) return;   // みんなの世界は中継サーバーが正本なので、ここには残さない
-    const k = c.cx + ',' + c.cz;
+    const k = this.pre + c.cx + ',' + c.cz;
     this.saved.set(k, this.serializeChunk(c));
     this.savedDirty.add(k);
     c.saveDirty = false;
@@ -665,7 +787,7 @@ class World {
         if (this.net && !this.net.chunkReady(this.dim, cx, cz)) continue;   // その区画の変更がまだ届いていない
         c = new Chunk(cx, cz);
         this.chunks.set(this.key(cx, cz), c);
-        const s = this.saved.get(cx + ',' + cz);
+        const s = this.saved.get(this.pre + cx + ',' + cz);
         if (s) { this.loadSaved(c, s); }
       }
       if (c.stage === 0 && !c.requested) {
@@ -710,8 +832,16 @@ class World {
 
   // ---------- 当たり判定・視線 ----------
   // 範囲に重なるブロックの箱を out に追加する（6つの数で1つの箱）
+  // フェンス・へい・ガラス板が どの向きにつながっているか
+  linkMask(x, y, z, id) {
+    const sh = SHAPE[id];
+    if (sh !== S_FENCE && sh !== S_WALL && sh !== S_PANE) return 0;
+    let m = 0;
+    for (let d = 0; d < 4; d++) { const nx = x + F4[d][0], nz = z + F4[d][1]; if (shapeLinks(sh, this.getBlock(nx, y, nz), this.getMeta(nx, y, nz), d)) m |= 1 << d; }
+    return m;
+  }
   collectBoxes(x0, y0, z0, x1, y1, z1, out) {
-    const ix0 = Math.floor(x0), iy0 = Math.max(0, Math.floor(y0)), iz0 = Math.floor(z0);
+    const ix0 = Math.floor(x0), iy0 = Math.max(0, Math.floor(y0) - 1), iz0 = Math.floor(z0);   // 1つ下の段も見る（フェンスは上に半マスはみ出すため）
     const ix1 = Math.floor(x1), iy1 = Math.min(CH - 1, Math.floor(y1)), iz1 = Math.floor(z1);
     for (let z = iz0; z <= iz1; z++) for (let x = ix0; x <= ix1; x++) {
       const c = this.getChunk(x >> 4, z >> 4);
@@ -721,7 +851,7 @@ class World {
         const id = c.blocks[(y << 8) | col];
         if (!SOLID[id]) continue;
         if (SHAPE[id] === S_CUBE) { out.push(x, y, z, x + 1, y + 1, z + 1); continue; }
-        const bs = collisionBoxes(id, c.meta[(y << 8) | col]);
+        const bs = collisionBoxes(id, c.meta[(y << 8) | col], this.linkMask(x, y, z, id));
         for (const b of bs) out.push(x + b[0], y + b[1], z + b[2], x + b[3], y + b[4], z + b[5]);
       }
     }
@@ -740,13 +870,17 @@ class World {
       if (id && SHAPE[id] !== S_FLUID) {
         if (SHAPE[id] === S_CUBE) return { x, y, z, nx, ny, nz, id, meta: this.getMeta(x, y, z), t };
         else {
-          const meta = this.getMeta(x, y, z), bs = selectionBoxes(id, meta);
+          const meta = this.getMeta(x, y, z), bs = selectionBoxes(id, meta, this.linkMask(x, y, z, id));
           let best = null;
           for (const b of bs) {
             const h = rayBox(ox, oy, oz, dx, dy, dz, x + b[0], y + b[1], z + b[2], x + b[3], y + b[4], z + b[5]);
             if (h && h.t <= maxDist && (!best || h.t < best.t)) best = h;
           }
-          if (best) return { x, y, z, nx: best.nx, ny: best.ny, nz: best.nz, id, meta, t: best.t, box: bs[0] };
+          if (best) {
+            let box = bs[0];
+            if (bs.length > 1) { box = bs[0].slice(); for (const b of bs) { for (let a = 0; a < 3; a++) { if (b[a] < box[a]) box[a] = b[a]; if (b[a + 3] > box[a + 3]) box[a + 3] = b[a + 3]; } } }   // 部品が いくつもある形は、全部を囲む箱を枠にする
+            return { x, y, z, nx: best.nx, ny: best.ny, nz: best.nz, id, meta, t: best.t, box };
+          }
         }
       }
       if (tx < ty && tx < tz) { t = tx; tx += tdx; x += sx; nx = -sx; ny = 0; nz = 0; }
@@ -818,4 +952,96 @@ let _genRR = 0;
 function requestGen(world, cx, cz, gv) {
   const w = genWorkers[(_genRR++) % genWorkers.length];
   w.postMessage({ t: 'gen', id: world.token, cx, cz, gv: gv || 1, dim: world.dim });
+}
+
+// ================= 門（べつの世界への出入口） =================
+function gateFree(id) { return id === 0 || (REPLACE[id] && !FLUID[id]); }
+// (x,y,z) をふくむ「黒曜石のわくの内がわ」を探して、あれば門で満たす。返り値は {x,y,z（内がわの左下）, a（向き 0＝X方向 1＝Z方向）, w, h}
+function tryLightGate(world, x, y, z) {
+  if (!gateFree(world.getBlock(x, y, z))) return null;
+  const OB = B.obsidian;
+  for (let ax = 0; ax < 2; ax++) {
+    const dx = ax ? 0 : 1, dz = ax ? 1 : 0;
+    let y0 = y; while (y0 > 1 && y - y0 < 22 && gateFree(world.getBlock(x, y0 - 1, z))) y0--;
+    if (world.getBlock(x, y0 - 1, z) !== OB) continue;
+    let a = 0; while (a < 22 && gateFree(world.getBlock(x - dx * (a + 1), y0, z - dz * (a + 1)))) a++;
+    const x0 = x - dx * a, z0 = z - dz * a;
+    if (world.getBlock(x0 - dx, y0, z0 - dz) !== OB) continue;
+    let w = 0; while (w < 22 && gateFree(world.getBlock(x0 + dx * w, y0, z0 + dz * w))) w++;
+    if (w < 2 || w > 21 || world.getBlock(x0 + dx * w, y0, z0 + dz * w) !== OB) continue;
+    let h = 0; while (h < 22 && gateFree(world.getBlock(x0, y0 + h, z0))) h++;
+    if (h < 3 || h > 21) continue;
+    let ok = true;
+    for (let i = 0; i < w && ok; i++) {
+      if (world.getBlock(x0 + dx * i, y0 - 1, z0 + dz * i) !== OB || world.getBlock(x0 + dx * i, y0 + h, z0 + dz * i) !== OB) ok = false;
+      for (let j = 0; j < h && ok; j++) if (!gateFree(world.getBlock(x0 + dx * i, y0 + j, z0 + dz * i))) ok = false;
+    }
+    for (let j = 0; j < h && ok; j++) if (world.getBlock(x0 - dx, y0 + j, z0 - dz) !== OB || world.getBlock(x0 + dx * w, y0 + j, z0 + dz * w) !== OB) ok = false;
+    if (!ok) continue;
+    for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) world.setBlock(x0 + dx * i, y0 + j, z0 + dz * i, B.homura_gate, ax, 1);
+    return { x: x0, y: y0, z: z0, a: ax, w, h };
+  }
+  return null;
+}
+// 門のマスから、その門の「内がわの左下」を求める
+function gateOrigin(world, x, y, z) {
+  if (world.getBlock(x, y, z) !== B.homura_gate) return null;
+  const ax = world.getMeta(x, y, z) & 1, dx = ax ? 0 : 1, dz = ax ? 1 : 0;
+  while (y > 1 && world.getBlock(x, y - 1, z) === B.homura_gate) y--;
+  let n = 0; while (n < 22 && world.getBlock(x - dx, y, z - dz) === B.homura_gate) { x -= dx; z -= dz; n++; }
+  return { x, y, z, a: ax };
+}
+// 着いた先に門がないとき：近くの立てる場所を探して（なければ場所を作って）、わくと門を作る
+function buildGate(world, tx, ty, tz) {
+  const dim = world.dim, ok = (x, y, z) => {
+    const fl = world.getBlock(x, y - 1, z), fl2 = world.getBlock(x + 1, y - 1, z);
+    if (!SOLID[fl] || !SOLID[fl2] || fl === B.bedrock || ISLEAF[fl] || ISLEAF[fl2] || !OPAQUE[fl]) return false;   // 木の上や 形のあるブロックの上には作らない
+    for (let dz = -1; dz <= 1; dz++) for (let dx = 0; dx <= 1; dx++) for (let dy = 0; dy <= 2; dy++) { const id = world.getBlock(x + dx, y + dy, z + dz); if (SOLID[id] || FLUID[id] || ISLEAF[id]) return false; }
+    return true;
+  };
+  let best = null, bd = 1e9;
+  const ord = spiralOrder(10);
+  for (let n = 0; n < ord.length; n += 2) {
+    const x = tx + ord[n], z = tz + ord[n + 1];
+    if (!world.areaLoaded(x, z, 2)) continue;
+    const c = world.getChunk(x >> 4, z >> 4), lo = dim === 1 ? H_LAVA + 2 : 40, hi = dim === 1 ? 112 : Math.min(118, c.maxY + 1);
+    for (let y = hi; y >= lo; y--) {
+      if (!ok(x, y, z)) continue;
+      const d = (ord[n] * ord[n] + ord[n + 1] * ord[n + 1]) + (dim === 1 ? Math.abs(y - ty) * 0.6 : 0);   // もとの世界では いちばん上（地上）をえらぶ
+      if (d < bd) { bd = d; best = [x, y, z]; }
+      if (dim !== 1) break;
+    }
+  }
+  let x, y, z;
+  if (best) { x = best[0]; y = best[1]; z = best[2]; }
+  else {   // 場所がない（岩の中・溶岩の上・海の上）→ 足場と空間を作る
+    x = tx; z = tz; y = dim === 1 ? clamp(ty, H_LAVA + 6, 104) : Math.max(SEA + 2, Math.min(118, world.surfaceY(tx, tz) + 1));
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 2; dx++) { world.setBlock(x + dx, y - 1, z + dz, B.obsidian, 0, 1); for (let dy = 0; dy <= 3; dy++) world.setBlock(x + dx, y + dy, z + dz, 0, 0, 1); }
+  }
+  for (let dx = -1; dx <= 2; dx++) { world.setBlock(x + dx, y - 1, z, B.obsidian, 0, 1); world.setBlock(x + dx, y + 3, z, B.obsidian, 0, 1); }
+  for (let dy = 0; dy <= 2; dy++) { world.setBlock(x - 1, y + dy, z, B.obsidian, 0, 1); world.setBlock(x + 2, y + dy, z, B.obsidian, 0, 1); }
+  for (let dy = 0; dy <= 2; dy++) for (let dx = 0; dx <= 1; dx++) world.setBlock(x + dx, y + dy, z, B.homura_gate, 0, 1);
+  return { x, y, z, a: 0 };
+}
+// ソラの門のわく：12こで 5×5 の輪（かどの4つはなし）ができていたら、まんなか 3×3 のマスの場所を返す
+function soraRingAt(world, x, y, z) {
+  for (let cz = z - 2; cz <= z + 2; cz++) for (let cx = x - 2; cx <= x + 2; cx++) {
+    let ok = true;
+    for (let dz = -2; dz <= 2 && ok; dz++) for (let dx = -2; dx <= 2 && ok; dx++) {
+      const edge = Math.abs(dx) === 2 || Math.abs(dz) === 2, corner = Math.abs(dx) === 2 && Math.abs(dz) === 2;
+      if (corner) continue;
+      const id = world.getBlock(cx + dx, y, cz + dz);
+      if (edge ? id !== B.sora_frame : !(gateFree(id) || id === B.sora_gate)) ok = false;
+    }
+    if (ok) return [cx, cz];
+  }
+  return null;
+}
+// ほしの結晶がこわれた：はじけて、つながっていたボスにダメージ
+function crystalBurst(world, x, y, z) {
+  sfxAt('crystal', x, y, z); blast(world, x + 0.5, y + 0.5, z + 0.5, 6, 3.4, '結晶', false);
+  fxPuff(x + 0.5, y + 0.5, z + 0.5, 30, 1, 0.7, 0.95, { glow: true, speed: 6, life: 0.9, size: 0.12, spread: 0.6 });
+  const b = game.boss;
+  if (b && !b.dead && b.type === 'hoshikui' && b.healP && b.healP.x === x && b.healP.z === z) { b.hurt = 0; hurtMob(b, 10, x + 0.5, z + 0.5, 0); b.healP = null; }
+  game.unlock('crystal');
 }

@@ -3,7 +3,7 @@
 //   meta  世界の設定      time 時刻      gv/区画 地形の版
 //   c/区画/マス 変えたブロック   e/区画/マス 入れ物の中身   a/区画/… しまってある動物
 //   pl/人 参加者   st/人 位置と、その人が動かしている生き物   dm/人 個別の連絡
-const NET_VER = 1, NET_MAX = 4;
+const NET_VER = 3, NET_MAX = 4;   // 2: ブロックの番号が256以上になった ／ 3: べつの世界（ホムラの底・ソラのはて）と門（2026-11-18）
 const NET_CFG = { apiKey: 'AIzaSyBTuzvBh9qtf5F8JnHVa5bv1-igP3E_ebA', authDomain: 'claude-4d377.firebaseapp.com', databaseURL: 'https://claude-4d377-default-rtdb.asia-southeast1.firebasedatabase.app', projectId: 'claude-4d377', storageBucket: 'claude-4d377.firebasestorage.app', messagingSenderId: '652412386711', appId: '1:652412386711:web:a6033541ef4fa62da998d2' };
 const NET_URL = 'https://mano0526.github.io/games/block.html';
 function withTimeout(p, ms) {
@@ -18,6 +18,7 @@ function parseStack(v) { if (typeof v !== 'string') return null; const a = v.spl
 // 入れ物の中身 ⇔ 中継サーバーに置く形（欄ごとに分けて、同時に触っても ほかの欄を消さないようにする）
 function entToNet(e) {
   if (e.t === 'chest') { const i = {}; for (let k = 0; k < 27; k++) if (e.items[k]) i[k] = stackStr(e.items[k]); const o = { t: 'c', i }; if (e.g) o.g = 1; return o; }
+  if (e.t === 'sign') return { t: 's', s: String(e.s || '').slice(0, 40) };
   const o = { t: 'f', b: e.burn | 0, bm: e.burnMax | 0, k: e.cook | 0 };
   if (e.in) o.in = stackStr(e.in); if (e.fuel) o.fuel = stackStr(e.fuel); if (e.out) o.out = stackStr(e.out);
   return o;
@@ -29,6 +30,7 @@ function entFromNet(v) {
     if (src && typeof src === 'object') for (const k in src) { const s = parseStack(src[k]); if (s && +k >= 0 && +k < 27) items[+k] = s; }
     const e = { t: 'chest', items }; if (v.g) e.g = 1; return e;
   }
+  if (v.t === 's') return { t: 'sign', s: String(v.s == null ? '' : v.s).slice(0, 40) };
   if (v.t === 'f') return { t: 'furnace', in: parseStack(v.in), fuel: parseStack(v.fuel), out: parseStack(v.out), burn: v.b | 0, burnMax: v.bm | 0, cook: v.k | 0 };
   return null;
 }
@@ -40,7 +42,8 @@ function entDiff(sh, nv, own) {
     const a = sh.i || {};
     for (let k = 0; k < 27; k++) { const v = nv.i[k] || null, o = a[k] || null; if (v !== o) out.push(['i/' + k, v]); }
     if ((nv.g || 0) !== (sh.g || 0)) out.push(['g', nv.g || null]);
-  } else for (const f of (own ? ['in', 'fuel', 'out', 'b', 'bm', 'k'] : ['in', 'fuel', 'out'])) { const v = nv[f] === undefined ? null : nv[f], o = sh[f] === undefined ? null : sh[f]; if (v !== o) out.push([f, v]); }
+  } else if (nv.t === 's') { if (nv.s !== sh.s) out.push(['s', nv.s]); }
+  else for (const f of (own ? ['in', 'fuel', 'out', 'b', 'bm', 'k'] : ['in', 'fuel', 'out'])) { const v = nv[f] === undefined ? null : nv[f], o = sh[f] === undefined ? null : sh[f]; if (v !== o) out.push([f, v]); }
   return out;
 }
 function entPatch(o, diff) {
@@ -142,6 +145,9 @@ const net = {
     sub(R.child('meta'), 'value', (s) => this.onMeta(s.val()));
     sub(R.child('fl'), 'value', (s) => { this.flags = s.val() || {}; });
     // 地図の「しるし」は みんなで同じものを見る
+    game.gates = new Map();   // 門の一覧（全員共通）
+    sub(R.child('gates'), 'child_added', (s) => game.gateIn(s.key, s.val()));
+    sub(R.child('gates'), 'child_removed', (s) => game.gates.delete(s.key));
     sub(R.child('pins'), 'child_added', (s) => map.pinIn(s.key, s.val()));
     sub(R.child('pins'), 'child_changed', (s) => map.pinIn(s.key, s.val()));
     sub(R.child('pins'), 'child_removed', (s) => map.pinOut(s.key));
@@ -183,21 +189,26 @@ const net = {
   onMeta(raw) {
     if (!raw) { if (performance.now() - this.entered > 3000 && !this.failed) { this.failed = true; ui.error('この世界は消されました。'); } return; }
     let m; try { m = JSON.parse(raw); } catch (e) { return; }
+    if ((m.v || 1) > NET_VER) { this.old(); return; }   // もっと新しい版の人が入ってきた → 読みこみ直してもらう
     this.meta = m; game.applyMeta(m);
+    // 自分のほうが新しければ、世界の版を上げておく（古い版のままの人が あとから入って 知らないブロックでおかしくならないように）
+    if ((m.v || 1) < NET_VER && this.on && !this.failed) this.setMeta({ v: NET_VER });
   },
   setMeta(patch) { this.meta = Object.assign({}, this.meta, patch); this.root.child('meta').set(JSON.stringify(this.meta)); game.applyMeta(this.meta); },
   destroy(code) { return this.db.ref('np/block/w/' + code).remove(); },
   // 何人いるか（一覧の表示用）
-  async count(code) { try { return (await withTimeout(this.db.ref('np/block/w/' + code + '/pl').once('value'), 8000)).numChildren(); } catch (e) { return -1; } },
+  async countAt(code) { try { return (await withTimeout(this.db.ref('np/block/w/' + code + '/pl').once('value'), 8000)).numChildren(); } catch (e) { return -1; } },
   async exists(code) { try { return (await withTimeout(this.db.ref('np/block/w/' + code + '/meta').once('value'), 8000)).val() !== null; } catch (e) { return null; } },
 
   pinSet(id, v) { if (this.on) this.root.child('pins/' + id).set({ x: v.x, z: v.z, n: v.n, c: v.c, by: v.by }).catch((e) => this.fail(e)); },
   pinDel(id) { if (this.on) this.root.child('pins/' + id).remove().catch((e) => this.fail(e)); },
+  gateSet(g) { if (this.on) this.root.child('gates/' + g.id).set({ d: g.d, x: g.x, y: g.y, z: g.z }).catch((e) => this.fail(e)); },
+  gateDel(id) { if (this.on) this.root.child('gates/' + id).remove().catch((e) => this.fail(e)); },
   // ---------- 持ち物など（参加者ごと。端末に保存する） ----------
   loadPlayer(code) { try { return JSON.parse(localStorage.getItem('blk_pd_' + code) || 'null'); } catch (e) { return null; } },
   savePlayer() {
     if (!this.on || !this.world) return;
-    try { localStorage.setItem('blk_pd_' + this.code, JSON.stringify({ player: player.serialize(), ach: game.ach, ended: game.ended, map: map.save(false), t: Date.now() })); } catch (e) { }
+    try { localStorage.setItem('blk_pd_' + this.code, JSON.stringify({ player: player.serialize(), ach: game.ach, ended: game.ended, map: map.save(false), dim: this.world.dim, t: Date.now() })); } catch (e) { }
   },
 
   // ---------- 参加者 ----------
@@ -205,6 +216,8 @@ const net = {
   // 名のっていて、いなくなった様子のない人だけを数える
   here(p) { return p.known && !p.goneAt; },
   count() { let n = 1; for (const p of this.peers.values()) if (this.here(p)) n++; return n; },
+  // 同じ世界（dim）にいる人の中で、自分の番号がいちばん小さいか（ボスを出す役などを1人に決める）
+  isFirstInDim() { for (const p of this.peers.values()) if (this.here(p) && this.fresh(p) && p.dim === this.world.dim && p.pid < this.pid) return false; return true; },
   isFirst(except) { for (const p of this.peers.values()) if (p.pid !== except && this.here(p) && p.pid < this.pid) return false; return true; },
   addPeer(pid) {
     const p = mkPeer(pid); this.peers.set(pid, p);
@@ -253,6 +266,7 @@ const net = {
       p.open = P[8] || 0; p.dim = P[9] | 0;
     }
     p.seen = now;
+    if (p.dim !== this.world.dim) { if (p.ents.size) { for (const e of p.ents.values()) if (e !== true) e.dead = true; p.ents.clear(); } return; }   // べつの世界にいる人の生き物・落とし物は見えない
     if (m[1] || m[2] || m[3]) netEnts(p, m[1] || [], m[2] || null, !!m[3]);
   },
   updPeers(dt) {
@@ -291,7 +305,7 @@ const net = {
   // ---------- 送る ----------
   dm(pid, o) { if (!this.on) return; o.f = this.pid; this.root.child('dm/' + pid).push(JSON.stringify(o)); },
   cell(x, y, z, id, meta) {
-    this.out['c/' + this.world.dim + '_' + (x >> 6) + '_' + (z >> 6) + '/c' + ((y << 12) | ((z & 63) << 6) | (x & 63)).toString(36)] = id | (meta << 8);
+    this.out['c/' + this.world.dim + '_' + (x >> 6) + '_' + (z >> 6) + '/c' + ((y << 12) | ((z & 63) << 6) | (x & 63)).toString(36)] = cellPack(id, meta);
     this.outN++;
   },
   entDirty(x, y, z) { this.dirtyEnts.set(posKey(x, y, z), [x, y, z]); },
@@ -383,7 +397,7 @@ const net = {
     m.set(ci, v);
     if (reg.dim !== w.dim) return;
     const r = w.remoteCell(x, y, z, v);
-    if (r && reg.ready && game.state !== 'loading') netBlockFx(x, y, z, r - 1, v & 255);
+    if (r && reg.ready && game.state !== 'loading') netBlockFx(x, y, z, r - 1, cellId(v));
   },
   onEnt(reg, key, v) {
     const q = this._q || (this._q = [0, 0, 0]); if (!this.cellPos(reg, key, q)) return;
@@ -406,9 +420,10 @@ const net = {
     const ck = w.key(c.cx, c.cz), m = reg.cells.get(ck);
     if (m && m.size) {
       for (const [i, v] of m) {
-        const id = v & 255, old = c.blocks[i];
+        const id = cellId(v), old = c.blocks[i];
+        if (!BLOCKS[id] && id !== 0) continue;
         if (old !== id && c.ents.size && c.ents.has(i) && !(BLOCKS[old] && BLOCKS[id] && BLOCKS[old].ent && BLOCKS[old].ent === BLOCKS[id].ent)) c.ents.delete(i);
-        c.blocks[i] = id; c.meta[i] = (v >> 8) & 255;
+        c.blocks[i] = id; c.meta[i] = cellMeta(v);
         if (id && (i >> 8) > c.maxY) c.maxY = i >> 8;
       }
       c.modified = true;
@@ -448,7 +463,7 @@ const net = {
   // 全員がベッドに入っていたら朝にする（番号がいちばん小さい人の端末が決める）
   checkSleep() {
     const w = this.world; if (!game.inBed || !w.isNight()) { this.sleepT = 0; return; }
-    for (const p of this.peers.values()) if (this.here(p) && this.fresh(p) && !p.dead && !p.sleeping) { this.sleepT = 0; return; }
+    for (const p of this.peers.values()) if (this.here(p) && this.fresh(p) && !p.dead && !p.sleeping && !p.dim) { this.sleepT = 0; return; }   // べつの世界にいる人は数えない
     if ((this.sleepT = (this.sleepT || 0) + 1) < 3) return;
     this.sleepT = 0; this.skipped = true; this.writeTime(0, w.day + 1); this.applyTime();
   },

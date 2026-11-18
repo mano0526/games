@@ -60,7 +60,7 @@ FEAT[BIOME.FROZEN] = { d: 0.0012, k: [TK.BERG, 100] };
 let FEAT_MAX = 0;
 for (const f of FEAT) if (f) { f.tot = 0; for (let i = 1; i < f.k.length; i += 2) f.tot += f.k[i]; FEAT_MAX = Math.max(FEAT_MAX, f.d * (f.n ? 1.7 : 1)); }
 // 生えるものが置きかえてよいブロック。F_HARD＝幹や氷など（葉や草をおしのける）
-const F_HARD = new Uint8Array(256), F_SOFT = new Uint8Array(256);
+const F_HARD = new Uint8Array(NB), F_SOFT = new Uint8Array(NB);
 for (let i = 1; i < 256; i++) if (BLOCKS[i]) {
   if (ISLOG[i]) F_HARD[i] = 1;
   if (ISLEAF[i] || SHAPE[i] === S_CROSS || SHAPE[i] === S_FLAT) F_SOFT[i] = 1;
@@ -68,7 +68,7 @@ for (let i = 1; i < 256; i++) if (BLOCKS[i]) {
 for (const k of ['mush_stem', 'packed_ice', 'cobble', 'mossy_cobble']) F_HARD[B[k]] = 1;
 for (const k of ['snow_layer', 'water', 'ice', 'vine']) F_SOFT[B[k]] = 1;
 // 幹や枝は 地面にめりこんでもよい（坂で枝が置けず、葉だけが残って枯れるのを防ぐ）
-const F_TERR = new Uint8Array(256);
+const F_TERR = new Uint8Array(NB);
 for (const k of ['stone', 'grass', 'dirt', 'sand', 'gravel', 'snow_block', 'red_sand', 'terracotta', 'terracotta_white', 'terracotta_yellow', 'terracotta_orange', 'terracotta_red', 'terracotta_brown', 'podzol', 'mud', 'coarse_dirt', 'moss', 'mycelium', 'granite', 'diorite', 'andesite', 'sandstone', 'clay']) F_TERR[B[k]] = 1;
 const FL4 = [41, 42, 43, 44], FL6 = [41, 42, 43, 44, 108, 109];
 

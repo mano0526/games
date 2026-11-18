@@ -1,6 +1,6 @@
 // ===== 09_player.js : プレイヤーの動き・こわす／置く・持ち物・体力と空腹 =====
 const input = { fwd: 0, strafe: 0, jump: false, sneak: false, sprint: false, breakHeld: false, breakPressed: false, useHeld: false, usePressed: false, lookDX: 0, lookDY: 0, rayNdc: null };
-const DEATH_MSG = { '落下': '高いところから落ちてしまった', '溶岩': '溶岩に落ちてしまった', '空腹': 'おなかが空いて力尽きた', '水': 'おぼれてしまった', 'サボテン': 'サボテンのトゲにやられた', '奈落': '世界の底に落ちてしまった' };
+const DEATH_MSG = { '落下': '高いところから落ちてしまった', '溶岩': '溶岩に落ちてしまった', '空腹': 'おなかが空いて力尽きた', '水': 'おぼれてしまった', 'サボテン': 'サボテンのトゲにやられた', '奈落': '世界の底に落ちてしまった', '火': '火に つつまれてしまった', 'マグマ石': 'マグマ石の上で やけどしてしまった', '結晶': 'ほしの結晶が はじけて まきこまれた' };
 
 class Player {
   constructor() { this.hw = 0.3; this.h = 1.8; this.reset(); }
@@ -14,6 +14,7 @@ class Player {
     this.fallDist = 0; this.hurtT = 0; this.regenT = 0; this.starveT = 0; this.stepAcc = 0; this.bob = 0; this.bobAmp = 0; this.jumpCd = 0;
     this.target = null; this.targetMob = null; this.ray = [0, 0, -1]; this.eyeOff = 1.62; this.invDirty = true; this.deathPos = null; this.lastSel = -1;
     this.stats = { broken: 0, placed: 0, kills: 0, deaths: 0, crafted: 0, dist: 0 };
+    this.burnT = 0; this.gateT = 0; this.gateWait = false;   // 火がついている残り時間／門の中にいる時間／門から出るまで待つ
   }
   eyeY() { return this.y + this.eyeOff; }
   held() { return this.inv[this.sel]; }
@@ -62,6 +63,7 @@ class Player {
     this.interact(world, dt);
     input.usePressed = input.breakPressed = false;
     const want = this.sneaking ? 1.47 : 1.62; this.eyeOff += (want - this.eyeOff) * Math.min(1, dt * 14);
+    if (this.stepLift) { this.stepLift -= Math.max(this.stepLift * dt * 16, dt * 1.2); if (this.stepLift < 0.004) this.stepLift = 0; }
   }
   hasFloor(world, x, z) {
     _cb.length = 0;
@@ -84,6 +86,7 @@ class Player {
     if (input.sprint && f > 0.5 && !this.sneaking && (this.mode === 1 || this.food > 6)) this.sprinting = true;
     if (f <= 0.1 || this.sneaking || (this.mode === 0 && this.food <= 6)) this.sprinting = false;
     let speed = this.flying ? (this.sprinting ? 21 : 10.5) : this.sneaking ? 1.3 : this.sprinting ? 5.6 : 4.3;
+    if (this.onGround && !this.flying) { const ub = BLOCKS[world.getBlock(fx, Math.floor(this.y - 0.2), fz)]; if (ub && ub.slow) speed *= 0.45; }
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     const wx = (-sy * f + cy * s) * speed, wz = (-cy * f - sy * s) * speed;
     this.jumpCd -= dt;
@@ -115,7 +118,8 @@ class Player {
       while (dx !== 0 && dz !== 0 && !this.hasFloor(world, this.x + dx, this.z + dz)) { if (Math.abs(dx) < st) dx = 0; else dx -= Math.sign(dx) * st; if (Math.abs(dz) < st) dz = 0; else dz -= Math.sign(dz) * st; }
     }
     const ox = this.x, oy = this.y, oz = this.z, wasG = this.onGround;
-    moveAABB(world, this, dx, dy, dz);
+    const lift = moveStep(world, this, dx, dy, dz, this.flying || inW || inL || ladder ? 0 : 0.6);
+    if (lift > 0) this.stepLift = Math.min(0.7, (this.stepLift || 0) + lift);   // 目の高さは なめらかに追いつかせる
     if (this.flying || inW || inL || ladder) this.fallDist = 0;
     else if (this.y < oy) this.fallDist += oy - this.y;
     if (this.onGround) {
@@ -227,9 +231,10 @@ class Player {
       const toWater = id === B.ice && (SOLID[world.getBlock(t.x, t.y - 1, t.z)] || FLUID[world.getBlock(t.x, t.y - 1, t.z)]);
       world.setBlock(t.x, t.y, t.z, toWater ? B.water : 0, 0);
       for (const [did, n] of drops) spawnDrop(t.x + 0.5, t.y + 0.35, t.z + 0.5, did, n, 0);
-      if (tool && b.hard > 0) this.wearHeld(tool.type === 'sword' ? 2 : 1);
+      if (tool && b.hard > 0 && tool.type !== 'lighter') this.wearHeld(tool.type === 'sword' ? 2 : 1);
       this.exh += 0.005;
     } else world.setBlock(t.x, t.y, t.z, 0, 0);
+    if (id === B.hoshi_crystal) crystalBurst(world, t.x, t.y, t.z);
     this.stats.broken++; this.stat('break', id);
   }
   attack(e) {
@@ -241,7 +246,7 @@ class Player {
     if (hurtMob(e, dmg, this.x, this.z, this.sprinting ? 8 : 5.5)) {
       sfx('hit');
       if (crit) fxPuff(e.x, e.y + e.h * 0.7, e.z, 10, 1, 0.9, 0.3, { glow: true, speed: 3, life: 0.4, size: 0.06 });
-      if (tool) this.wearHeld(tool.type === 'sword' ? 1 : 2);
+      if (tool && tool.type !== 'lighter') this.wearHeld(tool.type === 'sword' ? 1 : 2);
       this.exh += 0.1;
     }
   }
@@ -258,6 +263,7 @@ class Player {
     const t = this.target, it = this.held(), def = it ? ITEMS[it.id] : null;
     if (t && !this.sneaking) { const b = BLOCKS[t.id]; if (b.interact) { this.swing(); this.interactBlock(world, t, b.interact); return true; } }
     if (!it) return false;
+    if (def.tool && def.tool.type === 'lighter') return t ? this.useLighter(world, t) : false;
     if (def.bucket) return this.useBucket(world, it, def);
     if (def.tool && def.tool.type === 'hoe' && t && (t.id === B.grass || t.id === B.dirt)) {
       const ab = world.getBlock(t.x, t.y + 1, t.z);
@@ -276,9 +282,25 @@ class Player {
     let px = t.x + t.nx, py = t.y + t.ny, pz = t.z + t.nz;
     if (REPLACE[t.id] && !FLUID[t.id] && t.id !== id) { px = t.x; py = t.y; pz = t.z; }
     if (py < 1 || py > 125) { ui.toast('ここには置けません（高さの限界です）'); return false; }
+    const sh = SHAPE[id], lf = this.lookF(), toward = (lf + 2) & 3;
+    // 当たった場所が そのマスの上半分か（横の面に置くとき、ハーフブロックや階段の上下を決める）
+    const hy = this.eyeY() + this.ray[1] * t.t - t.y, upper = t.ny === -1 || (t.ny === 0 && hy > 0.5);
+    if (sh === S_SLAB) {   // 同じハーフブロックの あいているほうに置くと、1つのブロックになる
+      const full = BLOCKS[id].base;
+      if (t.id === id && ((t.ny === 1 && !(t.meta & 1)) || (t.ny === -1 && (t.meta & 1)))) { px = t.x; py = t.y; pz = t.z; }
+      const here = world.getBlock(px, py, pz);
+      if (here === id) {
+        const hm = world.getMeta(px, py, pz), want = (px === t.x && py === t.y && pz === t.z) ? (hm ^ 1) : (upper ? 1 : 0);
+        if (want === (hm & 1)) return false;
+        for (const e of ents) if (e.kind === 'mob' && px < e.x + e.hw && px + 1 > e.x - e.hw && py < e.y + e.h && py + 1 > e.y && pz < e.z + e.hw && pz + 1 > e.z - e.hw) return false;
+        if (px < this.x + this.hw && px + 1 > this.x - this.hw && py < this.y + this.h && py + 1 > this.y && pz < this.z + this.hw && pz + 1 > this.z - this.hw) return false;
+        world.setBlock(px, py, pz, full, 0, 1);
+        this.useHeldOne(); this.swing(); sfxAt('place_' + BLOCKS[id].sound, px, py, pz); this.stats.placed++; this.stat('place', id);
+        return true;
+      }
+    }
     const cur = world.getBlock(px, py, pz);
     if (!(cur === 0 || REPLACE[cur])) return false;
-    const sh = SHAPE[id], lf = this.lookF(), toward = (lf + 2) & 3;
     let meta = 0, extra = null;
     if (sh === S_TORCH) {
       if (t.ny === 1) meta = 0;
@@ -297,11 +319,19 @@ class Player {
       const d = F4[lf], hx = px + d[0], hz = pz + d[1], hc = world.getBlock(hx, py, hz);
       if (!(hc === 0 || REPLACE[hc]) || !SOLID[world.getBlock(px, py - 1, pz)] || !SOLID[world.getBlock(hx, py - 1, hz)]) { ui.toast('ベッドを置くには平らな場所が2マス必要です'); return false; }
       meta = lf; extra = [hx, py, hz, lf | 4];
+    } else if (sh === S_SLAB) meta = upper ? 1 : 0;
+    else if (sh === S_STAIR) meta = lf | (upper ? 4 : 0);            // のぼる先が 向いているほう
+    else if (sh === S_GATE) meta = lf;
+    else if (sh === S_TRAP) meta = toward | (upper ? 8 : 0);          // ちょうつがいは 手前がわ
+    else if (sh === S_SIGN) { meta = toward; if (!world.hasSupport(id, meta, px, py, pz)) { ui.toast('看板は地面の上に立てます'); return false; } }
+    else if (sh === S_LANTERN) {                                       // ブロックの下の面に置くと つるす。それ以外は床に置く
+      meta = t.ny === -1 ? 1 : 0;
+      if (!world.hasSupport(id, meta, px, py, pz)) { meta ^= 1; if (!world.hasSupport(id, meta, px, py, pz)) return false; }
     } else if (BLOCKS[id].support) { if (!world.hasSupport(id, 0, px, py, pz)) return false; }
     else if (BLOCKS[id].facing) meta = toward;
     else if (ISLEAF[id]) meta = 1;
     if (SOLID[id]) {
-      for (const b of collisionBoxes(id, meta)) {
+      for (const b of collisionBoxes(id, meta, 15)) {
         if (px + b[0] < this.x + this.hw && px + b[3] > this.x - this.hw && py + b[1] < this.y + this.h && py + b[4] > this.y && pz + b[2] < this.z + this.hw && pz + b[5] > this.z - this.hw) return false;
         for (const e of ents) if (e.kind === 'mob' && px + b[0] < e.x + e.hw && px + b[3] > e.x - e.hw && py + b[1] < e.y + e.h && py + b[4] > e.y && pz + b[2] < e.z + e.hw && pz + b[5] > e.z - e.hw) return false;
       }
@@ -312,9 +342,26 @@ class Player {
     const be = BLOCKS[id].ent;
     if (be === 'chest') world.setEnt(px, py, pz, { t: 'chest', items: new Array(27).fill(null) });
     else if (be === 'furnace') world.setEnt(px, py, pz, { t: 'furnace', in: null, fuel: null, out: null, burn: 0, burnMax: 0, cook: 0 });
+    else if (be === 'sign') { world.setEnt(px, py, pz, { t: 'sign', s: '' }); ui.editSign(px, py, pz); }
     this.useHeldOne(); this.swing();
     sfxAt('place_' + BLOCKS[id].sound, px, py, pz);
     this.stats.placed++; this.stat('place', id);
+    if (id === B.sora_frame) game.checkSoraRing(px, py, pz);
+    return true;
+  }
+  // 火打ち金：黒曜石のわくの内がわに使うと、ホムラの門がひらく
+  useLighter(world, t) {
+    const x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
+    this.swing(); sfxAt('spark', t.x, t.y, t.z); this.wearHeld(1);
+    fxPuff(t.x + 0.5 + t.nx * 0.55, t.y + 0.5 + t.ny * 0.55, t.z + 0.5 + t.nz * 0.55, 7, 1, 0.75, 0.25, { glow: true, speed: 1.6, life: 0.3, size: 0.05, grav: 6 });
+    if (world.dim === 2) { if (t.id === B.obsidian) ui.toast('ここでは ホムラの門は ひらかない'); return true; }
+    const g = tryLightGate(world, x, y, z);
+    if (g) {
+      sfxAt('ignite', x, y, z); game.shake = Math.max(game.shake, 0.25);
+      for (let i = 0; i < g.w; i++) for (let j = 0; j < g.h; j++) fxPuff(g.x + (g.a ? 0 : i) + 0.5, g.y + j + 0.5, g.z + (g.a ? i : 0) + 0.5, 5, 0.9, 0.4, 0.9, { glow: true, speed: 2.2, life: 0.8, size: 0.09, spread: 0.5 });
+      game.gateAdd(world.dim, g.x, g.y, g.z); game.unlock('gate');
+      ui.toast('ホムラの門が ひらいた！ 中に立つと、べつの世界へ行ける', 6);
+    } else if (t.id === B.obsidian) ui.toast('黒曜石で 四角いわくを作ろう（内がわが よこ2×たて3 以上）。火打ち金は わくの内がわに使う', 7);
     return true;
   }
   useBucket(world, it, def) {
@@ -339,6 +386,11 @@ class Player {
     if (py < 1 || py > 125) return false;
     const cur = world.getBlock(px, py, pz);
     if (!(cur === 0 || REPLACE[cur] || SHAPE[cur] === S_CROSS)) return false;
+    if (def.bucket === 'water' && world.dim === 1) {   // ホムラの底では 水は置けない
+      fxFizz(px, py - 0.5, pz); this.swing(); ui.toast('あつすぎて、水は すぐに じょうはつしてしまった');
+      if (this.mode === 0) { this.inv[this.sel] = { id: I.bucket, n: 1, d: 0 }; this.invDirty = true; }
+      return true;
+    }
     if (cur && !FLUID[cur]) world.breakNatural(px, py, pz);
     world.setBlock(px, py, pz, def.bucket === 'water' ? B.water : B.lava, 0); sfx('splash'); this.swing();
     if (this.mode === 0) { this.inv[this.sel] = { id: I.bucket, n: 1, d: 0 }; this.invDirty = true; }
@@ -361,7 +413,14 @@ class Player {
       world.setBlock(t.x, t.y, t.z, t.id, m, 1);
       if (world.getBlock(t.x, oy, t.z) === t.id) world.setBlock(t.x, oy, t.z, t.id, world.getMeta(t.x, oy, t.z) ^ 4, 1);
       sfxAt('door', t.x, t.y, t.z);
-    } else if (kind === 'bed') {
+    } else if (kind === 'gate') {
+      let m = t.meta ^ 4;
+      if (m & 4) { const f = m & 3, d = F4[f], away = (this.x - (t.x + 0.5)) * d[0] + (this.z - (t.z + 0.5)) * d[1] > 0; if (away) m = (m & ~3) | ((f + 2) & 3); }   // 自分とは反対がわへ開く
+      world.setBlock(t.x, t.y, t.z, t.id, m, 1); sfxAt('door', t.x, t.y, t.z);
+    } else if (kind === 'trap') { world.setBlock(t.x, t.y, t.z, t.id, t.meta ^ 4, 1); sfxAt('door', t.x, t.y, t.z); }
+    else if (kind === 'sign') ui.editSign(t.x, t.y, t.z);
+    else if (kind === 'bed') {
+      if (world.dim) { ui.toast('この世界では ねむれない（復活地点にも できない）'); sfx('deny', 0.4); return; }
       this.spawn = { x: t.x + 0.5, y: t.y + 0.6, z: t.z + 0.5 };
       if (!world.isNight()) { ui.toast('ここを復活地点にしました。眠れるのは夜だけです'); return; }
       for (const e of ents) if (e.kind === 'mob' && MOBS[e.type].hostile && e.hp > 0 && Math.hypot(e.x - this.x, e.y - this.y, e.z - this.z) < 9) { ui.toast('近くに敵がいて眠れません'); return; }
@@ -381,7 +440,12 @@ class Player {
       else if (this.food <= 0) { if (++this.starveT >= 80) { this.starveT = 0; if (this.hp > (game.diff >= 3 ? 0 : game.diff === 2 ? 1 : 10)) this.damage(1, this.x, this.z, 0, '空腹', true); } }
       if (this.headIn === 1) { this.air--; if (this.air <= -20) { this.air = 0; this.damage(2, this.x, this.z, 0, '水', true); } }
       else this.air = Math.min(300, this.air + 6);
-      if (this.inLava && world.tick % 10 === 0) this.damage(4, this.x, this.z, 0, '溶岩', true);
+      if (this.inLava && world.tick % 10 === 0) { this.damage(4, this.x, this.z, 0, '溶岩', true); this.burnT = Math.max(this.burnT, 60); }
+      if (this.burnT > 0) {   // 火がついている：水に入ると消える
+        if (this.inWater) { this.burnT = 0; sfx('fizz', 0.5); }
+        else { this.burnT--; if (this.burnT % 20 === 10 && !this.inLava) this.damage(1, this.x, this.z, 0, '火', true); if (world.tick % 2 === 0) fxPuff(this.x + (Math.random() - 0.5) * 0.5, this.y + 0.3 + Math.random() * 1.2, this.z + (Math.random() - 0.5) * 0.5, 1, 1, 0.55 + Math.random() * 0.3, 0.15, { glow: true, speed: 0.3, life: 0.5, size: 0.07, up: 1, grav: 0 }); }
+      }
+      if (world.tick % 10 === 0 && this.onGround && !this.sneaking) { const ub = BLOCKS[world.getBlock(Math.floor(this.x), Math.floor(this.y - 0.2), Math.floor(this.z))]; if (ub && ub.hot) this.damage(1, this.x, this.z, 0, 'マグマ石', true); }
       if (world.tick % 10 === 0) {
         const x0 = Math.floor(this.x - this.hw - 0.08), x1 = Math.floor(this.x + this.hw + 0.08), z0 = Math.floor(this.z - this.hw - 0.08), z1 = Math.floor(this.z + this.hw + 0.08);
         let hit = false;
@@ -390,6 +454,18 @@ class Player {
       }
     } else { this.air = 300; }
     if (this.y < -12) { if (this.mode === 1) { this.y = 100; this.vy = 0; } else this.damage(6, this.x, this.z, 0, '奈落', true); }
+    // 門の中にいるか（ホムラの門は しばらく立っていると移る。ソラの門は ふれたらすぐ）
+    if (this.dead || game.state === 'loading') return;
+    const gx = Math.floor(this.x), gz = Math.floor(this.z), g0 = world.getBlock(gx, Math.floor(this.y + 0.1), gz), g1 = world.getBlock(gx, Math.floor(this.y + 1), gz);
+    if (g0 === B.homura_gate || g1 === B.homura_gate) {
+      if (!this.gateWait && world.dim !== 2) {
+        if (this.gateT === 0) sfx('gatehum', 0.8);
+        this.gateT++;
+        if (this.gateT >= (this.mode === 1 ? 12 : 70)) { this.gateT = 0; game.travel(world.dim === 1 ? 0 : 1, 'gate'); }
+      }
+    } else if (g0 === B.sora_gate) {
+      if (!this.gateWait) game.travel(world.dim === 2 ? 0 : 2, world.dim === 2 ? 'home' : 'sora');
+    } else { this.gateT = Math.max(0, this.gateT - 3); this.gateWait = false; }
   }
   damage(amount, fromX, fromZ, kb, source, raw) {
     if (this.dead || this.mode === 1 || amount <= 0) return;
@@ -405,7 +481,7 @@ class Player {
     if (this.hp <= 0) { this.hp = 0; this.die(source); }
   }
   die(source) {
-    this.dead = true; this.stats.deaths++;
+    this.dead = true; this.stats.deaths++; this.burnT = 0; this.gateT = 0;
     this.deathPos = { x: Math.floor(this.x), y: Math.floor(this.y), z: Math.floor(this.z) };
     let dropped = false;
     if (!game.rules.keep) {
@@ -424,7 +500,7 @@ class Player {
     if (sp && world.getBlock(Math.floor(sp.x), Math.floor(sp.y - 0.6), Math.floor(sp.z)) !== B.bed && world.isLoaded(Math.floor(sp.x), Math.floor(sp.z))) { sp = null; this.spawn = null; ui.toast('ベッドがなくなったので最初の場所にもどります'); }
     if (!sp) sp = game.worldSpawn;
     this.x = sp.x; this.y = sp.y; this.z = sp.z; this.vx = this.vy = this.vz = 0;
-    this.hp = 20; this.food = 20; this.sat = 5; this.exh = 0; this.air = 300; this.dead = false; this.hurtT = 60; this.fallDist = 0;
+    this.hp = 20; this.food = 20; this.sat = 5; this.exh = 0; this.air = 300; this.dead = false; this.hurtT = 60; this.fallDist = 0; this.burnT = 0; this.gateT = 0; this.gateWait = true;
     game.needSafeSpot = sp === game.worldSpawn ? 1 : 2;
   }
   serialize() {
@@ -442,7 +518,7 @@ class Player {
   // ---- 視点 ----
   camera(cam) {
     const b = settings.bobbing ? this.bobAmp : 0;
-    cam.x = this.x; cam.y = this.eyeY() + Math.abs(Math.sin(this.bob * 1.9)) * 0.045 * b; cam.z = this.z;
+    cam.x = this.x; cam.y = this.eyeY() - (this.stepLift || 0) + Math.abs(Math.sin(this.bob * 1.9)) * 0.045 * b; cam.z = this.z;
     cam.yaw = this.yaw; cam.pitch = this.pitch;
     cam.roll = Math.sin(this.bob * 1.9) * 0.006 * b + game.camKick * 0.09 * Math.sin(game.camKick * 9) + (game.shake > 0 ? (Math.random() - 0.5) * game.shake * 0.08 : 0);
     if (game.shake > 0) { cam.x += (Math.random() - 0.5) * game.shake * 0.2; cam.y += (Math.random() - 0.5) * game.shake * 0.2; }
@@ -475,7 +551,7 @@ class Player {
       addColorBox(handCol, _mm, -0.085, -0.2, -0.085, 0.085, 0.3, 0.085, 0.82 * r, 0.38 * g, 0.2 * b, 1);
       return;
     }
-    const isCube = it.id < 256 && !ICON[it.id];
+    const isCube = isBlk(it.id) && !ICON[it.id];
     if (isCube) {
       m4Translate(_mm, hx * 0.56 - s1 * 0.34 * sc + bx - eat * hx * 0.45, -0.5 + s2 * 0.12 + by + ew, -1.0 - s2 * 0.2);
       m4RotX(_mr, 0.12 - s2 * 0.8); m4Mul(_mm, _mm, _mr); m4RotY(_mr, 0.78 + s1 * 0.5); m4Mul(_mm, _mm, _mr); m4Scale(_mr, 0.34 * sc, 0.34 * sc, 0.34 * sc); m4Mul(_mm, _mm, _mr);

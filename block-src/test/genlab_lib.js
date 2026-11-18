@@ -2,8 +2,8 @@
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
 function load(extra) {
   const root = path.join(__dirname, '..', 'src');
-  const src = ['01_util.js', '02_blocks.js', '03_gen.js', '03b_gen2.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
-  const names = ['CW', 'CH', 'CVOL', 'SEA', 'clamp', 'lerp', 'smoothstep', 'mulberry32', 'hash2', 'hash3', 'rand2', 'strSeed', 'Simplex', 'fbm2', 'BLOCKS', 'B', 'I', 'ITEMS', 'OPAQUE', 'SOLID', 'ISLEAF', 'ISLOG', 'SHAPE', 'BIOME', 'BIOME_NAMES', 'GENS', 'GEN_CUR', 'genTreeShape', 'WorldGen'].concat(extra || []);
+  const src = ['01_util.js', '02_blocks.js', '03_gen.js', '03b_gen2.js', '03c_dims.js'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+  const names = ['CW', 'CH', 'CVOL', 'SEA', 'clamp', 'lerp', 'smoothstep', 'mulberry32', 'hash2', 'hash3', 'rand2', 'strSeed', 'Simplex', 'fbm2', 'BLOCKS', 'B', 'I', 'ITEMS', 'OPAQUE', 'SOLID', 'ISLEAF', 'ISLOG', 'SHAPE', 'BIOME', 'BIOME_NAMES', 'GENS', 'GEN_CUR', 'genTreeShape', 'WorldGen', 'dimGenClass', 'fortInfo', 'nearestFort', 'soraPillars', 'H_LAVA', 'SORA_PED_Y'].concat(extra || []);
   const body = "'use strict';\n" + src + '\nreturn {' + names.map(n => n + ': (typeof ' + n + " !== 'undefined' ? " + n + ' : undefined)').join(',') + '};';
   return new Function(body)();
 }

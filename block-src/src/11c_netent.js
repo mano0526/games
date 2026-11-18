@@ -20,13 +20,13 @@ function stashMob(world, e) {
 // セーブ用：動いている動物と、しまってある動物をまとめる
 function collectMobs(world) {
   const out = [];
-  for (const e of ents) if (!e.remote && !e.dead && keepsMob(e)) out.push(mobRec(e));
-  for (const a of world.stash.values()) for (const r of a) out.push(r);
+  for (const e of ents) if (!e.remote && !e.dead && keepsMob(e)) out.push(world.dim ? mobRec(e).concat([world.dim]) : mobRec(e));
+  world.stashes.forEach((st, d) => { for (const a of st.values()) for (const r of a) out.push(d && r.length < 7 ? r.concat([d]) : r); });
   return out;
 }
 function restoreMobs(world, list) {
   if (!Array.isArray(list)) return;
-  for (const r of list) { if (!r || !MOBS[r[0]]) continue; const k = world.key(Math.floor(r[1]) >> 4, Math.floor(r[3]) >> 4); let a = world.stash.get(k); if (!a) world.stash.set(k, a = []); a.push(r); }
+  for (const r of list) { if (!r || !MOBS[r[0]]) continue; const st = world.stashes[r[6] | 0] || world.stashes[0], k = world.key(Math.floor(r[1]) >> 4, Math.floor(r[3]) >> 4); let a = st.get(k); if (!a) st.set(k, a = []); a.push(r); }
 }
 
 // ---- ねらう相手・近くの人 ----
@@ -73,21 +73,24 @@ function netTake(m) {
   if (e && e !== true && e.kind === 'mob' && !e.dead) { p.ents.set(m.n, true); e.remote = false; e.owner = null; e.nid = _nid++; e._ns = ''; }
   else e = spawnMob(a[0], a[1], a[2], a[3]);
   e.x = e.px = a[1]; e.y = e.py = a[2]; e.z = e.pz = a[3]; e.yaw = e.pyaw = a[5] || 0; e.awake = !!a[6]; e.hp = a[7] || a[4]; e.vx = e.vy = e.vz = 0;
-  if (MOBS[e.type].boss) { game.boss = e; game.bossLost = 0; ui.dark(true); }
+  if (MOBS[e.type].boss) bossSeen(e);
 }
+// ボスが自分の画面に現れた（体力バーを出す。暗くするのは カゲの王だけ）
+function bossSeen(e) { game.boss = e; game.bossLost = 0; ui.dark(e.type === 'king'); }
 
 // ---- 送る側：自分が動かしているものの一覧 ----
 function entRec(e) {
-  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 ? 4 : 0) | (e.onGround ? 8 : 0)];
+  if (e.kind === 'mob') return [e.nid, 0, e.type, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), Math.max(0, Math.ceil(e.hp)), (e.awake ? 1 : 0) | (e.swing > 0 ? 2 : 0) | (e.slam > 6 ? 4 : 0) | (e.onGround ? 8 : 0) | (e.breath ? 16 : 0) | (e.land ? 32 : 0)];
   if (e.kind === 'item') return [e.nid, 1, e.id, e.n, e.d, r2(e.x), r2(e.y), r2(e.z)];
   if (e.kind === 'falling') return [e.nid, 2, e.id, r2(e.x), r2(e.y), r2(e.z)];
-  return [e.nid, 3, e.dark ? 1 : 0, r2(e.x), r2(e.y), r2(e.z), r2(e.vx), r2(e.vy), r2(e.vz), e.dmg];
+  return [e.nid, 3, e.dark | 0, r2(e.x), r2(e.y), r2(e.z), r2(e.vx), r2(e.vy), r2(e.vz), e.dmg];
 }
 function netCollect(full) {
   const out = []; net.entTick = (net.entTick + 1) & 3;
   for (const e of ents) {
     if (e.remote || e.foreign || e.dead) continue;
-    net.nearPeer(e.x, e.z); const dn = net._npd;
+    net.nearPeer(e.x, e.z); let dn = net._npd;
+    if (e.type === 'hoshikui' && dn < 1e8) dn = 0;   // ソラのはてのボスは、同じ世界にいる人には 遠くても いつも送る
     if (dn > 64) { if (e._ns) { e._ns = ''; net.rmQ.push(e.nid); } continue; }
     if (e.kind === 'shot') { if (e._ns) continue; e._ns = '1'; out.push(entRec(e)); continue; }
     if (!full && e.kind === 'mob' && dn > 28 && net.entTick) continue;   // 遠い生き物は ゆっくり送る
@@ -116,7 +119,7 @@ function mkPuppet(p, r) {
   if (k === 0) {
     if (!MOBS[r[2]]) return null;
     e = spawnMob(r[2], r[3], r[4], r[5]); e.yaw = e.pyaw = r[6]; e.hp = r[7]; e.awake = !!(r[8] & 1); e.onGround = !!(r[8] & 8);
-    if (MOBS[r[2]].boss && r[7] > 0) { game.boss = e; game.bossLost = 0; ui.dark(true); }
+    if (MOBS[r[2]].boss && r[7] > 0) bossSeen(e);
   } else if (k === 1) { e = spawnDrop(r[5], r[6], r[7], r[2], r[3], r[4], 0, 0, 0, 0); if (!e) return null; }
   else if (k === 2) { e = addEnt({ kind: 'falling', x: r[3], y: r[4], z: r[5], px: r[3], py: r[4], pz: r[5], vx: 0, vy: 0, vz: 0, hw: 0.49, h: 0.98, id: r[2], age: 0, dead: false, onGround: false }); }
   else { const s = spawnShot(r[3] + r[6] * 0.15, r[4] + r[7] * 0.15, r[5] + r[8] * 0.15, r[6], r[7], r[8], r[9], r[2]); s.foreign = true; return true; }   // 弾は、見えた人それぞれの画面で飛ばす（よけやすいように）
@@ -131,6 +134,7 @@ function updPuppet(e, r) {
     e.hp = hp; e.awake = !!(b & 1); e.onGround = !!(b & 8);
     if ((b & 2) && !e._sw) e.swing = d.boss ? 20 : 8; e._sw = !!(b & 2);
     if ((b & 4) && !e._sl) e.slam = 20; e._sl = !!(b & 4);
+    e.breath = !!(b & 16); e.land = (b & 32) ? 1 : 0;
   } else if (e.kind === 'item') { e.n = r[3]; e.tx = r[5]; e.ty = r[6]; e.tz = r[7]; }
   else { e.tx = r[3]; e.ty = r[4]; e.tz = r[5]; }
 }
@@ -148,10 +152,11 @@ function puppetTick(world, e) {
   if (e.kind === 'mob') {
     if (e.swing > 0) e.swing--;
     if (e.slam > 0) { e.slam--; if (e.slam === 6) kingSlamFx(e); }
-    if (e.hp <= 0) e.death++;
+    if (e.hp <= 0) { e.death++; if (e.type === 'hoshikui' && e.segs && e.death % 2 === 0) { const s = e.segs[rnd(e.segs.length)]; fxPuff(s.x, s.y + 0.8, s.z, 8, 1, 0.9, 1, { glow: true, speed: 6, life: 1.1, size: 0.16, spread: 1 }); } }
     e.yaw = lerpAngle(e.yaw, e.tyaw, 0.45);
     const moved = Math.hypot(e.x - ox, e.z - oz);
     e.walk += moved * 2.6; e.walkAmp += (Math.min(1, moved * 14) - e.walkAmp) * 0.3;
+    if (e.type === 'hoshikui') hoshiBody(world, e, false);
     if (e.type === 'wisp' && e.age % 3 === 0) fxPuff(e.x, e.y + 0.3, e.z, 1, 0.45, 0.8, 1, { glow: true, speed: 0.3, life: 0.5, size: 0.06, up: -0.2, grav: 0 });
   } else if (e.kind === 'item') {
     if (!player.dead && (e.pickCd = (e.pickCd || 0) - 1) <= 0) {
@@ -327,7 +332,7 @@ function drawHuman(world, model, p, x, y, z) {
     }
   }
   if (handM) {   // 手に持っている物
-    const cube = p.held < 256 && !ICON[p.held], s = cube ? 4.6 : 8.5;
+    const cube = isBlk(p.held) && !ICON[p.held], s = cube ? 4.6 : 8.5;
     if (cube) { m4RotY(_ht, 0.6); m4Mul(handM, handM, _ht); }
     else { m4RotY(_ht, Math.PI / 2); m4Mul(handM, handM, _ht); m4RotZ(_ht, -0.9); m4Mul(handM, handM, _ht); m4Translate(_ht, 2.5, 2.5, 0); m4Mul(handM, handM, _ht); }
     m4Scale(_ht, s, s, s); m4Mul(handM, handM, _ht);
